@@ -3,6 +3,8 @@ export * from "./models";
 export * from "./schemas/statement";
 export * from "./schemas/positions";
 export * from "./schemas/preUnderwriting";
+export * from "./schemas/funderReply";
+export * from "./jobs/a8FunderReplyParsing";
 export * from "./jobs/a1StatementExtraction";
 export * from "./jobs/a2PositionDetection";
 export * from "./jobs/a3PreUnderwriting";

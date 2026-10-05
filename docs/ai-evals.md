@@ -22,6 +22,9 @@ packages/ai/evals/
       cases.json               input = metrics + app, expected = grade + flags
     a8-reply-parsing/
       cases.json               input = funder email text, expected = intent + offer fields
+                               (seeded with 24 cases modelled on the Ascend Fund inbox:
+                               5 approval formats, 6 decline styles, acks, stips, contract,
+                               funding call, funded + clawback, follow-ups, marketing)
   results/                     last run output per job (git-ignored)
 ```
 

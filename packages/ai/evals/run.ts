@@ -8,6 +8,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ClaudeClient, type AiRunRecord } from "../src/client";
 import { runPositionDetection } from "../src/jobs/a2PositionDetection";
+import { runFunderReplyParsing } from "../src/jobs/a8FunderReplyParsing";
+import type { FunderReply } from "../src/schemas/funderReply";
 import type { MonthlyRow } from "../src/schemas/statement";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -112,9 +114,127 @@ function emptyRow(month: string): MonthlyRow {
   };
 }
 
+interface A8Case {
+  id: string;
+  input: { from: string; subject: string; body: string };
+  expected: {
+    intent: FunderReply["intent"];
+    isAutomated?: boolean;
+    declineCategory?: FunderReply["declineCategory"];
+    declineReasonCount?: number;
+    offerCount?: number;
+    approvalAmount?: number;
+    numberOfPayments?: number;
+    buyRate?: number;
+    maxPoints?: number;
+    paymentFrequency?: string;
+    firstOffer?: Partial<FunderReply["offers"][number]>;
+    stipCount?: number;
+    linkCount?: number;
+    forwardedToAlternateFunder?: string;
+    funded?: Partial<FunderReply["funded"]>;
+  };
+}
+
+const near = (a: number | null | undefined, b: number) =>
+  a !== null && a !== undefined && Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.005);
+
+/** Returns the list of expectation names that did not hold for one case. */
+function checkA8(got: FunderReply, exp: A8Case["expected"]): string[] {
+  const miss: string[] = [];
+  if (got.intent !== exp.intent) miss.push(`intent ${got.intent}≠${exp.intent}`);
+  if (exp.isAutomated !== undefined && got.isAutomated !== exp.isAutomated)
+    miss.push("isAutomated");
+  if (exp.declineCategory !== undefined && got.declineCategory !== exp.declineCategory)
+    miss.push(`declineCategory ${got.declineCategory}`);
+  if (exp.declineReasonCount !== undefined && got.declineReasons.length !== exp.declineReasonCount)
+    miss.push("declineReasonCount");
+  if (exp.offerCount !== undefined && got.offers.length !== exp.offerCount)
+    miss.push(`offerCount ${got.offers.length}≠${exp.offerCount}`);
+  if (
+    exp.approvalAmount !== undefined &&
+    !near(got.offerBaseline.approvalAmount, exp.approvalAmount)
+  )
+    miss.push("approvalAmount");
+  if (
+    exp.numberOfPayments !== undefined &&
+    got.offerBaseline.numberOfPayments !== exp.numberOfPayments
+  )
+    miss.push("numberOfPayments");
+  if (exp.buyRate !== undefined && !near(got.offerBaseline.buyRate, exp.buyRate))
+    miss.push("buyRate");
+  if (
+    exp.paymentFrequency !== undefined &&
+    got.offerBaseline.paymentFrequency !== exp.paymentFrequency
+  )
+    miss.push("paymentFrequency");
+  if (exp.maxPoints !== undefined) {
+    const max = Math.max(...got.offers.map((o) => o.commissionPoints ?? 0));
+    if (!near(max, exp.maxPoints)) miss.push("maxPoints");
+  }
+  if (exp.firstOffer) {
+    const first = got.offers[0];
+    if (!first) miss.push("firstOffer missing");
+    else
+      for (const [k, v] of Object.entries(exp.firstOffer)) {
+        const g = (first as Record<string, unknown>)[k];
+        const ok = typeof v === "number" ? near(g as number, v) : g === v;
+        if (!ok) miss.push(`firstOffer.${k}`);
+      }
+  }
+  if (exp.stipCount !== undefined && got.stips.length !== exp.stipCount) miss.push("stipCount");
+  if (exp.linkCount !== undefined && got.links.length !== exp.linkCount) miss.push("linkCount");
+  if (
+    exp.forwardedToAlternateFunder !== undefined &&
+    !(got.forwardedToAlternateFunder ?? "")
+      .toLowerCase()
+      .includes(exp.forwardedToAlternateFunder.toLowerCase())
+  )
+    miss.push("forwardedToAlternateFunder");
+  if (exp.funded)
+    for (const [k, v] of Object.entries(exp.funded)) {
+      const g = (got.funded as Record<string, unknown>)[k];
+      const ok = typeof v === "number" ? near(g as number, v) : g === v;
+      if (!ok) miss.push(`funded.${k}`);
+    }
+  return miss;
+}
+
+async function evalA8(client: ClaudeClient): Promise<{ pass: boolean; summary: string }> {
+  const file = join(dataDir, "a8-reply-parsing", "cases.json");
+  const cases = JSON.parse(readFileSync(file, "utf8")) as A8Case[];
+  let intentHits = 0;
+  let fullHits = 0;
+  let cost = 0;
+  const perCase: unknown[] = [];
+  for (const c of cases) {
+    const res = await runFunderReplyParsing(client, c.input);
+    cost += res.record.costUsd;
+    const misses = checkA8(res.data, c.expected);
+    if (res.data.intent === c.expected.intent) intentHits++;
+    if (misses.length === 0) fullHits++;
+    perCase.push({ id: c.id, misses, got: res.data, costUsd: res.record.costUsd });
+  }
+  const intentAccuracy = cases.length ? intentHits / cases.length : 1;
+  const fieldAccuracy = cases.length ? fullHits / cases.length : 1;
+  const t = thresholds["a8-reply-parsing"]!;
+  const enough = cases.length >= t.minCases;
+  const pass = intentAccuracy >= ((t.intentAccuracy as number | undefined) ?? 0);
+  mkdirSync(resultsDir, { recursive: true });
+  writeFileSync(
+    join(resultsDir, "a8-reply-parsing.json"),
+    JSON.stringify({ intentAccuracy, fieldAccuracy, cost, perCase }, null, 2),
+  );
+  return {
+    pass,
+    summary: `a8: cases=${cases.length}${enough ? "" : ` (below minCases ${t.minCases}, advisory)`} intent=${intentAccuracy.toFixed(3)} allFields=${fieldAccuracy.toFixed(3)} cost=$${cost.toFixed(4)}`,
+  };
+}
+
 const EVALS: Record<string, (c: ClaudeClient) => Promise<{ pass: boolean; summary: string }>> = {
   "a2-position-detection": evalA2,
-  // a1 / a3 / a8 runners are added as their golden sets land (docs/ai-evals.md)
+  "a8-reply-parsing": evalA8,
+  // a1 / a3 runners are added as their golden sets land (docs/ai-evals.md)
 };
 
 async function main() {

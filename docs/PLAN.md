@@ -30,6 +30,88 @@ adding MoneyThumb from day one; hosting target.
 First deliverable in the repo after approval: Phase 0 scaffold plus a `docs/` folder holding
 this plan (`docs/PLAN.md`), the funder appetite matrix template, and the AI eval set layout.
 
+## 0. What the Ascend Fund inbox shows (read 2026-10-05, mailbox jonas@ascendfund.co)
+
+The connected Gmail belongs to **Ascend Fund** (ascendfund.co), an MCA broker/ISO. Workspace was
+created 2026-09-22; 276 messages, 95 unread, 122 threads, all in INBOX (no labels, no sent mail
+from jonas@ — everything goes out from the shared alias **funding@ascendfund.co**).
+
+**Team seen:** Jonas Abreu (jonas@), Xavier "Savvy" Abreu (savvy@, processor/ISO relations),
+David Gonzalez (david@, closer — talks to merchants, negotiates offers), Alfonso (alfonso@, first
+week only). Team writes to each other in Spanish. Funder list is a Google Sheet "Lenders".
+No CRM, dialer, e-sign or bank-link tool on Ascend's side; DocuSign, DecisionLogic, Streak and
+Funding Metrics appear only on funders' side.
+
+**Observed process (one deal = one thread per funder):**
+
+1. Package = `Ascend-Fund-Application-<Merchant>.pdf` + 3–4 monthly statements (+ MTD as
+   docx/pdf/photo). ~17 merchants submitted in 13 days, tickets $5K–$39K, mostly 2nd–6th
+   position C/D paper (restaurants, nail salon, landscaping, delivery, events, painting,
+   sanitation, property mgmt, medical PA). States seen: FL, NY, TX, AZ.
+2. Same email sent separately to 5–10 funders, subject `New Deal Submission - <Merchant>`,
+   body = "Please see the attached deal for submission." + existing positions as
+   `funder: $balance` lines + optional industry / revenue-drop note. Whole team cc'd.
+   Duplicates happen (realdripnyc sent 3× with different recipient sets).
+3. Funder replies: Mazal auto-ack "SUBMISSION RECEIVED / FILE IN REVIEW"; Zlur auto-ack then
+   auto-decline within ~5 min; Loan23 portal auto-rejection with reason ("Black list, State -
+   texas"); human declines: "Pass - very bad balances", "low revenue", "Does not meet minimum
+   true revenue $30k/mo" (Cashable), "big drop in rev" (TurboCap), "Low revenue, 1st position,
+   in debt settlement" (Hard Rock), "multiple advances in both businesses" (Instagreen),
+   "Declining deposits / Merchant took new funding in MTD" (Zlur, post-signing).
+   Mazal forwards passes to **Fundzilla** for alternative pricing.
+4. Approval formats (5 distinct, all plain text in email):
+   - Mazal/Fundzilla grid: approval amount, # payments, daily; rows `payment | rate | commission $ | points` up to 16 pts.
+   - Loan23 table: purchase price, RTR, origination 8 %, UCC $400, wire, net funding, daily payment, term 80/100/120 business days, broker fee 10–14 %.
+   - TurboCap list: `15K 40 Days` then `factor | fee % | pts` rows 1.399–1.699 / 6–18 pts.
+   - Instagreen 5 lines: Funding / Rate / Daily / Payback / Term.
+   - Zlur "Updated offer": OFFER / FEES / NET FUNDING / DAILY PAYMENTS / factor / commission %.
+5. Negotiation: David pre-sells to merchant ("This deal is already sold at $8,000 / 1.50 / 95
+   days"), asks funders to bump amounts; funders answer "we are at max", chase with "how is our
+   offer, what do you need to get this closed?", "Deal is in competition, first to sign docs wins!".
+6. Closing: Ascend emails "Please send contracts for $X the 1.49 and 95 days to <merchant
+   email>, see attached DL/VC" (driver licence + voided check photos). Funder asks for merchant
+   phone, sends DocuSign + DecisionLogic code, "Contract Has Been Sent", "Contract Has Been
+   Signed", Ascend replies "DL done", final review, funding call ("FC"), then
+   **"DEAL FUNDED! Amount $5,000 Commission $650"** with a 20-day clawback clause that the ISO
+   must confirm by reply before commission is released.
+7. Stips arrive as funder questions in-thread ("Where is payments to expansion?") or portal
+   links (Funding Metrics: "4 months required for NY, received 3", link expires in 2 weeks).
+
+**Funder roster actually used (submission addresses):** Mazal Funders (subs@, iso@, nate@;
+→ Fundzilla), Zlur (Submissions@zlur.com, contracts@), Loan23 (portal + underwriting@),
+Instagreen Capital (submit@), Nitro Advance (subs@), CapNova Funding (submit@), VOX Funding
+(submissions@), TMR Now (uw@), Lendini / Funding Metrics portal (submissions@lendini.com), Palisades
+Advance (UW@; 2nd–10th position, $10K–$2M, $45K min revenue, 1 yr TIB, max 5 NSF/mo, up to 12 pts,
+no credit check, max 150 days), Credora Capital (uw@), Cashable Funding (Submissions@; $30K true
+revenue min), TurboCap (misfits@), Hard Rock Financial (subs@).
+
+**Pain points visible:** 6–10 hand-sent emails per deal; status scattered across threads;
+offers in 5 formats read by eye; merchant never received DocuSign (wrong email); stip link
+buried in inbox; commission/clawback terms as free text; one funded deal = 52-message thread;
+funders closed for holidays stall deals; duplicate submissions.
+
+**Consequences for the plan (applied below):**
+
+- Phase 1 leads with the **inbox**, not statement extraction: sync `funding@ascendfund.co`,
+  create a `Deal` from each outgoing `New Deal Submission - <Merchant>`, attach every funder
+  thread as a `Submission`, and run A8 reply parsing for ack / decline(+reason) / stip /
+  approval / contract sent / signed / funded. This alone removes most of the re-keying.
+- A8 offer parser needs golden cases for all 5 observed formats; eval set can be built from
+  this mailbox immediately (≈10 approvals, ≈20 declines already available).
+- Funder directory is seeded from the roster above with observed appetite rules and the
+  "forwards to Fundzilla" behaviour modelled as a secondary `FunderProgram`.
+- Submission composer must reproduce the exact house email (subject, body, positions block,
+  cc list) and block duplicate sends to the same funder for the same merchant.
+- Closing checklist: contract-request template (amount, factor, term, merchant email + phone,
+  DL + VC attached), DecisionLogic code tracking, funding-call scheduling, funded-email →
+  `Commission` with `clawbackWindowEndsAt` = funded + 20 days (Fundzilla) and a required
+  "confirm clawback policy" reply.
+- Pre-sold price (`soldAmount`, `soldFactor`, `soldTermDays`) is a first-class field on `Deal`
+  because Ascend commits to the merchant before approval.
+- Positions block in the submission body is exactly the A2 output; generate it.
+- UI copy should be bilingual-ready (English/Spanish).
+- This section was synced into `docs/PLAN.md` on 2026-10-05.
+
 ## 1. MCA broker workflow (research findings)
 
 Brokers/ISOs originate ~70–80% of US MCA volume; average advance ≈ $65K (2025). The deal
@@ -268,8 +350,20 @@ Each phase is shippable on its own; the shop can start using phase 1 immediately
   Playwright smoke). Move tutorial files to `legacy/`.
 - Kick off A2P 10DLC brand/campaign registration and Twilio number provisioning (long lead).
 
-### Phase 1 — Pipeline + document intelligence (week 3–6) — replaces spreadsheets
+### Phase 1 — Inbox-first pipeline + document intelligence (week 3–6)
 
+- **Gmail sync of `funding@ascendfund.co`** (Google Workspace domain-wide delegation or
+  OAuth on the group): backfill the 122 existing threads, then incremental history sync.
+  Outgoing `New Deal Submission - <Merchant>` → `Deal` + `Merchant` (dedupe by name) +
+  `Document`s from attachments; each funder recipient → `Submission(channel=EMAIL)`.
+- **A8 reply parsing** on every inbound message: ack / decline(reason) / stip / approval
+  (5 formats) / contract-sent / contract-signed / funded(amount, commission, clawback days).
+  Human-confirm screen for approvals; everything else auto-applies. Golden set from the
+  mailbox (docs/ai-evals.md).
+- Funder directory seeded from the observed roster (§0) incl. submission addresses, cc rules,
+  appetite notes and Mazal→Fundzilla routing.
+- Submission composer: pick funders, house template, positions block (A2 output), attachments,
+  duplicate guard, one click → N emails via Gmail API from the alias.
 - Lead import (CSV/UCC list, web form, Zapier webhook) with dedupe (A12) and DNC scrub.
 - Deal board with the stage state machine; tasks; activity timeline; notes.
 - Document upload + merchant upload portal (magic link) + e-sign of application.
