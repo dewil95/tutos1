@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
 import { emailDryRun } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
+import { ApiKeyCreator } from "./ApiKeyCreator";
+import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +50,7 @@ export default async function SettingsPage({
   const user = await requireUser();
   const flash = await searchParams;
   const prisma = getPrisma();
-  const [tenant, mailboxes, funders, failedJobs] = await Promise.all([
+  const [tenant, mailboxes, funders, failedJobs, apiKeys] = await Promise.all([
     prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId } }),
     prisma.mailboxConnection.findMany({ where: { tenantId: user.tenantId } }),
     prisma.funder.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),
@@ -57,6 +59,7 @@ export default async function SettingsPage({
       orderBy: { updatedAt: "desc" },
       take: 10,
     }),
+    prisma.apiKey.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: "desc" } }),
   ]);
   const isAdmin = user.role === "ADMIN" || user.role === "MANAGER";
 
@@ -101,6 +104,53 @@ export default async function SettingsPage({
             </form>
           ) : null}
         </p>
+      </section>
+
+      <section className="panel">
+        <h2>Website API</h2>
+        <p className="small muted">
+          Your website sends each completed application to <code>POST /api/v1/applications</code>{" "}
+          with an API key (see docs/API.md). The deal, merchant, owners and files appear here
+          automatically.
+        </p>
+        {apiKeys.length ? (
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Key</th>
+                <th>Last used</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {apiKeys.map((k) => (
+                <tr key={k.id} className={k.revokedAt ? "muted" : ""}>
+                  <td>{k.name}</td>
+                  <td className="small">
+                    <code>{k.prefix}…</code>
+                  </td>
+                  <td className="small">
+                    {k.revokedAt
+                      ? `revoked ${k.revokedAt.toLocaleDateString("en-US")}`
+                      : k.lastUsedAt
+                        ? k.lastUsedAt.toLocaleString("en-US")
+                        : "never"}
+                  </td>
+                  <td>
+                    {!k.revokedAt && isAdmin ? (
+                      <form action={revokeApiKey}>
+                        <input type="hidden" name="id" value={k.id} />
+                        <button type="submit">Revoke</button>
+                      </form>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+        {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
 
       <section className="panel">

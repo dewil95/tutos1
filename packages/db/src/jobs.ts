@@ -1,6 +1,15 @@
 import type { Prisma, PrismaClient } from "./generated/client";
 
-export type JobType = "SEND_SUBMISSION" | "INBOX_SYNC" | "PARSE_REPLY" | "STATEMENT_ANALYSIS";
+export type JobType =
+  | "SEND_SUBMISSION"
+  | "INBOX_SYNC"
+  | "PARSE_REPLY"
+  | "STATEMENT_ANALYSIS"
+  | "APPLICATION_READ"
+  | "STATEMENT_EXTRACT"
+  | "STATEMENT_SCRUB"
+  | "RISK_REPORT"
+  | "EMAIL_RULES";
 
 export interface ClaimedJob {
   id: string;

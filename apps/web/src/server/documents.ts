@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Attachment, DealSubfolder } from "@mca/connectors";
-import type { DocumentType, PrismaClient } from "@mca/db";
+import { enqueueJob, type DocumentType, type PrismaClient } from "@mca/db";
 import { dealSubfolder, ensureDealFolder, type Mailbox } from "./google";
 
 /** Best guess from the file name; the processor can re-label it on the deal page. */
@@ -30,10 +30,12 @@ export interface StoreFileInput {
   dealId: string;
   merchantId: string | null;
   file: Attachment;
-  uploadedVia: "staff" | "email" | "funder_email";
+  uploadedVia: "staff" | "email" | "funder_email" | "website";
   uploadedById?: string | null;
   gmailMessageId?: string | null;
   type?: DocumentType;
+  /** Queue AI work for the new file (application reading). Default true. */
+  autoProcess?: boolean;
 }
 
 /**
@@ -54,7 +56,7 @@ export async function storeDealFile(prisma: PrismaClient, mailbox: Mailbox, inpu
     await dealSubfolder(mailbox, folderId, sub),
   );
 
-  return prisma.document.create({
+  const doc = await prisma.document.create({
     data: {
       tenantId: input.tenantId,
       dealId: input.dealId,
@@ -71,6 +73,36 @@ export async function storeDealFile(prisma: PrismaClient, mailbox: Mailbox, inpu
       gmailMessageId: input.gmailMessageId ?? null,
     },
   });
+  if (input.autoProcess !== false) await queueDocumentWork(prisma, doc);
+  return doc;
+}
+
+const READABLE = /^(application\/pdf|image\/(jpe?g|png))$/;
+
+/** New application files get read by A5 so the merchant and owner fields fill themselves. */
+export async function queueDocumentWork(
+  prisma: PrismaClient,
+  doc: {
+    id: string;
+    tenantId: string;
+    dealId: string | null;
+    type: DocumentType;
+    mimeType: string;
+  },
+): Promise<string[]> {
+  const ids: string[] = [];
+  if (!doc.dealId || !READABLE.test(doc.mimeType)) return ids;
+  if (doc.type === "APPLICATION") {
+    ids.push(
+      await enqueueJob(prisma, {
+        tenantId: doc.tenantId,
+        type: "APPLICATION_READ",
+        payload: { documentId: doc.id },
+        dedupeKey: `appread:${doc.id}`,
+      }),
+    );
+  }
+  return ids;
 }
 
 function subfolderForType(t: DocumentType): DealSubfolder {

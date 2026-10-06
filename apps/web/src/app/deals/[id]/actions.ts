@@ -134,3 +134,51 @@ export async function retrySubmission(dealId: string, form: FormData) {
   }
   redirect(back(dealId, { queued: "1" }));
 }
+
+const MERCHANT_FIELDS = new Set([
+  "legalName",
+  "dba",
+  "entityType",
+  "naics",
+  "industry",
+  "startDate",
+  "website",
+  "phone",
+  "email",
+  "addressLine1",
+  "city",
+  "state",
+  "postalCode",
+]);
+
+/** Settles one application-vs-saved difference: apply the application value or keep ours. */
+export async function resolveConflict(dealId: string, form: FormData) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const deal = await prisma.deal.findFirstOrThrow({
+    where: { id: dealId, tenantId: user.tenantId },
+  });
+  const field = String(form.get("field"));
+  const app = (deal.applicationData ?? {}) as {
+    conflicts?: { field: string; fromApplication: string }[];
+  };
+  const conflict = app.conflicts?.find((c) => c.field === field);
+  if (conflict && form.get("choice") === "application") {
+    const name = field.replace(/^merchant\./, "");
+    if (field.startsWith("merchant.") && MERCHANT_FIELDS.has(name)) {
+      const value =
+        name === "startDate" ? new Date(conflict.fromApplication) : conflict.fromApplication;
+      await prisma.merchant.update({ where: { id: deal.merchantId }, data: { [name]: value } });
+    }
+  }
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: {
+      applicationData: {
+        ...app,
+        conflicts: (app.conflicts ?? []).filter((c) => c.field !== field),
+      },
+    },
+  });
+  revalidatePath(`/deals/${dealId}`);
+}

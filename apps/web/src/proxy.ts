@@ -33,5 +33,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Public: login + OAuth callbacks, cron/health endpoints (secret-protected), static assets.
-  matcher: ["/((?!login|auth/|api/cron|api/health|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|auth/|api/cron|api/health|api/v1|_next/static|_next/image|favicon.ico).*)"],
 };

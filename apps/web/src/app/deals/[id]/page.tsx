@@ -9,6 +9,7 @@ import { emailDryRun } from "@/server/env";
 import { positionsToText } from "@/server/submissions";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
+import { MerchantPanel } from "./MerchantPanel";
 import {
   analyseDealStatements,
   relabelDocument,
@@ -50,7 +51,10 @@ export default async function DealPage({
 
   const deal = await prisma.deal.findFirst({
     where: { id, tenantId: user.tenantId },
-    include: { merchant: true, owner: { select: { name: true } } },
+    include: {
+      merchant: { include: { owners: { orderBy: { createdAt: "asc" } } } },
+      owner: { select: { name: true } },
+    },
   });
   if (!deal) notFound();
 
@@ -168,6 +172,8 @@ export default async function DealPage({
           <a href="/settings">Settings</a>.
         </p>
       ) : null}
+
+      <MerchantPanel deal={deal} merchant={deal.merchant} owners={deal.merchant.owners} />
 
       <section className="panel">
         <h2>Lender status</h2>

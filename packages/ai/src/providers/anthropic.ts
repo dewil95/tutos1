@@ -159,7 +159,7 @@ export class ClaudeClient implements LlmClient {
       );
     }
 
-    record.output = parsed;
+    record.output = input.redactForLog ? input.redactForLog(parsed) : parsed;
     await this.sink(record);
     return { data: parsed, record, raw };
   }

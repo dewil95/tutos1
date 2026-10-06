@@ -63,6 +63,8 @@ export interface StructuredCallInput<T extends z.ZodType> {
   maxTokens?: number;
   tenantId?: string;
   dealId?: string;
+  /** Masks sensitive fields (SSN, DOB) in what is written to the AiRun log. */
+  redactForLog?: (data: z.output<T>) => unknown;
 }
 
 export interface StructuredCallResult<T> {

@@ -45,6 +45,8 @@ model Tenant {
   commissions    Commission[]
   jobs           Job[]
   mailboxes      MailboxConnection[]
+  apiKeys        ApiKey[]
+  emailRules     EmailRule[]
 }
 
 enum UserRole {
@@ -203,6 +205,8 @@ model Merchant {
   sosCheckedAt  DateTime?
   bankName      String?
   processorName String?
+  /// Merchant asked not to get automated emails (stip chases, reminders).
+  emailOptOut   Boolean     @default(false)
 
   owners        Owner[]
   leads         Lead[]
@@ -288,6 +292,15 @@ model Deal {
   /// "funder: $balance" lines shown in the submission email (PositionLine[])
   submissionPositions Json   @default("[]")
   submissionNote  String?
+  /// Where the deal came from: website | email | staff | gmail_import
+  source          String     @default("staff")
+  /// Application id on Ascend's website (POST /api/v1/applications), unique per tenant.
+  externalRef     String?
+  /// A5 application reading output (SSN/DOB masked) and field conflicts for review.
+  applicationData Json?
+  /// Internal AI Risk Report (never sent to lenders).
+  riskReport      Json?
+  riskReportAt    DateTime?
 
   events          DealEvent[]
   documents       Document[]
@@ -307,6 +320,7 @@ model Deal {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
+  @@unique([tenantId, externalRef])
   @@index([tenantId, stage])
   @@index([tenantId, ownerId])
 }
@@ -377,6 +391,10 @@ model Document {
   uploadedVia   String       @default("staff") // staff | email | funder_email
   /// Set when the file arrived as an email attachment
   gmailMessageId String?
+  /// Internal files (AI Risk Report) can never be put in a lender package.
+  internalOnly  Boolean      @default(false)
+  /// When A1 extraction finished for this file (bank scrub, one job per document).
+  extractedAt   DateTime?
   createdAt     DateTime     @default(now())
 
   @@index([tenantId, dealId])
@@ -935,4 +953,45 @@ model MailboxConnection {
   updatedAt             DateTime @updatedAt
 
   @@unique([tenantId, email])
+}
+
+// ---------------------------------------------------------------------------
+// Website API keys and email automation
+// ---------------------------------------------------------------------------
+
+/// Key the Ascend website uses to post applications. Only a SHA-256 hash is stored.
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  /// First characters shown in Settings, e.g. "ak_live_3F9c"
+  prefix     String
+  hashedKey  String    @unique
+  createdById String?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+/// One automated email rule (missing docs, stip chase, lender follow-up, ...), editable in Settings.
+model EmailRule {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// MISSING_DOCS | STIP_CHASE | LENDER_FOLLOW_UP | CONTRACT_REQUEST | CLAWBACK_CONFIRM | FUNDED_THANKS
+  kind             String
+  enabled          Boolean  @default(true)
+  /// Wait before the first send (and between repeats).
+  delayHours       Int      @default(24)
+  maxSends         Int      @default(1)
+  /// Draft only: a person reviews and clicks send.
+  requiresApproval Boolean  @default(false)
+  subject          String
+  body             String
+  updatedAt        DateTime @updatedAt
+
+  @@unique([tenantId, kind])
 }

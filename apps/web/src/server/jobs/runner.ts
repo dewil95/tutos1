@@ -7,6 +7,7 @@ import {
   type PrismaClient,
 } from "@mca/db";
 import { PermanentJobError } from "./errors";
+import { handleApplicationRead } from "./applicationRead";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
@@ -14,11 +15,12 @@ import { handleStatementAnalysis } from "./statementAnalysis";
 
 export type JobHandler = (prisma: PrismaClient, job: ClaimedJob) => Promise<void>;
 
-const HANDLERS: Record<JobType, JobHandler> = {
+const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   SEND_SUBMISSION: handleSendSubmission,
   INBOX_SYNC: handleInboxSync,
   PARSE_REPLY: handleParseReply,
   STATEMENT_ANALYSIS: handleStatementAnalysis,
+  APPLICATION_READ: handleApplicationRead,
 };
 
 export interface RunResult {

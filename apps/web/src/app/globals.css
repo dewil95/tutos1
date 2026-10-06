@@ -282,3 +282,39 @@ table.offers td {
 ul.lenders li.outside {
   opacity: 0.8;
 }
+code.secret {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+dl.kvs {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+dl.kvs.owner {
+  margin-bottom: 10px;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+ul.conflicts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
