@@ -1,0 +1,48 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "agentGuidance": false,
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "MCA_AI_PROVIDER",
+    "MCA_AI_MODEL_PRIMARY",
+    "MCA_AI_MODEL_FAST",
+    "GEMINI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "ALLOWED_EMAIL_DOMAIN",
+    "APP_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "MCA_EMAIL_DRY_RUN",
+    "CRON_SECRET",
+    "PII_ENCRYPTION_KEY",
+    "MAIL_FROM",
+    "TEAM_CC",
+    "TENANT_SLUG",
+    "DB_POOL_MAX"
+  ],
+  "tasks": {
+    "generate": {
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "generate"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build", "generate"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

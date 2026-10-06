@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# prisma generated client
+packages/db/src/generated/
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs / misc
+*.log
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+
+# eval artefacts (real statements must never be committed)
+packages/ai/evals/data/**/*.pdf
+packages/ai/evals/data/**/*.png
+packages/ai/evals/results/

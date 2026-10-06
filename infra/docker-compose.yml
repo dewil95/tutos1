@@ -1,0 +1,23 @@
+# Local development only. Production runs on Supabase (Postgres, Auth, Cron) + Vercel; files
+# live in Google Drive and mail goes through Gmail, so Postgres is the only local service.
+name: mca-crm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mca
+      POSTGRES_PASSWORD: mca
+      POSTGRES_DB: mca
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mca"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

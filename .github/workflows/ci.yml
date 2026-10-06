@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "ccr-*"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mca
+          POSTGRES_PASSWORD: mca
+          POSTGRES_DB: mca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mca"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mca:mca@localhost:5432/mca?schema=public
+      DIRECT_URL: postgresql://mca:mca@localhost:5432/mca?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mca/db validate
+      - run: pnpm --filter @mca/db generate
+      # Applies the same migration Supabase gets (incl. RLS + append-only triggers), so the
+      # job-queue integration tests run against a real Postgres.
+      - run: pnpm --filter @mca/db migrate:deploy
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm format:check
+      - run: pnpm --filter @mca/web build

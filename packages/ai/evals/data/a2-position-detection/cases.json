@@ -1,0 +1,86 @@
+[
+  {
+    "id": "synthetic-two-daily-positions",
+    "note": "Synthetic case used to smoke-test the runner. Replace with anonymised real cases.",
+    "input": {
+      "funderDescriptors": {
+        "Example Funder A": ["EXFUNDA", "EX FUNDER A ACH"],
+        "Example Funder B": ["EXFB CAPITAL"]
+      },
+      "months": [
+        {
+          "month": "2026-07",
+          "recurringDebits": [
+            {
+              "descriptor": "EXFUNDA ACH DEBIT",
+              "amount": 412.5,
+              "frequency": "daily",
+              "occurrences": 22,
+              "firstDate": "2026-07-01",
+              "lastDate": "2026-07-31",
+              "looksLikeFinancing": true
+            },
+            {
+              "descriptor": "EXFB CAPITAL PMT",
+              "amount": 1850,
+              "frequency": "weekly",
+              "occurrences": 4,
+              "firstDate": "2026-07-03",
+              "lastDate": "2026-07-24",
+              "looksLikeFinancing": true
+            },
+            {
+              "descriptor": "GUSTO PAYROLL",
+              "amount": 6200,
+              "frequency": "biweekly",
+              "occurrences": 2,
+              "firstDate": "2026-07-10",
+              "lastDate": "2026-07-24",
+              "looksLikeFinancing": false
+            }
+          ]
+        },
+        {
+          "month": "2026-08",
+          "recurringDebits": [
+            {
+              "descriptor": "EXFUNDA ACH DEBIT",
+              "amount": 412.5,
+              "frequency": "daily",
+              "occurrences": 21,
+              "firstDate": "2026-08-03",
+              "lastDate": "2026-08-31",
+              "looksLikeFinancing": true
+            },
+            {
+              "descriptor": "GUSTO PAYROLL",
+              "amount": 6200,
+              "frequency": "biweekly",
+              "occurrences": 2,
+              "firstDate": "2026-08-07",
+              "lastDate": "2026-08-21",
+              "looksLikeFinancing": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "activePositionCount": 1,
+      "positions": [
+        {
+          "descriptor": "EXFUNDA ACH DEBIT",
+          "funderGuess": "Example Funder A",
+          "frequency": "daily",
+          "isActive": true
+        },
+        {
+          "descriptor": "EXFB CAPITAL PMT",
+          "funderGuess": "Example Funder B",
+          "frequency": "weekly",
+          "isActive": false
+        }
+      ]
+    }
+  }
+]

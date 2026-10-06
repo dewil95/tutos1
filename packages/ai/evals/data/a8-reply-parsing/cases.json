@@ -1,0 +1,289 @@
+[
+  {
+    "id": "mazal-auto-ack",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Riverside Plumbing LLC",
+      "body": "[image: Funder A]\n\n SUBMISSION RECEIVED\n\nFILE IN REVIEW\n\nThank you for your continued partnership. We look forward to your upcoming submissions."
+    },
+    "expected": { "intent": "ACKNOWLEDGED", "isAutomated": true }
+  },
+  {
+    "id": "zlur-auto-decline-no-reason",
+    "input": {
+      "from": "submissions@examplefunder-b.com",
+      "subject": "Re: New Deal Submission - Riverside Plumbing LLC",
+      "body": "*Unfortunately your submission has been declined.*\n\nIf you believe this submission has been declined in error, please resend your submission containing all required attachments previously sent, plus any new supporting documents."
+    },
+    "expected": { "intent": "DECLINED", "isAutomated": true, "declineCategory": "NO_REASON_GIVEN" }
+  },
+  {
+    "id": "portal-reject-state",
+    "input": {
+      "from": "portal@examplefunder-c.com",
+      "subject": "New Deal Submission - Lone Star Grill LLC",
+      "body": " Application Rejection Notice\n\nDear Applicant,\n\nAfter careful consideration of your application, we regret to inform you that we are unable to proceed with your request for the following reasons:\n\nRejection Details:\n\n*Lead Name:* New Deal Submission - Lone Star Grill LLC\n\n*Reason:*\nBlack list, State - texas"
+    },
+    "expected": { "intent": "DECLINED", "isAutomated": true, "declineCategory": "STATE" }
+  },
+  {
+    "id": "decline-bad-balances",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Harbor Events LLC",
+      "body": "[image: Funder A]\nThe deal below was DECLINED\n\n*REASON *\n\nPass - bad balances in August\n\nThank you for your continued partnership."
+    },
+    "expected": { "intent": "DECLINED", "declineCategory": "BAD_BALANCES" }
+  },
+  {
+    "id": "decline-min-true-revenue",
+    "input": {
+      "from": "Submissions@examplefunder-d.com",
+      "subject": "Re: New Deal Submission - Glow Cosmetic Center",
+      "body": "Decline: Does not meet our minimum true revenue requirement of $30k each month\n\n*All Offers are Subject to Final Review*"
+    },
+    "expected": { "intent": "DECLINED", "declineCategory": "LOW_REVENUE" }
+  },
+  {
+    "id": "decline-multiple-advances",
+    "input": {
+      "from": "submit@examplefunder-e.com",
+      "subject": "Re: New Deal Submission - Smokehouse Kitchen LLC and Smokehouse LLC",
+      "body": "We see multiple advances in both businesses ,\nWe will pass on this one.\n\n________________________________\nFrom: Broker <funding@broker.test>\nSent: Wednesday\nSubject: Re: New Deal Submission\n\nCould you please confirm the business that got this approval team?"
+    },
+    "expected": { "intent": "DECLINED", "declineCategory": "TOO_MANY_POSITIONS" }
+  },
+  {
+    "id": "decline-post-signing-mtd",
+    "input": {
+      "from": "submissions@examplefunder-b.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "Unfortunately we will not be moving forward here.\n- Declining deposits\n- Merchant took new funding in MTD"
+    },
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "NEW_FUNDING_MTD",
+      "declineReasonCount": 2
+    }
+  },
+  {
+    "id": "forwarded-to-alt-funder",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Harbor Events LLC",
+      "body": "Thank you for submitting this opportunity to Funder A.\n\nAt this time, the file does not meet our underwriting criteria. Rather than decline it, we have forwarded it to AltFund for alternative pricing.\n\nWe'll be in touch as soon as we receive an update."
+    },
+    "expected": { "intent": "IN_REVIEW", "forwardedToAlternateFunder": "AltFund" }
+  },
+  {
+    "id": "approval-grid",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Balam Group LLC",
+      "body": "[image: Funder A]\nFunding approval\nBalam Group LLC\nCongratulations - your file has been approved\nApproval amount $10,000.00\nNumber of payments 40\nRepayment Daily Offer terms\nPayment Rate Commission Points\n$345.00 1.38 $0.00 0\n$347.50 1.39 $100.00 1\n$350.00 1.40 $200.00 2\n$352.50 1.41 $300.00 3\n$355.00 1.42 $400.00 4\n$357.50 1.43 $500.00 5\n$360.00 1.44 $600.00 6\n$362.50 1.45 $700.00 7\n$365.00 1.46 $800.00 8\n$367.50 1.47 $900.00 9\n$370.00 1.48 $1,000.00 10\n$372.50 1.49 $1,100.00 11\n$375.00 1.50 $1,200.00 12\n$390.00 1.56 $1,400.00 14\n$400.00 1.60 $1,600.00 16"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 15,
+      "approvalAmount": 10000,
+      "numberOfPayments": 40,
+      "buyRate": 1.38,
+      "maxPoints": 16,
+      "paymentFrequency": "DAILY"
+    }
+  },
+  {
+    "id": "approval-table-three-terms",
+    "input": {
+      "from": "underwriting@examplefunder-c.com",
+      "subject": "Re: New Deal Submission - Luxe Nails & Spa",
+      "body": "*Luxe Nails & Spa*\n\n| PURCHASE PRICE | 39,000.00 | 39,000.00 | 39,000.00 |\n| Purchased amount of future receipts (RTR) | 58,110.00 | 58,110.00 | 58,110.00 |\n| Origination fee, % | 8.00% | 8.00% | 8.00% |\n| Origination fee, $ | 3,120.00 | 3,120.00 | 3,120.00 |\n| UCC | 400.00 | 400.00 | 400.00 |\n| Wire | 0.00 | 0.00 | 0.00 |\n| NET FUNDING AMOUNT | 35,480.00 | 35,480.00 | 35,480.00 |\n| DAILY PAYMENT | 726.38 | 581.10 | 484.25 |\n| Term (business days) | 80 | 100 | 120 |\n| Broker's fee, % | 14.00% | 13.00% | 10.00% |\n| Broker's fee, $ | 5,460.00 | 5,070.00 | 3,900.00 |"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 3,
+      "approvalAmount": 39000,
+      "firstOffer": {
+        "advanceAmount": 39000,
+        "paybackAmount": 58110,
+        "termDays": 80,
+        "commissionPoints": 14,
+        "netFundingAmount": 35480,
+        "paymentAmount": 726.38
+      }
+    }
+  },
+  {
+    "id": "approval-list-factor-fee-pts",
+    "input": {
+      "from": "misfits@examplefunder-f.com",
+      "subject": "Re: New Deal Submission - Ocean Drive LLC",
+      "body": "15K 40 Days\n\n1.699 12% fee 18 pts\n1.649 12% fee 17 pts\n1.599 12% fee 16 pts\n1.549 12% fee 15 pts\n1.529 11% fee 14 pts\n1.499 10% fee 13 pts\n1.459 8% fee 10 pts\n1.399 5% fee 6 pts\n\npending bizpoint and fenix PIF\n\n*Underwriting Department*"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 8,
+      "approvalAmount": 15000,
+      "firstOffer": {
+        "advanceAmount": 15000,
+        "factorRate": 1.699,
+        "termDays": 40,
+        "commissionPoints": 18,
+        "originationFeePct": 12
+      },
+      "stipCount": 1
+    }
+  },
+  {
+    "id": "approval-short-form",
+    "input": {
+      "from": "submit@examplefunder-e.com",
+      "subject": "Re: New Deal Submission - Smokehouse Kitchen LLC",
+      "body": "Funding $15,000\nRate 1.50\nDaily $299\nPayback $22,500\nTerm 76 days"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 15000,
+        "factorRate": 1.5,
+        "paymentAmount": 299,
+        "paybackAmount": 22500,
+        "termDays": 76,
+        "paymentFrequency": "DAILY"
+      }
+    }
+  },
+  {
+    "id": "updated-offer-block",
+    "input": {
+      "from": "submissions@examplefunder-b.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "Updated offer:\n*OFFER:*\n$8,000\nFEES: $880\n*NET FUNDING:*\n$7,120\nDAILY PAYMENTS: 95Factor/Daily/Commission:\n1.499 - $126.23 per day. 9%"
+    },
+    "expected": {
+      "intent": "OFFER_REVISED",
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 8000,
+        "factorRate": 1.499,
+        "paymentAmount": 126.23,
+        "numberOfPayments": 95,
+        "commissionPoints": 9,
+        "netFundingAmount": 7120
+      }
+    }
+  },
+  {
+    "id": "revised-grid-after-mtd",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "[image: AltFund]\nFunding approval\nNew Green Lawn Landscaping LLC\nCongratulations - your file has been approved\nRevised offer due to recent funding\nApproval amount $5,000.00\nNumber of payments 40\nRepayment Daily Offer terms\nPayment Rate Commission Points\n$193.75 1.55 $650.00 13\n$200.00 1.60 $700.00 14\n$206.25 1.65 $750.00 15\n$210.00 1.68 $800.00 16"
+    },
+    "expected": {
+      "intent": "OFFER_REVISED",
+      "offerCount": 4,
+      "approvalAmount": 5000,
+      "buyRate": 1.55
+    }
+  },
+  {
+    "id": "stip-question-in-thread",
+    "input": {
+      "from": "submit@examplefunder-e.com",
+      "subject": "Re: New Deal Submission - Citywide Events Inc",
+      "body": "Where is payments to expansion?\n\n[signature.png]\n\nFrom: Broker <funding@broker.test>\nDate: Thursday\nSubject: New Deal Submission - Citywide Events Inc\n\nHello, Please see the attached deal for submission."
+    },
+    "expected": { "intent": "STIP_REQUEST", "isAutomated": false, "stipCount": 1 }
+  },
+  {
+    "id": "stip-portal-missing-items",
+    "input": {
+      "from": "stips@exampleportal.com",
+      "subject": "Missing items for Polanko Construction Corp - Bank Statement Check - Docs",
+      "body": "The *Bank Statement Check - Docs* step for *Polanko Construction Corp* is on hold until we receive the items below.\n\nDocuments needed\n\n   - 1 more Bank Statement (4 months required for NY) (required 4, received 3)\n\nEnter the missing items\n<https://portal.example.test/stip/abc123>\n\nThis link expires on October 13, 2026."
+    },
+    "expected": { "intent": "STIP_REQUEST", "isAutomated": true, "stipCount": 1, "linkCount": 1 }
+  },
+  {
+    "id": "contract-request-needs-phone",
+    "input": {
+      "from": "contracts@examplefunder-b.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "Please provide the best contact phone number for the merchant.\nTo avoid delays in docs going out, please always provide the phone number in the original contract request."
+    },
+    "expected": { "intent": "STIP_REQUEST", "stipCount": 1 }
+  },
+  {
+    "id": "contract-sent-with-dl",
+    "input": {
+      "from": "contracts@examplefunder-b.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "*Contract Has Been Sent!*\nDecision Logic Link:\nhttps://app.decisionlogic.com/ABC123"
+    },
+    "expected": { "intent": "CONTRACT_SENT", "linkCount": 1 }
+  },
+  {
+    "id": "contract-signed",
+    "input": {
+      "from": "funding@examplefunder-b.com",
+      "subject": "CONTRACT SIGNED: GREEN LAWN LANDSCAPING LLC",
+      "body": "The contract for *GREEN LAWN LANDSCAPING LLC* has been signed.\n\nPlease have merchant complete the Decision Logic link:\n\nhttps://app.decisionlogic.com/ABC123"
+    },
+    "expected": { "intent": "CONTRACT_SIGNED", "linkCount": 1 }
+  },
+  {
+    "id": "funding-call",
+    "input": {
+      "from": "nate@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "Hey team gtf will call for FC soon"
+    },
+    "expected": { "intent": "FUNDING_CALL" }
+  },
+  {
+    "id": "funded-with-clawback",
+    "input": {
+      "from": "joey@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
+      "body": "[image: AltFund Logo.jpeg]\nDEAL FUNDED!\nThe deal below was funded\nDeal Name Green Lawn Landscaping LLC\nAmount: $ 5,000\nCommission:$ 650\nThank you for your continued partnership.\n.\nPlease Read Carefully:\nIf any deal defaults within 20 days of funding, the commission will be subject to a clawback. This means you will either be required to return the commission or it will be debited from your account via ACH.\nKindly confirm your understanding and acceptance of this policy in order for your commission to be released."
+    },
+    "expected": {
+      "intent": "FUNDED",
+      "funded": {
+        "amount": 5000,
+        "commissionAmount": 650,
+        "clawbackDays": 20,
+        "requiresConfirmationReply": true
+      }
+    }
+  },
+  {
+    "id": "follow-up-improve-offer",
+    "input": {
+      "from": "underwriting@examplefunder-c.com",
+      "subject": "RE: New Deal Submission - Luxe Nails & Spa",
+      "body": "Just following up on the offer.\n\nIf there's any room to improve the offer on our side to help you close the deal, we're happy to take another look.\n\nLet me know where things stand.\n\nBest,\nDmitrii"
+    },
+    "expected": { "intent": "FOLLOW_UP", "isAutomated": false }
+  },
+  {
+    "id": "follow-up-competition",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "Re: New Deal Submission - Big Valley Sanitation",
+      "body": "Deal is in competition, first to sign docs wins!\n\nOn Wed, Sep 30, 2026 at 7:38 AM Funder A <subs@examplefunder-a.com> wrote:\n> Funding approval\n> Approval amount $12,000.00"
+    },
+    "expected": { "intent": "FOLLOW_UP" }
+  },
+  {
+    "id": "marketing-blast",
+    "input": {
+      "from": "patrice@examplefunder-g.com",
+      "subject": "FUNDER G IS OPEN AND FUNDING",
+      "body": "FUNDER G IS BACK TO FUNDING!\n\nPROGRAM GUIDELINES AT A GLANCE:\n• Positions: 2nd – 10th\n• Funding Amount: $10K – $2M\n• Min Monthly Revenue: $45,000\n• Commission: Up to 12 pts\n• Max NSFs: 5/month"
+    },
+    "expected": { "intent": "MARKETING", "offerCount": 0 }
+  }
+]

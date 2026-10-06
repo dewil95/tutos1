@@ -1,0 +1,999 @@
+// MCA broker CRM — core data model (see docs/PLAN.md §5)
+// Hosted on Supabase Postgres. The app connects through Prisma on the server only; every table
+// has row-level security enabled and the Supabase Data API roles (anon, authenticated) have no
+// grants, so nothing is reachable from the browser (see prisma/migrations/README.md).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated"
+  moduleFormat        = "esm"
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & users
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  // Broker registration numbers per state (e.g. {"VA":"CFB-1234","TX":"..."}) printed on docs
+  stateRegistrations Json     @default("{}")
+  settings  Json     @default("{}")
+  /// Address submissions are sent from, e.g. funding@ascendfund.co
+  fromAddress String?
+  /// Team members copied on every lender submission (after the lender's own CC addresses)
+  teamCc    String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  leads          Lead[]
+  merchants      Merchant[]
+  deals          Deal[]
+  funders        Funder[]
+  documents      Document[]
+  activities     Activity[]
+  tasks          Task[]
+  sequences      Sequence[]
+  aiRuns         AiRun[]
+  commissions    Commission[]
+  jobs           Job[]
+  mailboxes      MailboxConnection[]
+  apiKeys        ApiKey[]
+  emailRules     EmailRule[]
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  OPENER
+  CLOSER
+  PROCESSOR
+  READ_ONLY
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email        String
+  /// Supabase Auth user id (auth.users.id)
+  authUserId   String?  @unique
+  name         String
+  role         UserRole @default(OPENER)
+  phone        String?
+  timezone     String   @default("America/New_York")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedLeads    Lead[]       @relation("LeadOwner")
+  ownedDeals    Deal[]       @relation("DealOwner")
+  activities    Activity[]
+  tasks         Task[]       @relation("TaskAssignee")
+  aiRunVerdicts AiRun[]      @relation("AiRunReviewer")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Leads, merchants, owners, consent
+// ---------------------------------------------------------------------------
+
+enum LeadSource {
+  UCC_LIST
+  AGED_LIST
+  LIVE_TRANSFER
+  WEB_FORM
+  REFERRAL
+  INBOUND_CALL
+  ZAPIER
+  MANUAL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTING
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+  CONVERTED
+  DO_NOT_CONTACT
+}
+
+model Lead {
+  id          String     @id @default(cuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerId     String?
+  owner       User?      @relation("LeadOwner", fields: [ownerId], references: [id])
+  source      LeadSource @default(MANUAL)
+  sourceDetail String?   // vendor name, campaign, list file
+  status      LeadStatus @default(NEW)
+  score       Int?       // 0-100 from A12
+  scoreReason String?
+
+  businessName String
+  contactName  String?
+  phone        String?
+  email        String?
+  state        String?   // 2-letter
+  timezone     String?
+  industry     String?
+  naics        String?
+  statedMonthlyRevenue Decimal? @db.Decimal(14, 2)
+  statedTimeInBusinessMonths Int?
+  requestedAmount Decimal? @db.Decimal(14, 2)
+
+  dncScrubbedAt   DateTime?
+  dncStatus       String?    // clean | dnc | litigator | unknown
+  rawPayload      Json?      // original import row
+
+  merchantId   String?
+  merchant     Merchant?  @relation(fields: [merchantId], references: [id])
+
+  consents    Consent[]
+  activities  Activity[]
+  tasks       Task[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, phone])
+  @@index([tenantId, email])
+}
+
+// Ascend works by email only (no calling, no SMS).
+enum ConsentChannel {
+  EMAIL
+}
+
+model Consent {
+  id        String         @id @default(cuid())
+  leadId    String
+  lead      Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel   ConsentChannel
+  granted   Boolean
+  source    String         // web form id, call recording id, "verbal", etc.
+  text      String?        // exact consent language shown/spoken
+  ipAddress String?
+  capturedAt DateTime      @default(now())
+  revokedAt  DateTime?
+
+  @@index([leadId, channel])
+}
+
+enum EntityType {
+  LLC
+  CORP
+  S_CORP
+  SOLE_PROP
+  PARTNERSHIP
+  NONPROFIT
+  OTHER
+}
+
+model Merchant {
+  id            String      @id @default(cuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  legalName     String
+  dba           String?
+  entityType    EntityType?
+  einEncrypted  String?     // field-level encrypted
+  einLast4      String?
+  naics         String?
+  industry      String?
+  startDate     DateTime?
+  website       String?
+  phone         String?
+  email         String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  sosStatus     String?     // from Cobalt/Middesk
+  sosCheckedAt  DateTime?
+  bankName      String?
+  processorName String?
+  /// Merchant asked not to get automated emails (stip chases, reminders).
+  emailOptOut   Boolean     @default(false)
+
+  owners        Owner[]
+  leads         Lead[]
+  deals         Deal[]
+  documents     Document[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, legalName])
+}
+
+model Owner {
+  id             String   @id @default(cuid())
+  merchantId     String
+  merchant       Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  firstName      String
+  lastName       String
+  ownershipPct   Decimal? @db.Decimal(5, 2)
+  ssnEncrypted   String?
+  ssnLast4       String?
+  dobEncrypted   String?
+  phone          String?
+  email          String?
+  addressLine1   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  ficoEstimate   Int?
+  isPrimary      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([merchantId])
+}
+
+// ---------------------------------------------------------------------------
+// Deals (state machine — docs/PLAN.md §1)
+// ---------------------------------------------------------------------------
+
+enum DealStage {
+  INTAKE
+  DOCS_REQUESTED
+  DOCS_RECEIVED
+  PRE_UNDERWRITING
+  READY_TO_SUBMIT
+  SUBMITTED
+  OFFERS_RECEIVED
+  OFFER_ACCEPTED
+  STIPS
+  CONTRACT_OUT
+  FUNDED
+  RENEWAL_ELIGIBLE
+  DECLINED
+  DEAD
+}
+
+model Deal {
+  id              String     @id @default(cuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  merchantId      String
+  merchant        Merchant   @relation(fields: [merchantId], references: [id])
+  ownerId         String?
+  owner           User?      @relation("DealOwner", fields: [ownerId], references: [id])
+  stage           DealStage  @default(INTAKE)
+  stageChangedAt  DateTime   @default(now())
+  requestedAmount Decimal?   @db.Decimal(14, 2)
+  useOfFunds      String?
+  isRenewal       Boolean    @default(false)
+  parentDealId    String?
+  parentDeal      Deal?      @relation("DealRenewal", fields: [parentDealId], references: [id])
+  renewals        Deal[]     @relation("DealRenewal")
+  paperGrade      String?    // A-D from A3 / human override
+  lostReason      String?
+  /// Google Drive folder holding every file for this deal
+  driveFolderId   String?
+  /// Gmail thread of the merchant's own emails, if the deal came in by email
+  sourceThreadId  String?
+  /// What the closer already sold the merchant before approval (amount / factor / days)
+  soldAmount      Decimal?   @db.Decimal(14, 2)
+  soldFactor      Decimal?   @db.Decimal(6, 4)
+  soldTermDays    Int?
+  /// "funder: $balance" lines shown in the submission email (PositionLine[])
+  submissionPositions Json   @default("[]")
+  submissionNote  String?
+  /// Where the deal came from: website | email | staff | gmail_import
+  source          String     @default("staff")
+  /// Application id on Ascend's website (POST /api/v1/applications), unique per tenant.
+  externalRef     String?
+  /// A5 application reading output (SSN/DOB masked) and field conflicts for review.
+  applicationData Json?
+  /// Internal AI Risk Report (never sent to lenders).
+  riskReport      Json?
+  riskReportAt    DateTime?
+
+  events          DealEvent[]
+  documents       Document[]
+  bankAnalyses    BankAnalysis[]
+  positions       Position[]
+  submissions     Submission[]
+  offers          Offer[]
+  stipulations    Stipulation[]
+  contracts       Contract[]
+  disclosureDeliveries DisclosureDelivery[]
+  funding         Funding?
+  commissions     Commission[]
+  renewal         Renewal?
+  activities      Activity[]
+  tasks           Task[]
+  aiRuns          AiRun[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([tenantId, externalRef])
+  @@index([tenantId, stage])
+  @@index([tenantId, ownerId])
+}
+
+// Append-only timeline. Never update or delete rows.
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type      String   // stage_changed | document_uploaded | submission_sent | offer_received | ...
+  actorType String   // user | system | ai
+  actorId   String?
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Documents & bank analysis
+// ---------------------------------------------------------------------------
+
+enum DocumentType {
+  APPLICATION
+  BANK_STATEMENT
+  VOIDED_CHECK
+  DRIVERS_LICENSE
+  TAX_RETURN
+  PROFIT_AND_LOSS
+  AR_AGING
+  PROCESSING_STATEMENT
+  MTD_STATEMENT
+  LEASE
+  ARTICLES
+  PAYOFF_LETTER
+  CONTRACT
+  DISCLOSURE
+  OFFER_SHEET
+  COMMISSION_STATEMENT
+  OTHER
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  merchantId    String?
+  merchant      Merchant?    @relation(fields: [merchantId], references: [id])
+  dealId        String?
+  deal          Deal?        @relation(fields: [dealId], references: [id])
+  type          DocumentType @default(OTHER)
+  typeConfidence Float?      // from A1 classification
+  driveFileId   String       @unique
+  driveWebViewLink String?
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  sha256        String
+  pageCount     Int?
+  // For bank statements: detected period & account
+  periodStart   DateTime?
+  periodEnd     DateTime?
+  bankName      String?
+  accountLast4  String?
+  extraction    Json?        // raw structured extraction (A1/A5)
+  fraudFlags    Json?        // A4 output
+  uploadedById  String?
+  uploadedVia   String       @default("staff") // staff | email | funder_email
+  /// Set when the file arrived as an email attachment
+  gmailMessageId String?
+  /// Internal files (AI Risk Report) can never be put in a lender package.
+  internalOnly  Boolean      @default(false)
+  /// When A1 extraction finished for this file (bank scrub, one job per document).
+  extractedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId, dealId])
+  @@index([sha256])
+}
+
+model BankAnalysis {
+  id              String   @id @default(cuid())
+  dealId          String
+  deal            Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  documentIds     String[] // statements included
+  monthlyRows     Json     // MonthlyRow[] (packages/ai schema)
+  metrics         Json     // BankMetrics (packages/domain)
+  trueRevenueAdjustments Json? // transfers / loan proceeds excluded
+  paperGrade      String?
+  redFlags        Json?
+  maxAdvanceEstimate Decimal? @db.Decimal(14, 2)
+  summary         String?
+  /// Bank scrub report (packages/domain scrubStatements) + per-file integrity checks.
+  scrub           Json?
+  aiRunId         String?
+  verifiedById    String?
+  verifiedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([dealId])
+}
+
+model Position {
+  id              String   @id @default(cuid())
+  dealId          String
+  deal            Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderGuess     String?
+  funderId        String?
+  funder          Funder?  @relation(fields: [funderId], references: [id])
+  descriptor      String   // ACH descriptor as seen on statement
+  frequency       String   // daily | weekly | monthly
+  paymentAmount   Decimal  @db.Decimal(14, 2)
+  firstSeen       DateTime?
+  lastSeen        DateTime?
+  estimatedBalance Decimal? @db.Decimal(14, 2)
+  confidence      Float
+  isActive        Boolean  @default(true)
+  confirmedById   String?
+  createdAt       DateTime @default(now())
+
+  @@index([dealId])
+}
+
+// ---------------------------------------------------------------------------
+// Funders, programs, submissions, offers
+// ---------------------------------------------------------------------------
+
+model Funder {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  website     String?
+  /// Main submission inbox: goes in To
+  submissionTo String?
+  /// Other addresses at this lender: go in CC on the same email (never BCC)
+  submissionCc String[]
+  /// Sender domains used to match lender replies to this funder
+  emailDomains String[]
+  achDescriptors String[] // used by A2 to recognise positions
+  isoAgreementNotes String?
+  renewalCommissionPct Decimal? @db.Decimal(5, 2)
+  clawbackDays Int?
+  backdoorProtection Boolean @default(false)
+  isActive    Boolean  @default(true)
+
+  programs    FunderProgram[]
+  contacts    FunderContact[]
+  submissions Submission[]
+  offers      Offer[]
+  positions   Position[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, name])
+}
+
+enum SubmissionChannel {
+  EMAIL
+  PORTAL
+  API
+}
+
+model FunderProgram {
+  id          String   @id @default(cuid())
+  funderId    String
+  funder      Funder   @relation(fields: [funderId], references: [id], onDelete: Cascade)
+  name        String
+  channel     SubmissionChannel @default(EMAIL)
+  submissionEmail String?
+  portalUrl   String?
+  paperGrades String[] // ["A","B"]
+  minMonthlyRevenue Decimal? @db.Decimal(14, 2)
+  minTimeInBusinessMonths Int?
+  minFico     Int?
+  maxExistingPositions Int?
+  positionAppetite String[] // ["1st","2nd"]
+  minAdvance  Decimal? @db.Decimal(14, 2)
+  maxAdvance  Decimal? @db.Decimal(14, 2)
+  maxFactorSell Decimal? @db.Decimal(5, 4)
+  buyRateFloor Decimal? @db.Decimal(5, 4)
+  maxPoints   Decimal? @db.Decimal(5, 2)
+  allowedStates String[]
+  excludedStates String[]
+  excludedNaics String[]
+  requiredDocs  String[]
+  typicalTurnaroundHours Int?
+  renewalEligibilityPct Decimal? @db.Decimal(5, 2)
+  notes       String?
+  isActive    Boolean  @default(true)
+
+  submissions Submission[]
+
+  @@index([funderId])
+}
+
+model FunderContact {
+  id       String  @id @default(cuid())
+  funderId String
+  funder   Funder  @relation(fields: [funderId], references: [id], onDelete: Cascade)
+  name     String
+  role     String?
+  email    String?
+  phone    String?
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SENT
+  ACKNOWLEDGED
+  IN_REVIEW
+  STIPS_REQUESTED
+  APPROVED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
+model Submission {
+  id            String            @id @default(cuid())
+  dealId        String
+  deal          Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderId      String
+  funder        Funder            @relation(fields: [funderId], references: [id])
+  programId     String?
+  program       FunderProgram?    @relation(fields: [programId], references: [id])
+  channel       SubmissionChannel
+  status        SubmissionStatus  @default(DRAFT)
+  sentAt        DateTime?
+  sentById      String?
+  externalRef   String?           // funder portal id
+  gmailThreadId String?
+  gmailMessageId String?
+  toAddresses   String[]
+  ccAddresses   String[]
+  packageDocumentIds String[]
+  watermarkTag  String?           // for backdoor tracing
+  declineReason String?
+  slaDueAt      DateTime?
+  lastFunderMessageAt DateTime?
+  rawStatusLog  Json              @default("[]")
+
+  offers        Offer[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([dealId, status])
+  @@index([funderId])
+  @@index([gmailThreadId])
+}
+
+enum PaymentFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum OfferStatus {
+  RECEIVED
+  PRESENTED
+  ACCEPTED
+  DECLINED_BY_MERCHANT
+  EXPIRED
+  WITHDRAWN
+}
+
+model Offer {
+  id             String           @id @default(cuid())
+  dealId         String
+  deal           Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  submissionId   String?
+  submission     Submission?      @relation(fields: [submissionId], references: [id])
+  funderId       String
+  funder         Funder           @relation(fields: [funderId], references: [id])
+  status         OfferStatus      @default(RECEIVED)
+  advanceAmount  Decimal          @db.Decimal(14, 2)
+  buyRate        Decimal          @db.Decimal(6, 4)  // factor at zero commission
+  sellRate       Decimal          @db.Decimal(6, 4)  // factor presented to merchant
+  paybackAmount  Decimal          @db.Decimal(14, 2) // advance * sellRate
+  termMonths     Decimal?         @db.Decimal(5, 2)
+  numberOfPayments Int?
+  paymentFrequency PaymentFrequency
+  paymentAmount  Decimal          @db.Decimal(14, 2)
+  holdbackPct    Decimal?         @db.Decimal(5, 2)
+  originationFee Decimal?         @db.Decimal(14, 2)
+  otherFees      Json?            // [{name, amount}]
+  psfAmount      Decimal?         @db.Decimal(14, 2) // broker fee to merchant
+  commissionPoints Decimal?       @db.Decimal(5, 2)
+  commissionAmount Decimal?       @db.Decimal(14, 2)
+  estimatedApr   Decimal?         @db.Decimal(8, 4)
+  position       Int?
+  expiresAt      DateTime?
+  rawText        String?          // original offer email / sheet text
+  sourceDocumentId String?
+  aiRunId        String?
+  confirmedById  String?          // human confirmed AI-parsed numbers
+  stipulations   Stipulation[]
+  contract       Contract?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([dealId, status])
+}
+
+enum StipStatus {
+  REQUESTED
+  SENT_TO_MERCHANT
+  RECEIVED
+  CLEARED
+  WAIVED
+}
+
+model Stipulation {
+  id          String     @id @default(cuid())
+  dealId      String
+  deal        Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId     String?
+  offer       Offer?     @relation(fields: [offerId], references: [id])
+  name        String     // "Voided check", "MTD statement", "Landlord call"
+  documentType DocumentType?
+  status      StipStatus @default(REQUESTED)
+  ownerUserId String?
+  documentId  String?
+  nextChaseAt DateTime?
+  chaseCount  Int        @default(0)
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([dealId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Closing: contracts, disclosures, funding, commissions, renewals
+// ---------------------------------------------------------------------------
+
+enum ContractStatus {
+  SENT
+  VIEWED
+  SIGNED
+  COUNTERSIGNED
+  VOIDED
+}
+
+model Contract {
+  id            String         @id @default(cuid())
+  dealId        String
+  deal          Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId       String         @unique
+  offer         Offer          @relation(fields: [offerId], references: [id])
+  status        ContractStatus @default(SENT)
+  esignProvider String?        // dropbox_sign | docusign
+  esignEnvelopeId String?
+  documentId    String?
+  sentAt        DateTime?
+  signedAt      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+// Immutable: rows are inserted once, never updated. Enforced by trigger in migration.
+model DisclosureDelivery {
+  id            String   @id @default(cuid())
+  dealId        String
+  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId       String?
+  state         String   // disclosure jurisdiction
+  documentId    String
+  documentSha256 String
+  channel       String   // email | esign | portal | in_person
+  recipient     String
+  deliveredAt   DateTime @default(now())
+  deliveredById String?
+  aiCheck       Json?    // A15 output
+}
+
+model Funding {
+  id            String   @id @default(cuid())
+  dealId        String   @unique
+  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId       String
+  fundedAt      DateTime
+  fundedAmount  Decimal  @db.Decimal(14, 2)
+  netToMerchant Decimal? @db.Decimal(14, 2)
+  paybackAmount Decimal  @db.Decimal(14, 2)
+  paymentAmount Decimal  @db.Decimal(14, 2)
+  paymentFrequency PaymentFrequency
+  firstPaymentAt DateTime?
+  uccFiledAt    DateTime?
+  clawbackWindowEndsAt DateTime?
+  createdAt     DateTime @default(now())
+}
+
+enum CommissionStatus {
+  EXPECTED
+  INVOICED
+  RECEIVED
+  PARTIALLY_RECEIVED
+  CLAWED_BACK
+  WRITTEN_OFF
+}
+
+model Commission {
+  id            String           @id @default(cuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dealId        String
+  deal          Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderName    String
+  points        Decimal          @db.Decimal(5, 2)
+  expectedAmount Decimal         @db.Decimal(14, 2)
+  receivedAmount Decimal?        @db.Decimal(14, 2)
+  psfAmount     Decimal?         @db.Decimal(14, 2)
+  status        CommissionStatus @default(EXPECTED)
+  expectedAt    DateTime?
+  receivedAt    DateTime?
+  clawbackWindowEndsAt DateTime?
+  clawedBackAt  DateTime?
+  clawbackAmount Decimal?        @db.Decimal(14, 2)
+  repSplits     Json?            // [{userId, pct}]
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model Renewal {
+  id                String   @id @default(cuid())
+  dealId            String   @unique
+  deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  paybackAmount     Decimal  @db.Decimal(14, 2)
+  paidToDate        Decimal  @db.Decimal(14, 2) @default(0)
+  paidDownPct       Decimal  @db.Decimal(5, 2)  @default(0)
+  eligibilityPct    Decimal  @db.Decimal(5, 2)  @default(50)
+  projectedEligibleAt DateTime?
+  eligibleAt        DateTime?
+  outreachStartedAt DateTime?
+  renewalDealId     String?
+  lastCheckedAt     DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Activities, tasks, sequences
+// ---------------------------------------------------------------------------
+
+enum ActivityType {
+  EMAIL
+  NOTE
+  MEETING
+  SYSTEM
+}
+
+enum ActivityDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+model Activity {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        ActivityType
+  direction   ActivityDirection @default(INTERNAL)
+  userId      String?
+  user        User?             @relation(fields: [userId], references: [id])
+  leadId      String?
+  lead        Lead?             @relation(fields: [leadId], references: [id])
+  dealId      String?
+  deal        Deal?             @relation(fields: [dealId], references: [id])
+  subject     String?
+  body        String?
+  externalId  String?           // Twilio SID, Gmail message id
+  threadId    String?
+  fromAddress String?
+  toAddress   String?
+  aiSummary   Json?             // A8 output
+  occurredAt  DateTime          @default(now())
+  createdAt   DateTime          @default(now())
+
+  @@index([tenantId, dealId, occurredAt])
+  @@index([tenantId, leadId, occurredAt])
+  @@index([externalId])
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id])
+  dealId      String?
+  deal        Deal?      @relation(fields: [dealId], references: [id])
+  title       String
+  description String?
+  dueAt       DateTime?
+  status      TaskStatus @default(OPEN)
+  createdBy   String     @default("user") // user | system | ai
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId, assigneeId, status])
+}
+
+model Sequence {
+  id          String         @id @default(cuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  trigger     String         // lead_created | docs_requested | stip_requested | renewal_eligible
+  requiresApproval Boolean   @default(true) // Draft mode (v1) vs Auto
+  isActive    Boolean        @default(true)
+  steps       SequenceStep[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([tenantId, name])
+}
+
+model SequenceStep {
+  id          String   @id @default(cuid())
+  sequenceId  String
+  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  order       Int
+  channel     ActivityType // EMAIL (sequences send email drafts only)
+  delayMinutes Int
+  template    String   // may contain {{merchant.name}} etc.; AI personalises within template
+  aiPersonalise Boolean @default(false)
+
+  @@unique([sequenceId, order])
+}
+
+// ---------------------------------------------------------------------------
+// AI observability — every Claude call
+// ---------------------------------------------------------------------------
+
+enum AiVerdict {
+  PENDING
+  ACCEPTED
+  CORRECTED
+  REJECTED
+}
+
+model AiRun {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  dealId        String?
+  deal          Deal?     @relation(fields: [dealId], references: [id])
+  job           String    // A1_STATEMENT_EXTRACTION, A2_POSITION_DETECTION, ...
+  promptVersion String
+  model         String
+  effort        String?
+  inputHash     String
+  inputTokens   Int
+  outputTokens  Int
+  cacheReadTokens Int     @default(0)
+  cacheWriteTokens Int    @default(0)
+  costUsd       Decimal   @db.Decimal(10, 6)
+  latencyMs     Int
+  stopReason    String?
+  output        Json?
+  error         String?
+  verdict       AiVerdict @default(PENDING)
+  reviewerId    String?
+  reviewer      User?     @relation("AiRunReviewer", fields: [reviewerId], references: [id])
+  reviewedAt    DateTime?
+  correction    Json?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, job, createdAt])
+  @@index([dealId])
+}
+
+// ---------------------------------------------------------------------------
+// Background work on serverless: a Postgres job table drained by /api/cron/tick
+// (Supabase Cron calls it every 2 minutes) and inline right after a user action.
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String    // SEND_SUBMISSION | INBOX_SYNC | PARSE_REPLY | STATEMENT_ANALYSIS
+  payload     Json      @default("{}")
+  status      JobStatus @default(QUEUED)
+  runAt       DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  lockedAt    DateTime?
+  lastError   String?
+  /// Optional idempotency key: one live job per key (e.g. "send:<submissionId>")
+  dedupeKey   String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+}
+
+/// The Google account the CRM uses for Gmail (read + send) and Drive. One per tenant.
+model MailboxConnection {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email                 String
+  /// AES-256-GCM encrypted with PII_ENCRYPTION_KEY
+  encryptedRefreshToken String
+  scopes                String[]
+  historyId             String?
+  lastSyncedAt          DateTime?
+  driveRootFolderId     String?
+  connectedById         String?
+  connectedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([tenantId, email])
+}
+
+// ---------------------------------------------------------------------------
+// Website API keys and email automation
+// ---------------------------------------------------------------------------
+
+/// Key the Ascend website uses to post applications. Only a SHA-256 hash is stored.
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  /// First characters shown in Settings, e.g. "ak_live_3F9c"
+  prefix     String
+  hashedKey  String    @unique
+  createdById String?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+/// One automated email rule (missing docs, stip chase, lender follow-up, ...), editable in Settings.
+model EmailRule {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// MISSING_DOCS | STIP_CHASE | LENDER_FOLLOW_UP | CONTRACT_REQUEST | CLAWBACK_CONFIRM | FUNDED_THANKS
+  kind             String
+  enabled          Boolean  @default(true)
+  /// Wait before the first send (and between repeats).
+  delayHours       Int      @default(24)
+  maxSends         Int      @default(1)
+  /// Draft only: a person reviews and clicks send.
+  requiresApproval Boolean  @default(false)
+  subject          String
+  body             String
+  updatedAt        DateTime @updatedAt
+
+  @@unique([tenantId, kind])
+}
