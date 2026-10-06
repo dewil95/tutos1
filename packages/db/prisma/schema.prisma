@@ -413,6 +413,8 @@ model BankAnalysis {
   redFlags        Json?
   maxAdvanceEstimate Decimal? @db.Decimal(14, 2)
   summary         String?
+  /// Bank scrub report (packages/domain scrubStatements) + per-file integrity checks.
+  scrub           Json?
   aiRunId         String?
   verifiedById    String?
   verifiedAt      DateTime?

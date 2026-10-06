@@ -318,3 +318,55 @@ ul.conflicts {
   display: grid;
   gap: 6px;
 }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stats > div {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+}
+.stats .k {
+  font-size: 12px;
+  color: var(--muted);
+}
+.tablewrap {
+  overflow-x: auto;
+}
+table.num td,
+table.num th {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+ul.flags {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.flag .sev {
+  display: inline-block;
+  min-width: 64px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.flag.critical .sev {
+  color: #c4321f;
+}
+.flag.warning .sev {
+  color: #c27c0e;
+}
+.flag.info .sev {
+  color: var(--muted);
+}
+.ok {
+  color: #2f9e62;
+}

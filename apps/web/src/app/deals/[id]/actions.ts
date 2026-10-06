@@ -95,23 +95,28 @@ export async function analyseDealStatements(dealId: string, form: FormData) {
   const prisma = getPrisma();
   const documentIds = form.getAll("documentIds").map(String);
   const docs = await prisma.document.findMany({
-    where: {
-      id: { in: documentIds },
-      dealId,
-      tenantId: user.tenantId,
-      type: { in: ["BANK_STATEMENT", "MTD_STATEMENT"] },
-    },
+    where: { id: { in: documentIds }, dealId, tenantId: user.tenantId, type: "BANK_STATEMENT" },
     select: { id: true },
   });
   if (docs.length === 0)
-    redirect(back(dealId, { error: "Select at least one bank statement to analyse." }));
-  const jobId = await enqueueJob(prisma, {
-    tenantId: user.tenantId,
-    type: "STATEMENT_ANALYSIS",
-    payload: { dealId, documentIds: docs.map((d) => d.id) },
-    dedupeKey: `analysis:${dealId}`,
+    redirect(back(dealId, { error: "Tick at least one bank statement to scrub." }));
+  // Re-read the ticked statements (e.g. after fixing a file type), then scrub the whole deal.
+  await prisma.document.updateMany({
+    where: { id: { in: docs.map((d) => d.id) } },
+    data: { extractedAt: null },
   });
-  after(() => runDueJobs(prisma, { budgetMs: 55_000, ids: [jobId] }).then(() => undefined));
+  const jobIds: string[] = [];
+  for (const d of docs) {
+    jobIds.push(
+      await enqueueJob(prisma, {
+        tenantId: user.tenantId,
+        type: "STATEMENT_EXTRACT",
+        payload: { documentId: d.id },
+        dedupeKey: `extract:${d.id}`,
+      }),
+    );
+  }
+  after(() => runDueJobs(prisma, { budgetMs: 55_000, ids: jobIds }).then(() => undefined));
   redirect(back(dealId, { analysing: "1" }));
 }
 
@@ -179,6 +184,15 @@ export async function resolveConflict(dealId: string, form: FormData) {
         conflicts: (app.conflicts ?? []).filter((c) => c.field !== field),
       },
     },
+  });
+  revalidatePath(`/deals/${dealId}`);
+}
+
+export async function verifyScrub(dealId: string, form: FormData) {
+  const user = await requireUser();
+  await getPrisma().bankAnalysis.updateMany({
+    where: { id: String(form.get("analysisId")), dealId, deal: { tenantId: user.tenantId } },
+    data: { verifiedById: user.id, verifiedAt: new Date() },
   });
   revalidatePath(`/deals/${dealId}`);
 }

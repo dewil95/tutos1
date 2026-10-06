@@ -1,4 +1,7 @@
 -- AlterTable
+ALTER TABLE "BankAnalysis" ADD COLUMN     "scrub" JSONB;
+
+-- AlterTable
 ALTER TABLE "Deal" ADD COLUMN     "applicationData" JSONB,
 ADD COLUMN     "externalRef" TEXT,
 ADD COLUMN     "riskReport" JSONB,

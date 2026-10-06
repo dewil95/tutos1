@@ -79,7 +79,10 @@ export async function storeDealFile(prisma: PrismaClient, mailbox: Mailbox, inpu
 
 const READABLE = /^(application\/pdf|image\/(jpe?g|png))$/;
 
-/** New application files get read by A5 so the merchant and owner fields fill themselves. */
+/**
+ * New files start their AI work: applications are read (A5) to fill merchant and owner fields,
+ * bank statements are extracted and scrubbed.
+ */
 export async function queueDocumentWork(
   prisma: PrismaClient,
   doc: {
@@ -99,6 +102,16 @@ export async function queueDocumentWork(
         type: "APPLICATION_READ",
         payload: { documentId: doc.id },
         dedupeKey: `appread:${doc.id}`,
+      }),
+    );
+  }
+  if (doc.type === "BANK_STATEMENT" && doc.mimeType === "application/pdf") {
+    ids.push(
+      await enqueueJob(prisma, {
+        tenantId: doc.tenantId,
+        type: "STATEMENT_EXTRACT",
+        payload: { documentId: doc.id },
+        dedupeKey: `extract:${doc.id}`,
       }),
     );
   }

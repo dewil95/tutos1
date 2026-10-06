@@ -1,4 +1,5 @@
 import { pdfBlock, textBlock, type StructuredCallResult, type LlmClient } from "../llm";
+import type { Effort } from "../models";
 
 import { StatementExtractionSchema, type StatementExtraction } from "../schemas/statement";
 
@@ -21,6 +22,8 @@ Rules:
 
 export interface A1Input {
   files: { data: Buffer; fileName: string }[];
+  /** Default "high". The per-file bank scrub uses "medium" to stay inside serverless time limits. */
+  effort?: Effort;
   tenantId?: string;
   dealId?: string;
 }
@@ -43,7 +46,7 @@ export async function runStatementExtraction(
     user,
     schema: StatementExtractionSchema,
     tier: "primary",
-    effort: "high",
+    effort: input.effort ?? "high",
     maxTokens: 32_000,
     tenantId: input.tenantId,
     dealId: input.dealId,

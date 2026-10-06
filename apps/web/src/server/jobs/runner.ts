@@ -11,7 +11,8 @@ import { handleApplicationRead } from "./applicationRead";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
-import { handleStatementAnalysis } from "./statementAnalysis";
+import { handleStatementExtract } from "./statementExtract";
+import { handleStatementScrub } from "./statementScrub";
 
 export type JobHandler = (prisma: PrismaClient, job: ClaimedJob) => Promise<void>;
 
@@ -19,9 +20,21 @@ const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   SEND_SUBMISSION: handleSendSubmission,
   INBOX_SYNC: handleInboxSync,
   PARSE_REPLY: handleParseReply,
-  STATEMENT_ANALYSIS: handleStatementAnalysis,
   APPLICATION_READ: handleApplicationRead,
+  STATEMENT_EXTRACT: handleStatementExtract,
+  STATEMENT_SCRUB: handleStatementScrub,
 };
+
+/** Jobs that read whole PDFs with the primary model can take up to ~40 s. */
+const SLOW: JobType[] = ["APPLICATION_READ", "STATEMENT_EXTRACT", "STATEMENT_SCRUB", "RISK_REPORT"];
+const SLOW_JOB_MS = 40_000;
+
+/** Never start a slow AI job the request cannot finish; quick jobs (sends, inbox) still run. */
+export function typesThatFit(remainingMs: number, types?: JobType[]): JobType[] | undefined {
+  if (remainingMs >= SLOW_JOB_MS) return types;
+  const all = (types ?? (Object.keys(HANDLERS) as JobType[])).filter((t) => !SLOW.includes(t));
+  return all.length ? all : ["__none__" as JobType];
+}
 
 export interface RunResult {
   done: string[];
@@ -43,10 +56,11 @@ export async function runDueJobs(
   const seen = new Set<string>();
 
   while (Date.now() - started < opts.budgetMs) {
+    const remaining = opts.budgetMs - (Date.now() - started);
     const jobs = await claimJobs(prisma, {
       limit: opts.batch ?? 3,
       ids: opts.ids,
-      types: opts.types,
+      types: typesThatFit(remaining, opts.types),
     });
     if (jobs.length === 0) break;
     await Promise.all(jobs.map((job) => runOne(prisma, job, result)));

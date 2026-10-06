@@ -10,6 +10,7 @@ import { positionsToText } from "@/server/submissions";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
+import { BankScrubPanel } from "./BankScrubPanel";
 import {
   analyseDealStatements,
   relabelDocument,
@@ -19,6 +20,8 @@ import {
 } from "./actions";
 
 export const dynamic = "force-dynamic";
+// Server actions on this page run queued jobs right after the click.
+export const maxDuration = 60;
 
 const DOC_TYPES: DocumentType[] = [
   "APPLICATION",
@@ -97,6 +100,9 @@ export default async function DealPage({
   const positions = (deal.submissionPositions ?? []) as unknown as PositionLine[];
 
   const metrics = analysis?.metrics as unknown as BankMetrics | undefined;
+  const pendingStatements = documents.filter(
+    (d) => d.type === "BANK_STATEMENT" && !d.extractedAt,
+  ).length;
   const history = await lenderHistory(prisma, user.tenantId, deal.paperGrade);
   const rows = lenderRows({
     funders,
@@ -164,7 +170,7 @@ export default async function DealPage({
         <p className="notice ok">{flash.uploaded} file(s) saved to Google Drive.</p>
       ) : null}
       {flash.analysing ? (
-        <p className="notice ok">Statement analysis started. Refresh in a minute.</p>
+        <p className="notice ok">Bank scrub started. Refresh in a minute.</p>
       ) : null}
       {!mailbox ? (
         <p className="notice warn">
@@ -379,10 +385,10 @@ export default async function DealPage({
         </p>
         <p>
           <button type="submit" formAction={analyseDealStatements.bind(null, id)}>
-            Analyse checked statements with AI
+            Re-run bank scrub on checked statements
           </button>{" "}
           <span className="small muted">
-            Pre-fills grade and positions; a person checks the numbers.
+            Statements are scrubbed automatically on arrival; use this after fixing a file.
           </span>
         </p>
       </form>
@@ -430,17 +436,7 @@ export default async function DealPage({
         ) : null}
       </section>
 
-      {analysis ? (
-        <section className="panel">
-          <h2>Statement analysis</h2>
-          <p className="small">
-            {analysis.summary}
-            {metrics
-              ? ` Avg true revenue ${money(metrics.avgMonthlyTrueRevenue)}/mo, ADB ${money(metrics.avgDailyBalance)}.`
-              : ""}
-          </p>
-        </section>
-      ) : null}
+      <BankScrubPanel dealId={id} analysis={analysis} pending={pendingStatements} />
 
       <section className="panel">
         <h2>Timeline</h2>

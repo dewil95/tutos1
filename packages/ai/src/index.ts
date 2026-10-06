@@ -11,3 +11,5 @@ export * from "./jobs/a3PreUnderwriting";
 export * from "./pipeline";
 export * from "./schemas/application";
 export * from "./jobs/a5ApplicationReading";
+export * from "./schemas/documentQa";
+export * from "./jobs/a4DocumentQa";
