@@ -1,6 +1,6 @@
 # AI eval set layout
 
-Every Claude job in `packages/ai` (A1–A15 in `PLAN.md`) ships with a golden eval set. CI runs the
+Every AI job in `packages/ai` (A1–A15 in `PLAN.md`) ships with a golden eval set. CI runs the
 evals for any job whose prompt or schema changed and fails the build when accuracy drops below the
 thresholds in `packages/ai/evals/thresholds.json`.
 
@@ -48,5 +48,7 @@ pnpm --filter @mca/ai eval -- a1-statement-extraction
 pnpm --filter @mca/ai eval -- all
 ```
 
-Requires `ANTHROPIC_API_KEY`. Runs use the same `callClaude()` wrapper as production so caching
-behaviour and `AiRun` logging are exercised.
+Requires `GEMINI_API_KEY` (default provider). To compare providers, run the same set with
+`MCA_AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`. Runs use the same `createLlmClient()` as
+production, so structured output, retries and cost reporting are exercised. Use real statements
+only with a key from a billing-enabled project, and never commit them (see `.gitignore`).

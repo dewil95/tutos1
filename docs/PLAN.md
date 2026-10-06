@@ -1,6 +1,34 @@
-# Plan: AI-native CRM for MCA Brokers (built on Anthropic Claude)
+# Plan: AI-native CRM for MCA Brokers (Ascend Fund)
 
-## Context
+## Decisions as built (2026-10-06) — these override older wording below
+
+Two change requests from Ascend replaced parts of the original plan. Where a later section
+still says "Claude", "BullMQ", "Twilio", "S3" or "Auth.js", read it with these decisions:
+
+| Area            | Decision                                                                                                                                                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phones          | **No calls and no SMS.** Twilio, dialer, call recording, A11 call summaries, voice agent, 10DLC and TCPA quiet hours are out of scope. Communication is email only.                                                                                |
+| Hosting         | **Vercel Hobby** (Next.js app and API) + **Supabase Free** (Postgres with RLS on every table, Auth with Google sign-in for @ascendfund.co only, Cron).                                                                                             |
+| Background work | A `Job` table in Postgres claimed with `FOR UPDATE SKIP LOCKED`; Supabase Cron calls `/api/cron/tick` every 2 minutes; new jobs also run right after a click. No Redis, no worker app.                                                             |
+| Files           | **Google Drive**, one folder per deal (`Ascend CRM/Deals/<Merchant>/Application, Statements, MTD, Stips, Contracts`).                                                                                                                              |
+| Email           | Gmail API on `funding@ascendfund.co` (read + send), one OAuth connection with Drive.                                                                                                                                                               |
+| AI              | **Google Gemini API** by default (`gemini-3.1-pro-preview` for A1–A3, `gemini-3-flash-preview` for A8); Claude kept as an optional provider behind the same `LlmClient` interface. Every "Claude Ax" job below runs on the configured provider.    |
+| Sending         | **One email per lender.** To = the lender's first address; CC = its other addresses + the team (jonas@, savvy@, david@); **never BCC**. Duplicate guard per merchant × lender. Packages over 18 MB go as Drive links shared only with that lender. |
+
+Diagrams: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+
+Phase order now: **Phase 1** — Supabase + Vercel deploy, Google sign-in, Gmail/Drive connect,
+inbox check, Drive folders, lender directory with To/CC, one-click per-lender sending, A8 reply
+parsing, deal board with per-lender status (built). **Phase 2** — statement analysis on Gemini
+(A1–A3, wired) feeding the positions block, offer confirm screen, stips tracker, commission
+ledger with clawback timers. **Phase 3** — renewals, KPI dashboard, deal-desk assistant.
+
+Free-tier caveats: Vercel Hobby is for non-commercial use (move to Pro when the CRM runs the
+business); Supabase Free pauses after a week without activity and caps the DB at 500 MB (the
+2-minute cron keeps it active; files are in Drive); use a Gemini key from a billing-enabled
+project, because free-tier prompts may be used to improve Google products.
+
+## Context (original request, 2026-10-05)
 
 The repo `dewil95/tutos1` currently holds only a small static encrypt/decrypt tutorial page
 (`index.html`, `css.css`, `reset.css`, two PNGs). There is no CRM code to reuse, so this is a

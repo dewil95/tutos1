@@ -15,6 +15,8 @@
     "test": "turbo run test",
     "db:generate": "pnpm --filter @mca/db generate",
     "db:migrate": "pnpm --filter @mca/db migrate:dev",
+    "db:deploy": "pnpm --filter @mca/db migrate:deploy",
+    "db:seed": "pnpm --filter @mca/db seed",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yml,yaml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yml,yaml,css}\""
   },
