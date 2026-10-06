@@ -117,10 +117,11 @@ sequenceDiagram
   participant DB as Postgres Job table
   participant H as Job handlers
   C->>T: POST with Authorization: Bearer CRON_SECRET
-  T->>DB: queue INBOX_SYNC per mailbox (one live job per mailbox)
+  T->>DB: queue INBOX_SYNC per mailbox and EMAIL_RULES per tenant (one live job each)
   loop until ~45 s used
     T->>DB: claim due jobs (FOR UPDATE SKIP LOCKED)
-    T->>H: SEND_SUBMISSION · INBOX_SYNC · PARSE_REPLY · STATEMENT_ANALYSIS
+    T->>H: SEND_SUBMISSION, INBOX_SYNC, PARSE_REPLY, EMAIL_RULES
+    T->>H: APPLICATION_READ, STATEMENT_EXTRACT, STATEMENT_SCRUB, RISK_REPORT (only with 40 s left)
     H-->>DB: done, or retry in 1, 2, 4… minutes (failed after 5 tries)
   end
 ```
@@ -128,19 +129,45 @@ sequenceDiagram
 A send that crashes after Gmail accepted it is never sent twice: the job marks the submission
 "sending" first, and a retry looks in Sent before trying again.
 
-## 5. AI pipeline
+## 5. From application to Risk Report
+
+The website posts each application to the CRM API (`docs/API.md`); statements can also arrive by
+email or upload. Each file starts its own job, so nothing waits on a long request.
 
 ```mermaid
 flowchart LR
-  pdf["Bank statement PDFs<br/>(downloaded from Drive)"] --> a1["A1 Extraction<br/>Gemini 3.1 Pro"]
-  a1 --> m["Metrics + paper grade<br/>(plain code, packages/domain)"]
-  m --> a2["A2 Positions<br/>Gemini 3.1 Pro"]
-  a2 --> a3["A3 Pre-underwriting<br/>Gemini 3.1 Pro"]
-  a3 --> v["Deal page: grade, positions block<br/>a person checks the numbers"]
-  reply["Lender reply email"] --> a8["A8 Reply parsing<br/>Gemini 3 Flash"]
-  a8 --> s["Submission status, offers, stips, funded"]
-  a1 & a2 & a3 & a8 -.-> run[("AiRun table<br/>model · tokens · cost")]
+  web["Ascend website<br/>POST /api/v1/applications"] --> deal["Deal + merchant + owners<br/>SSN / DOB / EIN encrypted"]
+  mail["Email to funding@"] --> files
+  up["Upload on deal page"] --> files
+  web --> files["Files in the deal's Drive folder"]
+  files -- application PDF --> a5["A5 App reading<br/>Gemini 3.1 Pro<br/>fills empty fields, flags differences"]
+  files -- each statement --> a1["A1 Extraction<br/>one job per file"]
+  files -- each statement --> chk["PDF history check<br/>+ A4 visual check (Flash)"]
+  a1 & chk --> scrub["Bank scrub (code)<br/>balance math, gaps, NSFs,<br/>negative days, stacking, holdback"]
+  scrub --> a2["A2 Positions<br/>Gemini 3.1 Pro"]
+  a2 --> risk["Risk score (code)<br/>+ narrative (Gemini)<br/>internal only"]
+  risk --> rank["Lender ranking<br/>appetite + approval history"]
+  a5 & a1 & a2 & risk -.-> run[("AiRun log<br/>model, tokens, cost<br/>SSN/DOB masked")]
 ```
+
+Lender replies go through A8 (Gemini 3 Flash) to update each lender's status row.
+
+## 6. Watermarks and email automation
+
+Every PDF in a lender's copy of the package is stamped on each page ("Submitted by Ascend Fund
+to <Lender> only · date · Ref <tag>") and carries the tag in its metadata. The tag is stored on
+that lender's submission, so a file that turns up elsewhere shows whose copy it was.
+
+| Email                 | To                              | When                                   | Default                         |
+| --------------------- | ------------------------------- | -------------------------------------- | ------------------------------- |
+| Missing documents     | merchant                        | deal waiting on application/statements | automatic, up to 3, a day apart |
+| Stip chase            | merchant                        | a lender asked for something           | automatic, up to 3, a day apart |
+| Lender follow-up      | lender, same thread, same To/CC | no reply a day after sending           | automatic, once, weekdays       |
+| Contract request      | lender, same thread             | rep clicks on an approved row          | one click, DL/VC attached       |
+| Clawback confirmation | lender, same thread             | funded email asks for it               | one click                       |
+
+All of them can be edited or turned off in Settings, skip merchants marked "no automated
+emails", follow dry-run mode, and never use BCC.
 
 The AI provider sits behind one interface, so Gemini can be swapped for Claude with one setting:
 
@@ -166,13 +193,17 @@ classDiagram
 
 ## Where things live in the code
 
-| Concern                                      | Path                                                         |
-| -------------------------------------------- | ------------------------------------------------------------ |
-| To/CC rules                                  | `packages/connectors/src/recipients.ts`                      |
-| House email (subject, body, positions block) | `packages/connectors/src/funder/email.ts`                    |
-| Gmail and Drive clients                      | `packages/connectors/src/email/gmail.ts`, `storage/drive.ts` |
-| Job queue                                    | `packages/db/src/jobs.ts`                                    |
-| Send / inbox / reply / analysis jobs         | `apps/web/src/server/jobs/`                                  |
-| Deal page                                    | `apps/web/src/app/deals/[id]/`                               |
-| Gemini client                                | `packages/ai/src/providers/gemini.ts`                        |
-| Database schema and RLS                      | `packages/db/prisma/`                                        |
+| Concern                                      | Path                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| To/CC rules                                  | `packages/connectors/src/recipients.ts`                          |
+| House email (subject, body, positions block) | `packages/connectors/src/funder/email.ts`                        |
+| Gmail and Drive clients                      | `packages/connectors/src/email/gmail.ts`, `storage/drive.ts`     |
+| Job queue                                    | `packages/db/src/jobs.ts`                                        |
+| Background jobs (send, inbox, scrub, report) | `apps/web/src/server/jobs/`                                      |
+| Website API                                  | `apps/web/src/app/api/v1/`, `docs/API.md`                        |
+| Bank scrub checks, risk score, lender rank   | `packages/domain/src/scrub.ts`, `riskScore.ts`, `funderMatch.ts` |
+| Watermark, PDF checks, report PDF            | `packages/connectors/src/pdf/`                                   |
+| Email automation                             | `apps/web/src/server/email/`, `server/jobs/emailRules.ts`        |
+| Deal page                                    | `apps/web/src/app/deals/[id]/`                                   |
+| Gemini client                                | `packages/ai/src/providers/gemini.ts`                            |
+| Database schema and RLS                      | `packages/db/prisma/`                                            |

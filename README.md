@@ -7,8 +7,16 @@ Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO
   in **To**, its other addresses and the team in **CC**, never BCC.
 - Reads lender replies with Google Gemini and keeps a status row per lender
   (received, declined with reason, offer, stips, contract, funded).
+- Takes applications straight from Ascend's website through an API key ([`docs/API.md`](docs/API.md));
+  application PDFs are read by AI to fill the merchant and owner fields.
+- Scrubs every bank statement: balance math, missing months, NSFs, negative days, existing advances,
+  new funding (stacking) and signs of PDF editing; an internal AI Risk Report sums it up.
+- Ranks lenders by appetite and their past approvals, and stamps each lender's copy of the PDFs
+  with a traceable watermark.
+- Sends routine emails on its own: missing documents, stip chases, lender follow-ups; contract
+  requests and clawback confirmations are one click.
 - Runs on free tiers: Vercel (app), Supabase (database, sign-in, cron), Google Workspace (Gmail, Drive).
-  No phone or SMS features.
+  No phone or SMS features, no Salesforce, no e-signature (the website handles the application).
 
 How it fits together: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Research and roadmap:
 [`docs/PLAN.md`](docs/PLAN.md).
