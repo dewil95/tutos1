@@ -103,11 +103,23 @@ Vercel also calls the same route once a day (`apps/web/vercel.json`) as a fallba
 Try a few deals with `MCA_EMAIL_DRY_RUN=true`: each "sent" email appears on the deal timeline
 with its exact To and CC. When it looks right, set `MCA_EMAIL_DRY_RUN=false` in Vercel and redeploy.
 
-### Free-tier limits to know
+### Free plans while testing, and when to upgrade
 
-- Vercel Hobby is licensed for personal, non-commercial use; move to Pro once the CRM runs the business.
-- Supabase Free pauses after 7 days without activity (the cron keeps it awake) and holds 500 MB;
-  files live in Drive, so the database stays small.
-- Uploads through the CRM are limited to about 4 MB per request by Vercel; larger files can be
-  emailed to the funding inbox and are filed automatically.
-- Gmail sends up to 2,000 messages a day per Workspace user.
+The CRM runs on free plans while you test with dry-run mode and sample deals. Your website can
+stay on Cloudflare; it only talks to the CRM through `/api/v1` with an API key. Before real
+merchant data goes in:
+
+- [ ] **Supabase Pro** (about $25/month): daily backups you can restore, no pausing, 8 GB.
+      The free plan has no restorable backups, pauses after 7 days without activity (the cron
+      keeps it awake) and holds 500 MB; files live in Drive, but the AI results stored per deal
+      can fill that within a year at around 100 deals a month.
+- [ ] **Vercel Pro** (about $20/month): Hobby is licensed for personal, non-commercial use only.
+      (Alternative: host the app on your existing Cloudflare Workers account; that is a migration
+      to test first.)
+- [ ] **Gemini key from a billing-enabled Google Cloud project**, so statements are not used to
+      improve Google's products.
+- [ ] A few deals in dry-run mode look right, then set `MCA_EMAIL_DRY_RUN=false`.
+
+Limits that stay on any plan: uploads through the CRM are about 4 MB per request (Vercel), larger
+files can be emailed to the funding inbox and are filed automatically; Gmail sends up to 2,000
+messages a day per Workspace user.
