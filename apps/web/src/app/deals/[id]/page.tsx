@@ -1,12 +1,14 @@
 import type { FunderReply } from "@mca/ai";
-import { buildRecipients, type PositionLine } from "@mca/connectors";
+import type { PositionLine } from "@mca/connectors";
 import { getPrisma, type DocumentType } from "@mca/db";
-import { matchFunders, type BankMetrics, type PaperGrade } from "@mca/domain";
+import type { BankMetrics } from "@mca/domain";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { positionsToText } from "@/server/submissions";
+import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
+import { SelectTopLenders } from "./SelectTopLenders";
 import {
   analyseDealStatements,
   relabelDocument,
@@ -90,60 +92,22 @@ export default async function DealPage({
   const thisDealSubs = submissions.filter((s) => s.dealId === id);
   const positions = (deal.submissionPositions ?? []) as unknown as PositionLine[];
 
-  // Appetite hints (not a hard block) once statements have been analysed.
   const metrics = analysis?.metrics as unknown as BankMetrics | undefined;
-  const hints = new Map<string, string[]>();
-  if (metrics && deal.paperGrade) {
-    const tib = deal.merchant.startDate
-      ? Math.floor((Date.now() - deal.merchant.startDate.getTime()) / (30.44 * 86_400_000))
-      : null;
-    const matches = matchFunders(
-      {
-        paperGrade: deal.paperGrade as PaperGrade,
-        avgMonthlyTrueRevenue: metrics.avgMonthlyTrueRevenue,
-        timeInBusinessMonths: tib,
-        ficoEstimate: null,
-        existingPositions: positions.length,
-        requestedAmount: deal.requestedAmount ? Number(deal.requestedAmount) : null,
-        state: deal.merchant.state,
-        naics: deal.merchant.naics,
-      },
-      funders.flatMap((f) =>
-        f.programs.map((p) => ({
-          programId: f.id,
-          funderName: f.name,
-          programName: p.name,
-          paperGrades: p.paperGrades,
-          minMonthlyRevenue: p.minMonthlyRevenue ? Number(p.minMonthlyRevenue) : null,
-          minTimeInBusinessMonths: p.minTimeInBusinessMonths,
-          minFico: p.minFico,
-          maxExistingPositions: p.maxExistingPositions,
-          positionAppetite: p.positionAppetite,
-          minAdvance: p.minAdvance ? Number(p.minAdvance) : null,
-          maxAdvance: p.maxAdvance ? Number(p.maxAdvance) : null,
-          allowedStates: p.allowedStates,
-          excludedStates: p.excludedStates,
-          excludedNaics: p.excludedNaics,
-          isActive: p.isActive,
-        })),
-      ),
-    );
-    for (const m of matches) if (!m.eligible) hints.set(m.programId, m.failedRules);
-  }
-
-  const lenderRows = funders.map((f) => {
-    let to: string[] = [];
-    let cc: string[] = [];
-    let problem: string | null = null;
-    try {
-      ({ to, cc } = buildRecipients(
-        { emails: [f.submissionTo, ...f.submissionCc].filter((e): e is string => !!e) },
-        { teamCc: tenant.teamCc, from: tenant.fromAddress ?? undefined },
-      ));
-    } catch (err) {
-      problem = err instanceof Error ? err.message : String(err);
-    }
-    return { f, to, cc, problem, already: submittedFunderIds.has(f.id), hint: hints.get(f.id) };
+  const history = await lenderHistory(prisma, user.tenantId, deal.paperGrade);
+  const rows = lenderRows({
+    funders,
+    tenant,
+    history,
+    alreadySubmitted: submittedFunderIds,
+    profile: dealProfile({
+      paperGrade: deal.paperGrade,
+      avgMonthlyTrueRevenue: metrics?.avgMonthlyTrueRevenue ?? null,
+      startDate: deal.merchant.startDate,
+      existingPositions: positions.length,
+      requestedAmount: deal.requestedAmount ? Number(deal.requestedAmount) : null,
+      state: deal.merchant.state,
+      naics: deal.merchant.naics,
+    }),
   });
 
   const replyFor = (submissionId: string) =>
@@ -356,18 +320,28 @@ export default async function DealPage({
               To = the lender&apos;s first address · CC = its other addresses + team (
               {tenant.teamCc.join(", ") || "none"}) · never BCC
             </p>
+            <SelectTopLenders />
             <ul className="lenders">
-              {lenderRows.map(({ f, to, cc, problem, already, hint }) => (
-                <li key={f.id} className={already || problem ? "disabled" : ""}>
+              {rows.map(({ funder: f, to, cc, problem, already, eligible, score, reasons }) => (
+                <li
+                  key={f.id}
+                  className={already || problem ? "disabled" : eligible ? "" : "outside"}
+                >
                   <label>
                     <input
                       type="checkbox"
                       name="funderIds"
                       value={f.id}
                       disabled={already || !!problem}
+                      data-recommended={!already && !problem && eligible ? "1" : undefined}
                     />{" "}
                     <strong>{f.name}</strong>
-                  </label>
+                  </label>{" "}
+                  {!already && !problem ? (
+                    <span className={`score ${eligible ? "fit" : "nofit"}`} title="Fit score 0-100">
+                      {eligible ? `fit ${score}` : "outside appetite"}
+                    </span>
+                  ) : null}
                   {already ? (
                     <span className="small muted"> already submitted for this merchant</span>
                   ) : null}
@@ -378,8 +352,10 @@ export default async function DealPage({
                       {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
                     </div>
                   ) : null}
-                  {hint ? (
-                    <div className="small warn">Outside appetite: {hint.join("; ")}</div>
+                  {reasons.length && !already ? (
+                    <div className={`small ${eligible ? "muted" : "warn"}`}>
+                      {reasons.join(" · ")}
+                    </div>
                   ) : null}
                 </li>
               ))}

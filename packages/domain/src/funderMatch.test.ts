@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchFunders, type FunderProgramRule } from "./funderMatch";
+import { matchFunders, rankFunders, type DealProfile, type FunderProgramRule } from "./funderMatch";
 
 const programs: FunderProgramRule[] = [
   {
@@ -102,5 +102,54 @@ describe("matchFunders", () => {
       programs.map((p) => ({ ...p, isActive: false })),
     );
     expect(res).toEqual([]);
+  });
+});
+
+describe("rankFunders", () => {
+  const second: DealProfile = {
+    paperGrade: "B",
+    avgMonthlyTrueRevenue: 30_000,
+    timeInBusinessMonths: 24,
+    ficoEstimate: null,
+    existingPositions: 1,
+    requestedAmount: 25_000,
+    state: "FL",
+    naics: "722511",
+  };
+
+  it("puts eligible lenders first, with reasons for the rest", () => {
+    const tight = {
+      ...programs[1]!,
+      programId: "c-tight",
+      funderName: "Funder C",
+      minMonthlyRevenue: 29_000,
+    };
+    const r = rankFunders({ ...second, existingPositions: 2 }, [...programs, tight]);
+    expect(r.map((x) => [x.funderName, x.eligible])).toEqual([
+      ["Funder B", true],
+      ["Funder C", true],
+      ["Funder A", false],
+    ]);
+    // B clears its revenue minimum by far more than C does.
+    expect(r[0]!.score).toBeGreaterThan(r[1]!.score);
+    expect(r[0]!.reasons).toContain("revenue well above minimum");
+    expect(r[2]!.reasons).toContain("more than 1 existing positions");
+    expect(r[2]!.score).toBeLessThan(r[1]!.score);
+  });
+
+  it("rewards lenders that approve Ascend's files", () => {
+    const twin = { ...programs[1]!, programId: "b-twin", funderName: "Funder B2" };
+    const r = rankFunders(second, [programs[1]!, twin], {
+      "b-twin": { submitted: 10, approved: 7, declined: 3 },
+      "b-second": { submitted: 10, approved: 1, declined: 9 },
+    });
+    expect(r[0]!.funderName).toBe("Funder B2");
+    expect(r[0]!.reasons).toContain("approved 7 of 10 sent");
+  });
+
+  it("still ranks before statements are analysed (no grade or revenue yet)", () => {
+    const r = rankFunders({ ...second, paperGrade: null, avgMonthlyTrueRevenue: null }, programs);
+    expect(r.find((x) => x.programId === "b-second")!.eligible).toBe(true);
+    expect(r.every((x) => !x.failedRules.some((f) => /grade|revenue/.test(f)))).toBe(true);
   });
 });

@@ -111,12 +111,18 @@ describe.runIf(reachable)("send to lenders (dry run)", () => {
       ["Zlur", "SENT", ["submissions@zlur.com"], ["jonas@ascendfund.co", "savvy@ascendfund.co"]],
     ]);
 
+    // Each lender's copy carries its own watermark reference.
+    const tags = subs.map((s) => s.watermarkTag);
+    expect(tags.every((t) => /^[A-Z2-9]{8}$/.test(t ?? ""))).toBe(true);
+    expect(new Set(tags).size).toBe(2);
+
     const emails = await prisma.activity.findMany({ where: { dealId, direction: "OUTBOUND" } });
     expect(emails).toHaveLength(2);
     for (const e of emails) {
       expect(e.subject).toBe("[DRY RUN] New Deal Submission - Acme Pizza LLC");
       expect(e.body).toContain("Fundzilla: $8,000");
       expect(e.toAddress).not.toMatch(/bcc/i);
+      expect(e.body).toMatch(/Each PDF stamped for (Mazal|Zlur), ref [A-Z2-9]{8}/);
     }
     // Each lender's email names only that lender's addresses.
     expect(

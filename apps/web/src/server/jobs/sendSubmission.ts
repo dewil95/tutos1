@@ -2,6 +2,7 @@ import {
   buildSubmissionEmail,
   EmailFunderConnector,
   MAX_ATTACHMENT_BYTES,
+  watermarkAttachment,
   type Attachment,
   type PositionLine,
   type SubmissionPackage,
@@ -67,7 +68,11 @@ export async function handleSendSubmission(prisma: PrismaClient, job: ClaimedJob
           direction: "OUTBOUND",
           userId: sub.sentById,
           subject: `[DRY RUN] ${email.subject}`,
-          body: `${email.text}\n\n--- Attachments ---\n${docs.map((d) => d.fileName).join("\n")}`,
+          body:
+            `${email.text}\n\n--- Attachments ---\n${docs.map((d) => d.fileName).join("\n")}` +
+            (sub.watermarkTag && watermarkEnabled(deal.tenant.settings)
+              ? `\n\nEach PDF stamped for ${sub.funder.name}, ref ${sub.watermarkTag}`
+              : ""),
           fromAddress: from,
           toAddress: `To: ${email.to.join(", ")} | Cc: ${email.cc.join(", ")}`,
           externalId: `dry-run:${sub.id}`,
@@ -108,6 +113,19 @@ export async function handleSendSubmission(prisma: PrismaClient, job: ClaimedJob
       data: await mailbox.drive.download(d.driveFileId),
     });
   }
+  // Each lender gets its own stamped copy (footer + metadata tag) so a leaked file is traceable.
+  const skipped: string[] = [];
+  if (sub.watermarkTag && watermarkEnabled(deal.tenant.settings)) {
+    for (const [i, a] of attachments.entries()) {
+      const r = await watermarkAttachment(a, {
+        brokerName: deal.tenant.name,
+        lenderName: sub.funder.name,
+        tag: sub.watermarkTag,
+      });
+      attachments[i] = r.attachment;
+      if (!r.stamped) skipped.push(`${a.fileName} (${r.skippedReason})`);
+    }
+  }
   const tooBig = attachments.reduce((n, a) => n + a.data.length, 0) > MAX_ATTACHMENT_BYTES;
   let links: SubmissionPackage["links"];
   if (tooBig) {
@@ -135,7 +153,17 @@ export async function handleSendSubmission(prisma: PrismaClient, job: ClaimedJob
     messageId: receipt.messageId ?? null,
     threadId: receipt.externalRef,
     viaDriveLinks: tooBig,
+    watermarkSkipped: tooBig ? ["all files (sent as Drive links)"] : skipped,
   });
+}
+
+/** Watermarking is on unless the tenant turned it off (Tenant.settings.watermark = false). */
+export function watermarkEnabled(settings: unknown): boolean {
+  return !(
+    settings &&
+    typeof settings === "object" &&
+    (settings as { watermark?: unknown }).watermark === false
+  );
 }
 
 async function markSent(
@@ -148,6 +176,7 @@ async function markSent(
     threadId: string | null;
     dryRun?: boolean;
     viaDriveLinks?: boolean;
+    watermarkSkipped?: string[];
   },
 ) {
   const now = new Date();
@@ -178,6 +207,7 @@ async function markSent(
           funderName,
           dryRun: r.dryRun ?? false,
           viaDriveLinks: r.viaDriveLinks ?? false,
+          watermarkSkipped: r.watermarkSkipped ?? [],
         },
       },
     }),

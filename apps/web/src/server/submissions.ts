@@ -1,4 +1,4 @@
-import { planSubmissions, type PositionLine } from "@mca/connectors";
+import { newWatermarkTag, planSubmissions, type PositionLine } from "@mca/connectors";
 import { enqueueJob, type PrismaClient } from "@mca/db";
 
 /**
@@ -128,6 +128,7 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
         toAddresses: p.recipients.to,
         ccAddresses: p.recipients.cc,
         packageDocumentIds: req.documentIds,
+        watermarkTag: newWatermarkTag(),
       },
     });
     submissionIds.push(sub.id);

@@ -265,3 +265,20 @@ table.offers td {
 .crumbs {
   color: var(--muted);
 }
+.score {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.score.fit {
+  color: #2f9e62;
+  border-color: #3aa76d;
+}
+.score.nofit {
+  color: #c27c0e;
+}
+ul.lenders li.outside {
+  opacity: 0.8;
+}
