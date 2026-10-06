@@ -10,6 +10,7 @@ import { positionsToText } from "@/server/submissions";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
+import { DealHeader } from "./DealHeader";
 import { BankScrubPanel } from "./BankScrubPanel";
 import { RiskReportPanel } from "./RiskReportPanel";
 import { ContractRequestForm } from "./ContractRequestForm";
@@ -146,29 +147,17 @@ export default async function DealPage({
 
   return (
     <>
-      <p className="crumbs">
-        <a href="/">Deals</a> / {merchantName}
-      </p>
-      <h1>{merchantName}</h1>
-      <p className="meta">
-        {label(deal.stage)}
-        {deal.paperGrade ? ` · grade ${deal.paperGrade}` : ""}
-        {deal.requestedAmount ? ` · requested ${money(Number(deal.requestedAmount))}` : ""}
-        {deal.merchant.state ? ` · ${deal.merchant.state}` : ""}
-        {deal.owner ? ` · ${deal.owner.name}` : ""}
-        {deal.driveFolderId ? (
-          <>
-            {" · "}
-            <a
-              href={`https://drive.google.com/drive/folders/${deal.driveFolderId}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Drive folder
-            </a>
-          </>
-        ) : null}
-      </p>
+      <DealHeader
+        name={merchantName}
+        legalName={deal.merchant.legalName}
+        stage={deal.stage}
+        grade={deal.paperGrade}
+        requested={deal.requestedAmount ? Number(deal.requestedAmount) : null}
+        state={deal.merchant.state}
+        ownerName={deal.owner?.name ?? null}
+        source={deal.source}
+        driveFolderId={deal.driveFolderId}
+      />
 
       {flash.error ? <p className="notice error">{flash.error}</p> : null}
       {flash.queued ? (
@@ -202,124 +191,126 @@ export default async function DealPage({
 
       <MerchantPanel deal={deal} merchant={deal.merchant} owners={deal.merchant.owners} />
 
-      <section className="panel">
+      <section className="panel" id="lenders">
         <h2>Lender status</h2>
         {thisDealSubs.length === 0 ? <p className="empty">Not sent to any lender yet.</p> : null}
         {thisDealSubs.length ? (
-          <table className="grid">
-            <thead>
-              <tr>
-                <th>Lender</th>
-                <th>Status</th>
-                <th>Sent</th>
-                <th>To / CC</th>
-                <th>Latest reply</th>
-              </tr>
-            </thead>
-            <tbody>
-              {thisDealSubs.map((s) => {
-                const job = jobs.find((j) => j.dedupeKey === `send:${s.id}`);
-                const reply = replyFor(s.id);
-                return (
-                  <tr key={s.id}>
-                    <td>{s.funder.name}</td>
-                    <td>
-                      <span className={`pill ${s.status.toLowerCase()}`}>{label(s.status)}</span>
-                      {s.status === "DRAFT" && job?.status === "FAILED" ? (
-                        <form action={retrySubmission.bind(null, id)} className="inline">
-                          <input type="hidden" name="submissionId" value={s.id} />
-                          <span className="error small">
-                            send failed: {job.lastError?.slice(0, 120)}
-                          </span>{" "}
-                          <button type="submit">Retry</button>
-                        </form>
-                      ) : s.status === "DRAFT" ? (
-                        <span className="small muted"> sending…</span>
-                      ) : null}
-                      {s.declineReason ? (
-                        <div className="small muted">{s.declineReason}</div>
-                      ) : null}
-                    </td>
-                    <td className="small">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
-                    <td className="small">
-                      <div>To: {s.toAddresses.join(", ")}</div>
-                      {s.ccAddresses.length ? (
-                        <div className="muted">CC: {s.ccAddresses.join(", ")}</div>
-                      ) : null}
-                    </td>
-                    <td className="small">
-                      {reply ? (
-                        <>
-                          <div>{reply.r.summary}</div>
-                          {reply.r.offers.length ? (
-                            <table className="offers">
-                              <tbody>
-                                {reply.r.offers.map((o, i) => (
-                                  <tr key={i}>
-                                    <td>{money(o.advanceAmount)}</td>
-                                    <td>{o.factorRate}</td>
-                                    <td>
-                                      {o.paymentAmount
-                                        ? `${money(o.paymentAmount)} ${o.paymentFrequency?.toLowerCase() ?? ""}`
-                                        : ""}
-                                    </td>
-                                    <td>
-                                      {o.termDays
-                                        ? `${o.termDays}d`
-                                        : o.numberOfPayments
-                                          ? `${o.numberOfPayments} pmts`
+          <div className="tablewrap">
+            <table className="grid">
+              <thead>
+                <tr>
+                  <th>Lender</th>
+                  <th>Status</th>
+                  <th>Sent</th>
+                  <th>To / CC</th>
+                  <th>Latest reply</th>
+                </tr>
+              </thead>
+              <tbody>
+                {thisDealSubs.map((s) => {
+                  const job = jobs.find((j) => j.dedupeKey === `send:${s.id}`);
+                  const reply = replyFor(s.id);
+                  return (
+                    <tr key={s.id}>
+                      <td>{s.funder.name}</td>
+                      <td>
+                        <span className={`pill ${s.status.toLowerCase()}`}>{label(s.status)}</span>
+                        {s.status === "DRAFT" && job?.status === "FAILED" ? (
+                          <form action={retrySubmission.bind(null, id)} className="inline">
+                            <input type="hidden" name="submissionId" value={s.id} />
+                            <span className="error small">
+                              send failed: {job.lastError?.slice(0, 120)}
+                            </span>{" "}
+                            <button type="submit">Retry</button>
+                          </form>
+                        ) : s.status === "DRAFT" ? (
+                          <span className="small muted"> sending…</span>
+                        ) : null}
+                        {s.declineReason ? (
+                          <div className="small muted">{s.declineReason}</div>
+                        ) : null}
+                      </td>
+                      <td className="small">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
+                      <td className="addr">
+                        <div>To: {s.toAddresses.join(", ")}</div>
+                        {s.ccAddresses.length ? (
+                          <div className="muted">CC: {s.ccAddresses.join(", ")}</div>
+                        ) : null}
+                      </td>
+                      <td className="small">
+                        {reply ? (
+                          <>
+                            <div>{reply.r.summary}</div>
+                            {reply.r.offers.length ? (
+                              <table className="offers">
+                                <tbody>
+                                  {reply.r.offers.map((o, i) => (
+                                    <tr key={i}>
+                                      <td>{money(o.advanceAmount)}</td>
+                                      <td>{o.factorRate}</td>
+                                      <td>
+                                        {o.paymentAmount
+                                          ? `${money(o.paymentAmount)} ${o.paymentFrequency?.toLowerCase() ?? ""}`
                                           : ""}
-                                    </td>
-                                    <td>
-                                      {o.commissionPoints !== null
-                                        ? `${o.commissionPoints} pts`
-                                        : ""}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : null}
-                          {reply.r.offers.length ? (
-                            <div className="muted">
-                              AI-read offer — check against the email before quoting.
-                            </div>
-                          ) : null}
-                          {reply.r.intent === "FUNDED" &&
-                          reply.r.funded.requiresConfirmationReply ? (
-                            <form action={confirmClawback.bind(null, id)} className="inline">
-                              <input type="hidden" name="submissionId" value={s.id} />
-                              <input type="hidden" name="activityId" value={reply.a.id} />
-                              <button type="submit">Reply: confirm clawback policy</button>
-                            </form>
-                          ) : null}
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                      {s.status === "APPROVED" && s.gmailThreadId ? (
-                        <ContractRequestForm
-                          dealId={id}
-                          submissionId={s.id}
-                          merchantEmail={deal.merchant.email}
-                          offer={reply?.r.offers[0] ?? null}
-                          stipFiles={allDocuments
-                            .filter(
-                              (d) => d.type === "VOIDED_CHECK" || d.type === "DRIVERS_LICENSE",
-                            )
-                            .map((d) => ({ id: d.id, fileName: d.fileName }))}
-                        />
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                                      </td>
+                                      <td>
+                                        {o.termDays
+                                          ? `${o.termDays}d`
+                                          : o.numberOfPayments
+                                            ? `${o.numberOfPayments} pmts`
+                                            : ""}
+                                      </td>
+                                      <td>
+                                        {o.commissionPoints !== null
+                                          ? `${o.commissionPoints} pts`
+                                          : ""}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : null}
+                            {reply.r.offers.length ? (
+                              <div className="muted">
+                                AI-read offer — check against the email before quoting.
+                              </div>
+                            ) : null}
+                            {reply.r.intent === "FUNDED" &&
+                            reply.r.funded.requiresConfirmationReply ? (
+                              <form action={confirmClawback.bind(null, id)} className="inline">
+                                <input type="hidden" name="submissionId" value={s.id} />
+                                <input type="hidden" name="activityId" value={reply.a.id} />
+                                <button type="submit">Reply: confirm clawback policy</button>
+                              </form>
+                            ) : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                        {s.status === "APPROVED" && s.gmailThreadId ? (
+                          <ContractRequestForm
+                            dealId={id}
+                            submissionId={s.id}
+                            merchantEmail={deal.merchant.email}
+                            offer={reply?.r.offers[0] ?? null}
+                            stipFiles={allDocuments
+                              .filter(
+                                (d) => d.type === "VOIDED_CHECK" || d.type === "DRIVERS_LICENSE",
+                              )
+                              .map((d) => ({ id: d.id, fileName: d.fileName }))}
+                          />
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </section>
 
-      <form action={sendToLenders.bind(null, id)} className="panel">
+      <form action={sendToLenders.bind(null, id)} className="panel" id="ship">
         <h2>Ship the file</h2>
         <div className="cols">
           <div>
@@ -401,7 +392,7 @@ export default async function DealPage({
                   ) : null}
                   {problem ? <span className="small error"> {problem}</span> : null}
                   {!problem ? (
-                    <div className="small muted">
+                    <div className="addr">
                       To: {to.join(", ")}
                       {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
                     </div>
@@ -435,7 +426,7 @@ export default async function DealPage({
         </p>
       </form>
 
-      <section className="panel">
+      <section className="panel" id="files">
         <h2>Add files</h2>
         <form action={uploadFiles.bind(null, id)} className="row">
           <input
@@ -487,12 +478,12 @@ export default async function DealPage({
         hasScrub={Boolean(analysis?.scrub)}
       />
 
-      <section className="panel">
+      <section className="panel" id="timeline">
         <h2>Timeline</h2>
         {activities.length === 0 ? <p className="empty">No emails yet.</p> : null}
         <ul className="timeline">
           {activities.map((a) => (
-            <li key={a.id}>
+            <li key={a.id} className={a.direction === "INBOUND" ? "inbound" : ""}>
               <span className="small muted">
                 {a.occurredAt.toLocaleString("en-US")} · {a.direction.toLowerCase()} ·{" "}
                 {a.fromAddress ?? ""}

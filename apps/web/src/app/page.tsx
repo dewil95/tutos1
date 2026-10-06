@@ -25,6 +25,7 @@ interface BoardDeal {
   merchantName: string;
   ownerName: string | null;
   updatedAt: Date;
+  stageChangedAt: Date;
 }
 
 async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error: string | null }> {
@@ -48,6 +49,7 @@ async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error:
         merchantName: d.merchant.dba ?? d.merchant.legalName,
         ownerName: d.owner?.name ?? null,
         updatedAt: d.updatedAt,
+        stageChangedAt: d.stageChangedAt,
       })),
       error: null,
     };
@@ -56,15 +58,48 @@ async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error:
   }
 }
 
+const STAGE_LABEL: Partial<Record<DealStage, string>> = {
+  INTAKE: "Intake",
+  DOCS_REQUESTED: "Docs requested",
+  DOCS_RECEIVED: "Docs received",
+  PRE_UNDERWRITING: "Scrubbed",
+  READY_TO_SUBMIT: "Ready to submit",
+  SUBMITTED: "Submitted",
+  OFFERS_RECEIVED: "Offers",
+  OFFER_ACCEPTED: "Offer accepted",
+  STIPS: "Stips",
+  CONTRACT_OUT: "Contract out",
+  FUNDED: "Funded",
+};
+
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+function daysIn(d: Date): string {
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  return days <= 0 ? "today" : `${days}d`;
+}
+
 export default async function DealBoardPage() {
   const user = await requireUser();
   const { deals, error } = await loadDeals(user.tenantId);
+  const open = deals.filter((d) => d.stage !== "FUNDED");
+  const pipeline = open.reduce((a, d) => a + (d.requestedAmount ?? 0), 0);
   return (
     <>
-      <h1 style={{ fontSize: 20, margin: "4px 0 12px" }}>Deal board</h1>
+      <header className="page-head">
+        <div>
+          <h1>Deals</h1>
+          <p>
+            {open.length} open · {money(pipeline)} requested in the pipeline
+          </p>
+        </div>
+        <a className="button primary" href="/deals/new">
+          New deal
+        </a>
+      </header>
       {error ? (
-        <p className="empty">
-          Database not reachable ({error}). Check DATABASE_URL and run <code>pnpm db:migrate</code>{" "}
+        <p className="notice error">
+          Database not reachable ({error}). Check DATABASE_URL and run <code>pnpm db:deploy</code>{" "}
           (see README).
         </p>
       ) : null}
@@ -74,19 +109,31 @@ export default async function DealBoardPage() {
           return (
             <section className="column" key={stage}>
               <h3>
-                {stage.replace(/_/g, " ").toLowerCase()} ({inStage.length})
+                {STAGE_LABEL[stage] ?? stage}
+                <span className="count">{inStage.length}</span>
               </h3>
-              {inStage.length === 0 ? <p className="empty">—</p> : null}
+              {inStage.length === 0 ? <p className="empty">No deals</p> : null}
               {inStage.map((d) => (
                 <a className="card" key={d.id} href={`/deals/${d.id}`}>
-                  <div>{d.merchantName}</div>
-                  <div className="meta">
-                    {d.requestedAmount
-                      ? `$${d.requestedAmount.toLocaleString("en-US")}`
-                      : "amount tbd"}
-                    {d.paperGrade ? ` · grade ${d.paperGrade}` : ""}
-                    {d.ownerName ? ` · ${d.ownerName}` : ""}
-                  </div>
+                  <span className="name">{d.merchantName}</span>
+                  <span className="amount">
+                    {d.requestedAmount ? (
+                      money(d.requestedAmount)
+                    ) : (
+                      <span className="faint">amount tbd</span>
+                    )}
+                  </span>
+                  <span className="meta">
+                    <span>
+                      {d.paperGrade ? (
+                        <span className={`grade ${d.paperGrade}`}>{d.paperGrade}</span>
+                      ) : null}{" "}
+                      {d.ownerName ?? ""}
+                    </span>
+                    <span className="faint" title="Time in this stage">
+                      {daysIn(d.stageChangedAt)}
+                    </span>
+                  </span>
                 </a>
               ))}
             </section>

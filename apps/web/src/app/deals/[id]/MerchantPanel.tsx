@@ -33,7 +33,7 @@ export function MerchantPanel({
     .filter(Boolean)
     .join(", ");
   return (
-    <section className="panel">
+    <section className="panel" id="merchant">
       <h2>Merchant &amp; owners</h2>
       <p className="small muted">
         Source: {deal.source}
