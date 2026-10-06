@@ -1,5 +1,5 @@
 import { runPositionDetection, type StatementExtraction } from "@mca/ai";
-import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
+import { enqueueJob, type ClaimedJob, type Prisma, type PrismaClient } from "@mca/db";
 import { computeBankMetrics, gradePaper, scrubStatements, type ScrubRow } from "@mca/domain";
 import { llmClient } from "../ai";
 import { PermanentJobError } from "./errors";
@@ -40,6 +40,7 @@ export function collectRows(
 /**
  * Bank scrub, step 2 of 2: deterministic checks over all extracted months (balance math, gaps,
  * NSFs, negative days, holdback burden, stacking), metrics + rule grade, and A2 positions.
+ * Then queues the internal AI Risk Report.
  */
 export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob): Promise<void> {
   const { dealId } = job.payload as unknown as StatementScrubPayload;
@@ -154,5 +155,12 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
         },
       },
     });
+  });
+  // Next: the internal Risk Report built on this scrub.
+  await enqueueJob(prisma, {
+    tenantId: deal.tenantId,
+    type: "RISK_REPORT",
+    payload: { dealId },
+    dedupeKey: `risk:${dealId}`,
   });
 }

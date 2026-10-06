@@ -58,8 +58,11 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
 
   const docs = await prisma.document.findMany({
     where: { id: { in: req.documentIds }, dealId: deal.id },
-    select: { id: true },
+    select: { id: true, internalOnly: true },
   });
+  // The Risk Report and other team-only files can never go to a lender.
+  if (docs.some((d) => d.internalOnly))
+    throw new Error("Internal files cannot be sent to lenders.");
   if (docs.length !== new Set(req.documentIds).size)
     throw new Error("Some files are not on this deal.");
 

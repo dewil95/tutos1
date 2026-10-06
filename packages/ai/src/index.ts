@@ -13,3 +13,5 @@ export * from "./schemas/application";
 export * from "./jobs/a5ApplicationReading";
 export * from "./schemas/documentQa";
 export * from "./jobs/a4DocumentQa";
+export * from "./schemas/riskReport";
+export * from "./jobs/riskReport";

@@ -196,3 +196,17 @@ export async function verifyScrub(dealId: string, form: FormData) {
   });
   revalidatePath(`/deals/${dealId}`);
 }
+
+export async function regenerateRiskReport(dealId: string) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  await prisma.deal.findFirstOrThrow({ where: { id: dealId, tenantId: user.tenantId } });
+  const jobId = await enqueueJob(prisma, {
+    tenantId: user.tenantId,
+    type: "RISK_REPORT",
+    payload: { dealId },
+    dedupeKey: `risk:${dealId}`,
+  });
+  after(() => runDueJobs(prisma, { budgetMs: 55_000, ids: [jobId] }).then(() => undefined));
+  redirect(back(dealId, { risk: "1" }));
+}

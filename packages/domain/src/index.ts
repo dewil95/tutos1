@@ -4,3 +4,4 @@ export * from "./bankMetrics";
 export * from "./qualification";
 export * from "./funderMatch";
 export * from "./scrub";
+export * from "./riskScore";

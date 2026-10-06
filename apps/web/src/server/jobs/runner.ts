@@ -11,6 +11,7 @@ import { handleApplicationRead } from "./applicationRead";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
+import { handleRiskReport } from "./riskReport";
 import { handleStatementExtract } from "./statementExtract";
 import { handleStatementScrub } from "./statementScrub";
 
@@ -23,6 +24,7 @@ const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   APPLICATION_READ: handleApplicationRead,
   STATEMENT_EXTRACT: handleStatementExtract,
   STATEMENT_SCRUB: handleStatementScrub,
+  RISK_REPORT: handleRiskReport,
 };
 
 /** Jobs that read whole PDFs with the primary model can take up to ~40 s. */

@@ -139,7 +139,15 @@ export class DriveProvider implements StorageProvider {
 }
 
 /** Standard per-deal folder layout under the CRM root folder. */
-export const DEAL_SUBFOLDERS = ["Application", "Statements", "MTD", "Stips", "Contracts"] as const;
+export const DEAL_SUBFOLDERS = [
+  "Application",
+  "Statements",
+  "MTD",
+  "Stips",
+  "Contracts",
+  // Team-only files (AI Risk Report); never offered for a lender package.
+  "Internal",
+] as const;
 export type DealSubfolder = (typeof DEAL_SUBFOLDERS)[number];
 
 export function dealFolderPath(merchantName: string, dealId: string): string[] {

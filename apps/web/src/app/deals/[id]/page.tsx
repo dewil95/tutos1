@@ -11,6 +11,7 @@ import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
 import { BankScrubPanel } from "./BankScrubPanel";
+import { RiskReportPanel } from "./RiskReportPanel";
 import {
   analyseDealStatements,
   relabelDocument,
@@ -61,7 +62,7 @@ export default async function DealPage({
   });
   if (!deal) notFound();
 
-  const [tenant, documents, submissions, funders, activities, analysis, mailbox] =
+  const [tenant, allDocuments, submissions, funders, activities, analysis, mailbox] =
     await Promise.all([
       prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId } }),
       prisma.document.findMany({
@@ -91,6 +92,13 @@ export default async function DealPage({
     select: { dedupeKey: true, status: true, lastError: true, runAt: true },
   });
 
+  // Team-only files (Risk Report) are listed separately and can never be packaged.
+  const documents = allDocuments.filter((d) => !d.internalOnly);
+  const riskPdf = allDocuments.find(
+    (d) =>
+      d.internalOnly &&
+      d.id === (deal.riskReport as { pdfDocumentId?: string } | null)?.pdfDocumentId,
+  );
   const merchantName = deal.merchant.dba ?? deal.merchant.legalName;
   const preselected = new Set(defaultPackage(documents));
   const submittedFunderIds = new Set(
@@ -171,6 +179,9 @@ export default async function DealPage({
       ) : null}
       {flash.analysing ? (
         <p className="notice ok">Bank scrub started. Refresh in a minute.</p>
+      ) : null}
+      {flash.risk ? (
+        <p className="notice ok">Risk report is being regenerated. Refresh in a minute.</p>
       ) : null}
       {!mailbox ? (
         <p className="notice warn">
@@ -437,6 +448,13 @@ export default async function DealPage({
       </section>
 
       <BankScrubPanel dealId={id} analysis={analysis} pending={pendingStatements} />
+
+      <RiskReportPanel
+        dealId={id}
+        report={deal.riskReport}
+        pdfLink={riskPdf?.driveWebViewLink ?? null}
+        hasScrub={Boolean(analysis?.scrub)}
+      />
 
       <section className="panel">
         <h2>Timeline</h2>

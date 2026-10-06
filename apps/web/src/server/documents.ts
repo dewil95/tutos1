@@ -136,8 +136,15 @@ function subfolderForType(t: DocumentType): DealSubfolder {
 
 /** Default package: the newest application plus the latest four bank statements. */
 export function defaultPackage<
-  D extends { id: string; type: DocumentType; createdAt: Date; periodEnd: Date | null },
->(docs: D[]): string[] {
+  D extends {
+    id: string;
+    type: DocumentType;
+    createdAt: Date;
+    periodEnd: Date | null;
+    internalOnly?: boolean;
+  },
+>(all: D[]): string[] {
+  const docs = all.filter((d) => !d.internalOnly);
   const newest = (a: D, b: D) =>
     (b.periodEnd ?? b.createdAt).getTime() - (a.periodEnd ?? a.createdAt).getTime();
   const app = docs.filter((d) => d.type === "APPLICATION").sort(newest)[0];
