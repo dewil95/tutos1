@@ -5,6 +5,7 @@ import { requireUser } from "@/server/auth";
 import { emailDryRun } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ApiKeyCreator } from "./ApiKeyCreator";
+import { EmailRulesSection } from "./EmailRulesSection";
 import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
@@ -152,6 +153,8 @@ export default async function SettingsPage({
         ) : null}
         {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
+
+      <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
 
       <section className="panel">
         <h2>Lenders ({funders.filter((f) => f.isActive).length} active)</h2>

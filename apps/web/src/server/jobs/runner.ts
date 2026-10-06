@@ -8,6 +8,7 @@ import {
 } from "@mca/db";
 import { PermanentJobError } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
+import { handleEmailRules } from "./emailRules";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
@@ -25,6 +26,7 @@ const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   STATEMENT_EXTRACT: handleStatementExtract,
   STATEMENT_SCRUB: handleStatementScrub,
   RISK_REPORT: handleRiskReport,
+  EMAIL_RULES: handleEmailRules,
 };
 
 /** Jobs that read whole PDFs with the primary model can take up to ~40 s. */

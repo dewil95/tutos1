@@ -32,6 +32,16 @@ async function tick(req: Request) {
       dedupeKey: `sync:${m.id}`,
     });
   }
+  // Automated emails (missing docs, stip chases, lender follow-ups) for every tenant.
+  const tenants = await prisma.tenant.findMany({ select: { id: true } });
+  for (const t of tenants) {
+    await enqueueJob(prisma, {
+      tenantId: t.id,
+      type: "EMAIL_RULES",
+      payload: {},
+      dedupeKey: `rules:${t.id}`,
+    });
+  }
   const result = await runDueJobs(prisma, { budgetMs: 45_000 });
   return Response.json({
     mailboxes: mailboxes.length,

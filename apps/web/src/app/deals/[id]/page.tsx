@@ -12,8 +12,10 @@ import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
 import { BankScrubPanel } from "./BankScrubPanel";
 import { RiskReportPanel } from "./RiskReportPanel";
+import { ContractRequestForm } from "./ContractRequestForm";
 import {
   analyseDealStatements,
+  confirmClawback,
   relabelDocument,
   retrySubmission,
   sendToLenders,
@@ -112,6 +114,7 @@ export default async function DealPage({
     (d) => d.type === "BANK_STATEMENT" && !d.extractedAt,
   ).length;
   const history = await lenderHistory(prisma, user.tenantId, deal.paperGrade);
+  const activePositions = await prisma.position.count({ where: { dealId: id, isActive: true } });
   const rows = lenderRows({
     funders,
     tenant,
@@ -121,7 +124,8 @@ export default async function DealPage({
       paperGrade: deal.paperGrade,
       avgMonthlyTrueRevenue: metrics?.avgMonthlyTrueRevenue ?? null,
       startDate: deal.merchant.startDate,
-      existingPositions: positions.length,
+      // Typed positions or advances the bank scrub saw still debiting, whichever is more.
+      existingPositions: Math.max(positions.length, activePositions),
       requestedAmount: deal.requestedAmount ? Number(deal.requestedAmount) : null,
       state: deal.merchant.state,
       naics: deal.merchant.naics,
@@ -179,6 +183,12 @@ export default async function DealPage({
       ) : null}
       {flash.analysing ? (
         <p className="notice ok">Bank scrub started. Refresh in a minute.</p>
+      ) : null}
+      {flash.sent ? (
+        <p className="notice ok">
+          {flash.sent}
+          {emailDryRun() ? " (dry run: written to the timeline)" : ""}.
+        </p>
       ) : null}
       {flash.risk ? (
         <p className="notice ok">Risk report is being regenerated. Refresh in a minute.</p>
@@ -275,10 +285,31 @@ export default async function DealPage({
                               AI-read offer — check against the email before quoting.
                             </div>
                           ) : null}
+                          {reply.r.intent === "FUNDED" &&
+                          reply.r.funded.requiresConfirmationReply ? (
+                            <form action={confirmClawback.bind(null, id)} className="inline">
+                              <input type="hidden" name="submissionId" value={s.id} />
+                              <input type="hidden" name="activityId" value={reply.a.id} />
+                              <button type="submit">Reply: confirm clawback policy</button>
+                            </form>
+                          ) : null}
                         </>
                       ) : (
                         "—"
                       )}
+                      {s.status === "APPROVED" && s.gmailThreadId ? (
+                        <ContractRequestForm
+                          dealId={id}
+                          submissionId={s.id}
+                          merchantEmail={deal.merchant.email}
+                          offer={reply?.r.offers[0] ?? null}
+                          stipFiles={allDocuments
+                            .filter(
+                              (d) => d.type === "VOIDED_CHECK" || d.type === "DRIVERS_LICENSE",
+                            )
+                            .map((d) => ({ id: d.id, fileName: d.fileName }))}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 );

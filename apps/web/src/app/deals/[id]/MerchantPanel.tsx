@@ -1,6 +1,6 @@
 import type { Deal, Merchant, Owner } from "@mca/db";
 import type { FieldConflict } from "@/server/applicationData";
-import { resolveConflict } from "./actions";
+import { resolveConflict, setEmailOptOut } from "./actions";
 
 interface AppData {
   readAt?: string;
@@ -96,6 +96,15 @@ export function MerchantPanel({
           </ul>
         </>
       ) : null}
+      <form action={setEmailOptOut.bind(null, deal.id)} className="row small">
+        <input type="hidden" name="optOut" value={merchant.emailOptOut ? "off" : "on"} />
+        <span className="muted">
+          Automated emails to this merchant: {merchant.emailOptOut ? "off" : "on"}
+        </span>
+        <button type="submit">
+          {merchant.emailOptOut ? "Turn back on" : "Stop automated emails"}
+        </button>
+      </form>
       {app.lowConfidenceFields?.length ? (
         <p className="small warn">
           Hard to read on the application: {app.lowConfidenceFields.join(", ")}

@@ -416,3 +416,17 @@ ul.flags {
   font-weight: 600;
   margin: 2px 0 0;
 }
+details.rule {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+details.rule summary {
+  cursor: pointer;
+}
+.tag.on {
+  color: #2f9e62;
+  border-color: #3aa76d;
+}
+details.contract {
+  margin-top: 6px;
+}
