@@ -16,7 +16,9 @@
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
-    "build": "echo 'db: nothing to build'"
+    "build": "echo 'db: nothing to build'",
+    "test": "vitest run",
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
@@ -28,6 +30,8 @@
     "@types/node": "^22.19.0",
     "@types/pg": "^8.15.5",
     "prisma": "7.10.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.3"
   }
 }

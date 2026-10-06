@@ -1,12 +1,13 @@
 /**
  * Eval runner: `pnpm --filter @mca/ai eval -- <job|all>`.
  * Reads evals/data/<job>/cases.json, runs the job, compares to `expected`, prints accuracy and
- * cost, exits non-zero when below evals/thresholds.json. Requires ANTHROPIC_API_KEY.
+ * cost, exits non-zero when below evals/thresholds.json. Uses the active provider
+ * (MCA_AI_PROVIDER, default gemini) and needs its API key (GEMINI_API_KEY by default).
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ClaudeClient, type AiRunRecord } from "../src/client";
+import { apiKeyEnvVar, createLlmClient, type AiRunRecord, type LlmClient } from "../src/client";
 import { runPositionDetection } from "../src/jobs/a2PositionDetection";
 import { runFunderReplyParsing } from "../src/jobs/a8FunderReplyParsing";
 import type { FunderReply } from "../src/schemas/funderReply";
@@ -39,7 +40,7 @@ interface A2Case {
 
 const thresholds = JSON.parse(readFileSync(join(here, "thresholds.json"), "utf8")) as Thresholds;
 
-async function evalA2(client: ClaudeClient): Promise<{ pass: boolean; summary: string }> {
+async function evalA2(client: LlmClient): Promise<{ pass: boolean; summary: string }> {
   const file = join(dataDir, "a2-position-detection", "cases.json");
   const cases = JSON.parse(readFileSync(file, "utf8")) as A2Case[];
   let tp = 0;
@@ -200,7 +201,7 @@ function checkA8(got: FunderReply, exp: A8Case["expected"]): string[] {
   return miss;
 }
 
-async function evalA8(client: ClaudeClient): Promise<{ pass: boolean; summary: string }> {
+async function evalA8(client: LlmClient): Promise<{ pass: boolean; summary: string }> {
   const file = join(dataDir, "a8-reply-parsing", "cases.json");
   const cases = JSON.parse(readFileSync(file, "utf8")) as A8Case[];
   let intentHits = 0;
@@ -231,7 +232,7 @@ async function evalA8(client: ClaudeClient): Promise<{ pass: boolean; summary: s
   };
 }
 
-const EVALS: Record<string, (c: ClaudeClient) => Promise<{ pass: boolean; summary: string }>> = {
+const EVALS: Record<string, (c: LlmClient) => Promise<{ pass: boolean; summary: string }>> = {
   "a2-position-detection": evalA2,
   "a8-reply-parsing": evalA8,
   // a1 / a3 runners are added as their golden sets land (docs/ai-evals.md)
@@ -239,12 +240,14 @@ const EVALS: Record<string, (c: ClaudeClient) => Promise<{ pass: boolean; summar
 
 async function main() {
   const target = process.argv[2] ?? "all";
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("ANTHROPIC_API_KEY is required to run evals");
+  const keyVar = apiKeyEnvVar();
+  if (!process.env[keyVar]) {
+    console.error(`${keyVar} is required to run evals`);
     process.exit(2);
   }
   const runs: AiRunRecord[] = [];
-  const client = new ClaudeClient({ sink: (r) => void runs.push(r) });
+  const client = createLlmClient({ sink: (r) => void runs.push(r) });
+  console.log(`provider=${client.provider}`);
   const jobs = target === "all" ? Object.keys(EVALS) : [target];
   let failed = false;
   for (const job of jobs) {

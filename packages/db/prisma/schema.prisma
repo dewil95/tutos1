@@ -1,6 +1,7 @@
 // MCA broker CRM — core data model (see docs/PLAN.md §5)
-// Every tenant-scoped table carries tenantId; row-level security policies are added in a
-// migration once the first tenant exists (see prisma/migrations/README.md).
+// Hosted on Supabase Postgres. The app connects through Prisma on the server only; every table
+// has row-level security enabled and the Supabase Data API roles (anon, authenticated) have no
+// grants, so nothing is reachable from the browser (see prisma/migrations/README.md).
 
 generator client {
   provider            = "prisma-client"
@@ -24,6 +25,10 @@ model Tenant {
   // Broker registration numbers per state (e.g. {"VA":"CFB-1234","TX":"..."}) printed on docs
   stateRegistrations Json     @default("{}")
   settings  Json     @default("{}")
+  /// Address submissions are sent from, e.g. funding@ascendfund.co
+  fromAddress String?
+  /// Team members copied on every lender submission (after the lender's own CC addresses)
+  teamCc    String[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -38,6 +43,8 @@ model Tenant {
   sequences      Sequence[]
   aiRuns         AiRun[]
   commissions    Commission[]
+  jobs           Job[]
+  mailboxes      MailboxConnection[]
 }
 
 enum UserRole {
@@ -54,6 +61,8 @@ model User {
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email        String
+  /// Supabase Auth user id (auth.users.id)
+  authUserId   String?  @unique
   name         String
   role         UserRole @default(OPENER)
   phone        String?
@@ -140,11 +149,9 @@ model Lead {
   @@index([tenantId, email])
 }
 
+// Ascend works by email only (no calling, no SMS).
 enum ConsentChannel {
-  SMS
-  VOICE
   EMAIL
-  AUTODIALER
 }
 
 model Consent {
@@ -270,6 +277,17 @@ model Deal {
   renewals        Deal[]     @relation("DealRenewal")
   paperGrade      String?    // A-D from A3 / human override
   lostReason      String?
+  /// Google Drive folder holding every file for this deal
+  driveFolderId   String?
+  /// Gmail thread of the merchant's own emails, if the deal came in by email
+  sourceThreadId  String?
+  /// What the closer already sold the merchant before approval (amount / factor / days)
+  soldAmount      Decimal?   @db.Decimal(14, 2)
+  soldFactor      Decimal?   @db.Decimal(6, 4)
+  soldTermDays    Int?
+  /// "funder: $balance" lines shown in the submission email (PositionLine[])
+  submissionPositions Json   @default("[]")
+  submissionNote  String?
 
   events          DealEvent[]
   documents       Document[]
@@ -341,7 +359,8 @@ model Document {
   deal          Deal?        @relation(fields: [dealId], references: [id])
   type          DocumentType @default(OTHER)
   typeConfidence Float?      // from A1 classification
-  storageKey    String       // S3 object key
+  driveFileId   String       @unique
+  driveWebViewLink String?
   fileName      String
   mimeType      String
   sizeBytes     Int
@@ -355,7 +374,9 @@ model Document {
   extraction    Json?        // raw structured extraction (A1/A5)
   fraudFlags    Json?        // A4 output
   uploadedById  String?
-  uploadedVia   String       @default("staff") // staff | merchant_portal | email | api
+  uploadedVia   String       @default("staff") // staff | email | funder_email
+  /// Set when the file arrived as an email attachment
+  gmailMessageId String?
   createdAt     DateTime     @default(now())
 
   @@index([tenantId, dealId])
@@ -413,6 +434,12 @@ model Funder {
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   website     String?
+  /// Main submission inbox: goes in To
+  submissionTo String?
+  /// Other addresses at this lender: go in CC on the same email (never BCC)
+  submissionCc String[]
+  /// Sender domains used to match lender replies to this funder
+  emailDomains String[]
   achDescriptors String[] // used by A2 to recognise positions
   isoAgreementNotes String?
   renewalCommissionPct Decimal? @db.Decimal(5, 2)
@@ -503,7 +530,12 @@ model Submission {
   channel       SubmissionChannel
   status        SubmissionStatus  @default(DRAFT)
   sentAt        DateTime?
-  externalRef   String?           // funder portal id / email thread id
+  sentById      String?
+  externalRef   String?           // funder portal id
+  gmailThreadId String?
+  gmailMessageId String?
+  toAddresses   String[]
+  ccAddresses   String[]
   packageDocumentIds String[]
   watermarkTag  String?           // for backdoor tracing
   declineReason String?
@@ -517,6 +549,7 @@ model Submission {
 
   @@index([dealId, status])
   @@index([funderId])
+  @@index([gmailThreadId])
 }
 
 enum PaymentFrequency {
@@ -716,8 +749,6 @@ model Renewal {
 // ---------------------------------------------------------------------------
 
 enum ActivityType {
-  CALL
-  SMS
   EMAIL
   NOTE
   MEETING
@@ -748,10 +779,7 @@ model Activity {
   threadId    String?
   fromAddress String?
   toAddress   String?
-  durationSec Int?
-  recordingUrl String?
-  transcript  String?
-  aiSummary   Json?             // A11 / A8 output
+  aiSummary   Json?             // A8 output
   occurredAt  DateTime          @default(now())
   createdAt   DateTime          @default(now())
 
@@ -808,7 +836,7 @@ model SequenceStep {
   sequenceId  String
   sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
   order       Int
-  channel     ActivityType // SMS | EMAIL | CALL (task)
+  channel     ActivityType // EMAIL (sequences send email drafts only)
   delayMinutes Int
   template    String   // may contain {{merchant.name}} etc.; AI personalises within template
   aiPersonalise Boolean @default(false)
@@ -856,4 +884,55 @@ model AiRun {
 
   @@index([tenantId, job, createdAt])
   @@index([dealId])
+}
+
+// ---------------------------------------------------------------------------
+// Background work on serverless: a Postgres job table drained by /api/cron/tick
+// (Supabase Cron calls it every 2 minutes) and inline right after a user action.
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String    // SEND_SUBMISSION | INBOX_SYNC | PARSE_REPLY | STATEMENT_ANALYSIS
+  payload     Json      @default("{}")
+  status      JobStatus @default(QUEUED)
+  runAt       DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  lockedAt    DateTime?
+  lastError   String?
+  /// Optional idempotency key: one live job per key (e.g. "send:<submissionId>")
+  dedupeKey   String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+}
+
+/// The Google account the CRM uses for Gmail (read + send) and Drive. One per tenant.
+model MailboxConnection {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email                 String
+  /// AES-256-GCM encrypted with PII_ENCRYPTION_KEY
+  encryptedRefreshToken String
+  scopes                String[]
+  historyId             String?
+  lastSyncedAt          DateTime?
+  driveRootFolderId     String?
+  connectedById         String?
+  connectedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([tenantId, email])
 }

@@ -82,3 +82,186 @@ body {
   color: var(--muted);
   font-size: 13px;
 }
+h1 {
+  font-size: 22px;
+  margin: 4px 0 8px;
+}
+h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+h3 {
+  font-size: 14px;
+  margin: 14px 0 6px;
+}
+a {
+  color: var(--accent);
+}
+a.card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+a.card:hover {
+  border-color: var(--accent);
+}
+.topbar nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.topbar nav a {
+  margin-left: 0;
+}
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+.panel.narrow,
+.login {
+  max-width: 560px;
+}
+.login {
+  margin: 48px auto;
+  text-align: center;
+}
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 800px) {
+  .cols {
+    grid-template-columns: 1fr;
+  }
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.stack {
+  display: grid;
+  gap: 10px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+input,
+select,
+textarea,
+button,
+.button {
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+textarea {
+  width: 100%;
+}
+button,
+.button {
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.link {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 0;
+}
+form.inline {
+  display: inline;
+}
+ul.files,
+ul.lenders,
+ul.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+ul.files li,
+ul.lenders li,
+ul.timeline li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+ul.lenders li.disabled {
+  opacity: 0.55;
+}
+table.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+table.grid th,
+table.grid td {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+table.offers td {
+  padding: 0 8px 0 0;
+}
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--border);
+}
+.pill.approved {
+  background: #d7f5e1;
+  color: #11632f;
+}
+.pill.declined {
+  background: #fde0e0;
+  color: #8a1c1c;
+}
+.pill.stips_requested {
+  background: #fff1cc;
+  color: #7a5200;
+}
+.notice {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.notice.ok {
+  border-color: #3aa76d;
+}
+.notice.warn,
+.warn {
+  color: #9a6200;
+}
+.notice.error,
+.error {
+  color: #b42318;
+}
+.small {
+  font-size: 12px;
+}
+.muted,
+.meta,
+.crumbs {
+  color: var(--muted);
+}

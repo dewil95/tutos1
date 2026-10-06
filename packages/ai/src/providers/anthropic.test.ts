@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiOutputError, AiRefusalError, ClaudeClient, type AiRunRecord } from "./client";
-import { estimateCostUsd } from "./models";
-import { MonthlyRowSchema, StatementExtractionSchema } from "./schemas/statement";
+import { AiOutputError, AiRefusalError, ClaudeClient, type AiRunRecord } from "../client";
+import { estimateCostUsd } from "../models";
+import { MonthlyRowSchema, StatementExtractionSchema } from "../schemas/statement";
 
 function fakeMessage(overrides: Partial<Anthropic.Beta.BetaMessage>): Anthropic.Beta.BetaMessage {
   return {
@@ -70,6 +70,32 @@ describe("ClaudeClient.structured", () => {
       format: { type: "json_schema" },
     });
     expect((params as unknown as Record<string, unknown>).fallbacks).toBeUndefined();
+  });
+
+  it("converts provider-neutral PDF parts into document blocks", async () => {
+    const { client, create } = clientWith(fakeMessage({}), () => undefined);
+    await client.structured({
+      job: "A1_STATEMENT_EXTRACTION",
+      promptVersion: "test.v1",
+      system: "s",
+      user: [
+        { type: "pdf", data: Buffer.from("%PDF-1.7"), title: "July.pdf" },
+        { type: "text", text: "extract" },
+      ],
+      schema,
+    });
+    const params = create.mock.calls[0]![0] as Anthropic.Beta.MessageCreateParamsNonStreaming;
+    const content = params.messages[0]!.content as Anthropic.Beta.BetaContentBlockParam[];
+    expect(content[0]).toMatchObject({
+      type: "document",
+      title: "July.pdf",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: Buffer.from("%PDF-1.7").toString("base64"),
+      },
+    });
+    expect(content[1]).toEqual({ type: "text", text: "extract" });
   });
 
   it("sends the fallback beta when enabled", async () => {

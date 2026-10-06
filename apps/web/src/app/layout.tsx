@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MCA CRM",
-  description: "AI-native CRM for merchant cash advance brokers",
+  title: "Ascend CRM",
+  description: "Deal tracking and one-click lender submissions for Ascend Fund",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -12,10 +12,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <header className="topbar">
-          <strong>MCA CRM</strong>
+          <strong>Ascend CRM</strong>
           <nav>
             <a href="/">Deals</a>
-            <a href="/api/health">Health</a>
+            <a href="/deals/new">New deal</a>
+            <a href="/settings">Settings</a>
+            <form action="/auth/signout" method="post" className="inline">
+              <button type="submit" className="link">
+                Sign out
+              </button>
+            </form>
           </nav>
         </header>
         <main className="content">{children}</main>

@@ -1,66 +1,43 @@
-import { analyseStatements, ClaudeClient, type AiRunRecord } from "@mca/ai";
-import { getPrisma, type Prisma, type PrismaClient } from "@mca/db";
-import type { Job } from "bullmq";
-import type { StatementAnalysisJob } from "../queues";
+import { analyseStatements } from "@mca/ai";
+import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
+import { llmClient } from "../ai";
+import { tenantMailbox } from "../google";
+import { PermanentJobError } from "./errors";
 
-/** Persist every Claude call to the AiRun table. */
-export function aiRunSink(prisma: PrismaClient) {
-  return async (r: AiRunRecord) => {
-    await prisma.aiRun.create({
-      data: {
-        tenantId: r.tenantId ?? null,
-        dealId: r.dealId ?? null,
-        job: r.job,
-        promptVersion: r.promptVersion,
-        model: r.model,
-        effort: r.effort,
-        inputHash: r.inputHash,
-        inputTokens: r.usage.inputTokens,
-        outputTokens: r.usage.outputTokens,
-        cacheReadTokens: r.usage.cacheReadTokens,
-        cacheWriteTokens: r.usage.cacheWriteTokens,
-        costUsd: r.costUsd,
-        latencyMs: r.latencyMs,
-        stopReason: r.stopReason,
-        output: r.output === null ? undefined : (r.output as object),
-        error: r.error,
-      },
-    });
-  };
+export interface StatementAnalysisPayload {
+  dealId: string;
+  documentIds: string[];
 }
 
-/** Object storage read; S3 client is wired in Phase 1. */
-export type DocumentFetcher = (storageKey: string) => Promise<Buffer>;
-
-export async function processStatementAnalysis(
-  job: Job<StatementAnalysisJob>,
-  deps: { fetchDocument: DocumentFetcher; prisma?: PrismaClient; client?: ClaudeClient },
+/** A1 → metrics → A2 → A3 on the deal's statements, read from Google Drive. */
+export async function handleStatementAnalysis(
+  prisma: PrismaClient,
+  job: ClaimedJob,
 ): Promise<void> {
-  const prisma = deps.prisma ?? getPrisma();
-  const client =
-    deps.client ?? new ClaudeClient({ sink: aiRunSink(prisma), enableFallbacks: true });
-  const { tenantId, dealId, documentIds } = job.data;
+  const { dealId, documentIds } = job.payload as unknown as StatementAnalysisPayload;
+  const tenantId = job.tenantId;
 
-  const deal = await prisma.deal.findUniqueOrThrow({
+  const deal = await prisma.deal.findUnique({
     where: { id: dealId },
     include: { merchant: { include: { owners: true } } },
   });
+  if (!deal) throw new PermanentJobError(`deal ${dealId} not found`);
   const docs = await prisma.document.findMany({ where: { id: { in: documentIds }, dealId } });
-  if (docs.length === 0) throw new Error(`no documents found for deal ${dealId}`);
+  if (docs.length === 0) throw new PermanentJobError(`no documents found for deal ${dealId}`);
+
+  const mailbox = await tenantMailbox(prisma, tenantId);
+  const files = [];
+  for (const d of docs)
+    files.push({ data: await mailbox.drive.download(d.driveFileId), fileName: d.fileName });
 
   const funders = await prisma.funder.findMany({ where: { tenantId, isActive: true } });
   const funderDescriptors = Object.fromEntries(funders.map((f) => [f.name, f.achDescriptors]));
-
-  const files = await Promise.all(
-    docs.map(async (d) => ({ data: await deps.fetchDocument(d.storageKey), fileName: d.fileName })),
-  );
-
   const primaryOwner = deal.merchant.owners.find((o) => o.isPrimary) ?? deal.merchant.owners[0];
   const tib = deal.merchant.startDate
     ? Math.floor((Date.now() - deal.merchant.startDate.getTime()) / (30.44 * 86_400_000))
     : null;
 
-  const result = await analyseStatements(client, {
+  const result = await analyseStatements(llmClient(prisma), {
     files,
     funderDescriptors,
     tenantId,
@@ -105,12 +82,22 @@ export async function processStatementAnalysis(
         isActive: p.isActive,
       })),
     });
+    // Pre-fill the submission email's positions block when the rep has not typed one.
+    const current = (deal.submissionPositions ?? []) as unknown[];
+    const positions = result.positions.positions
+      .filter((p) => p.isActive)
+      .map((p) => ({
+        funder: p.funderGuess ?? p.descriptor,
+        balance: p.estimatedRemainingBalance,
+      }));
     await tx.deal.update({
       where: { id: dealId },
       data: {
-        stage: "PRE_UNDERWRITING",
-        stageChangedAt: new Date(),
         paperGrade: result.ruleGrade.grade,
+        ...(current.length === 0 && positions.length ? { submissionPositions: positions } : {}),
+        ...(deal.stage === "INTAKE" || deal.stage === "DOCS_RECEIVED"
+          ? { stage: "PRE_UNDERWRITING", stageChangedAt: new Date() }
+          : {}),
       },
     });
     await tx.dealEvent.create({

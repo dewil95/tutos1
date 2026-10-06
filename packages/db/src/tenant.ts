@@ -19,3 +19,14 @@ export async function withTenant<T>(
     return fn(tx);
   });
 }
+
+/**
+ * Deletes a tenant and everything it owns, including append-only audit rows. Only for the
+ * retention purge and test cleanup; the explicit opt-in keeps normal code from erasing history.
+ */
+export async function purgeTenant(prisma: PrismaClient, tenantId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL app.allow_purge = 'on'`);
+    await tx.tenant.delete({ where: { id: tenantId } });
+  });
+}

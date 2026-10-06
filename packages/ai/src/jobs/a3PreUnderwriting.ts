@@ -1,6 +1,6 @@
 import type { BankMetrics, GradeResult } from "@mca/domain";
-import { ClaudeClient, textBlock, type StructuredCallResult } from "../client";
-import { MODELS } from "../models";
+import { textBlock, type StructuredCallResult, type LlmClient } from "../llm";
+
 import type { PositionDetection } from "../schemas/positions";
 import { PreUnderwritingSchema, type PreUnderwriting } from "../schemas/preUnderwriting";
 
@@ -38,7 +38,7 @@ export interface A3Input {
 }
 
 export async function runPreUnderwriting(
-  client: ClaudeClient,
+  client: LlmClient,
   input: A3Input,
 ): Promise<StructuredCallResult<PreUnderwriting>> {
   const { tenantId, dealId, ...facts } = input;
@@ -48,7 +48,7 @@ export async function runPreUnderwriting(
     system: A3_SYSTEM,
     user: [textBlock(`Deal facts:\n${JSON.stringify(facts, null, 2)}`)],
     schema: PreUnderwritingSchema,
-    model: MODELS.primary,
+    tier: "primary",
     effort: "high",
     tenantId,
     dealId,

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@google/genai": "^2.27.0",
     "@mca/domain": "workspace:*",
     "zod": "^4.6.5"
   },

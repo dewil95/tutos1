@@ -11,7 +11,7 @@ CREATE TYPE "LeadSource" AS ENUM ('UCC_LIST', 'AGED_LIST', 'LIVE_TRANSFER', 'WEB
 CREATE TYPE "LeadStatus" AS ENUM ('NEW', 'CONTACTING', 'CONTACTED', 'QUALIFIED', 'DISQUALIFIED', 'CONVERTED', 'DO_NOT_CONTACT');
 
 -- CreateEnum
-CREATE TYPE "ConsentChannel" AS ENUM ('SMS', 'VOICE', 'EMAIL', 'AUTODIALER');
+CREATE TYPE "ConsentChannel" AS ENUM ('EMAIL');
 
 -- CreateEnum
 CREATE TYPE "EntityType" AS ENUM ('LLC', 'CORP', 'S_CORP', 'SOLE_PROP', 'PARTNERSHIP', 'NONPROFIT', 'OTHER');
@@ -44,7 +44,7 @@ CREATE TYPE "ContractStatus" AS ENUM ('SENT', 'VIEWED', 'SIGNED', 'COUNTERSIGNED
 CREATE TYPE "CommissionStatus" AS ENUM ('EXPECTED', 'INVOICED', 'RECEIVED', 'PARTIALLY_RECEIVED', 'CLAWED_BACK', 'WRITTEN_OFF');
 
 -- CreateEnum
-CREATE TYPE "ActivityType" AS ENUM ('CALL', 'SMS', 'EMAIL', 'NOTE', 'MEETING', 'SYSTEM');
+CREATE TYPE "ActivityType" AS ENUM ('EMAIL', 'NOTE', 'MEETING', 'SYSTEM');
 
 -- CreateEnum
 CREATE TYPE "ActivityDirection" AS ENUM ('INBOUND', 'OUTBOUND', 'INTERNAL');
@@ -55,6 +55,9 @@ CREATE TYPE "TaskStatus" AS ENUM ('OPEN', 'DONE', 'CANCELLED');
 -- CreateEnum
 CREATE TYPE "AiVerdict" AS ENUM ('PENDING', 'ACCEPTED', 'CORRECTED', 'REJECTED');
 
+-- CreateEnum
+CREATE TYPE "JobStatus" AS ENUM ('QUEUED', 'RUNNING', 'DONE', 'FAILED');
+
 -- CreateTable
 CREATE TABLE "Tenant" (
     "id" TEXT NOT NULL,
@@ -62,6 +65,8 @@ CREATE TABLE "Tenant" (
     "slug" TEXT NOT NULL,
     "stateRegistrations" JSONB NOT NULL DEFAULT '{}',
     "settings" JSONB NOT NULL DEFAULT '{}',
+    "fromAddress" TEXT,
+    "teamCc" TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -73,6 +78,7 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "authUserId" TEXT,
     "name" TEXT NOT NULL,
     "role" "UserRole" NOT NULL DEFAULT 'OPENER',
     "phone" TEXT,
@@ -198,6 +204,13 @@ CREATE TABLE "Deal" (
     "parentDealId" TEXT,
     "paperGrade" TEXT,
     "lostReason" TEXT,
+    "driveFolderId" TEXT,
+    "sourceThreadId" TEXT,
+    "soldAmount" DECIMAL(14,2),
+    "soldFactor" DECIMAL(6,4),
+    "soldTermDays" INTEGER,
+    "submissionPositions" JSONB NOT NULL DEFAULT '[]',
+    "submissionNote" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -225,7 +238,8 @@ CREATE TABLE "Document" (
     "dealId" TEXT,
     "type" "DocumentType" NOT NULL DEFAULT 'OTHER',
     "typeConfidence" DOUBLE PRECISION,
-    "storageKey" TEXT NOT NULL,
+    "driveFileId" TEXT NOT NULL,
+    "driveWebViewLink" TEXT,
     "fileName" TEXT NOT NULL,
     "mimeType" TEXT NOT NULL,
     "sizeBytes" INTEGER NOT NULL,
@@ -239,6 +253,7 @@ CREATE TABLE "Document" (
     "fraudFlags" JSONB,
     "uploadedById" TEXT,
     "uploadedVia" TEXT NOT NULL DEFAULT 'staff',
+    "gmailMessageId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Document_pkey" PRIMARY KEY ("id")
@@ -290,6 +305,9 @@ CREATE TABLE "Funder" (
     "tenantId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "website" TEXT,
+    "submissionTo" TEXT,
+    "submissionCc" TEXT[],
+    "emailDomains" TEXT[],
     "achDescriptors" TEXT[],
     "isoAgreementNotes" TEXT,
     "renewalCommissionPct" DECIMAL(5,2),
@@ -354,7 +372,12 @@ CREATE TABLE "Submission" (
     "channel" "SubmissionChannel" NOT NULL,
     "status" "SubmissionStatus" NOT NULL DEFAULT 'DRAFT',
     "sentAt" TIMESTAMP(3),
+    "sentById" TEXT,
     "externalRef" TEXT,
+    "gmailThreadId" TEXT,
+    "gmailMessageId" TEXT,
+    "toAddresses" TEXT[],
+    "ccAddresses" TEXT[],
     "packageDocumentIds" TEXT[],
     "watermarkTag" TEXT,
     "declineReason" TEXT,
@@ -529,9 +552,6 @@ CREATE TABLE "Activity" (
     "threadId" TEXT,
     "fromAddress" TEXT,
     "toAddress" TEXT,
-    "durationSec" INTEGER,
-    "recordingUrl" TEXT,
-    "transcript" TEXT,
     "aiSummary" JSONB,
     "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -613,8 +633,47 @@ CREATE TABLE "AiRun" (
     CONSTRAINT "AiRun_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Job" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "payload" JSONB NOT NULL DEFAULT '{}',
+    "status" "JobStatus" NOT NULL DEFAULT 'QUEUED',
+    "runAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "maxAttempts" INTEGER NOT NULL DEFAULT 5,
+    "lockedAt" TIMESTAMP(3),
+    "lastError" TEXT,
+    "dedupeKey" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Job_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MailboxConnection" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "encryptedRefreshToken" TEXT NOT NULL,
+    "scopes" TEXT[],
+    "historyId" TEXT,
+    "lastSyncedAt" TIMESTAMP(3),
+    "driveRootFolderId" TEXT,
+    "connectedById" TEXT,
+    "connectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MailboxConnection_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_authUserId_key" ON "User"("authUserId");
 
 -- CreateIndex
 CREATE INDEX "User_tenantId_idx" ON "User"("tenantId");
@@ -650,6 +709,9 @@ CREATE INDEX "Deal_tenantId_ownerId_idx" ON "Deal"("tenantId", "ownerId");
 CREATE INDEX "DealEvent_dealId_createdAt_idx" ON "DealEvent"("dealId", "createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Document_driveFileId_key" ON "Document"("driveFileId");
+
+-- CreateIndex
 CREATE INDEX "Document_tenantId_dealId_idx" ON "Document"("tenantId", "dealId");
 
 -- CreateIndex
@@ -672,6 +734,9 @@ CREATE INDEX "Submission_dealId_status_idx" ON "Submission"("dealId", "status");
 
 -- CreateIndex
 CREATE INDEX "Submission_funderId_idx" ON "Submission"("funderId");
+
+-- CreateIndex
+CREATE INDEX "Submission_gmailThreadId_idx" ON "Submission"("gmailThreadId");
 
 -- CreateIndex
 CREATE INDEX "Offer_dealId_status_idx" ON "Offer"("dealId", "status");
@@ -714,6 +779,15 @@ CREATE INDEX "AiRun_tenantId_job_createdAt_idx" ON "AiRun"("tenantId", "job", "c
 
 -- CreateIndex
 CREATE INDEX "AiRun_dealId_idx" ON "AiRun"("dealId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Job_dedupeKey_key" ON "Job"("dedupeKey");
+
+-- CreateIndex
+CREATE INDEX "Job_status_runAt_idx" ON "Job"("status", "runAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MailboxConnection_tenantId_email_key" ON "MailboxConnection"("tenantId", "email");
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -862,36 +936,69 @@ ALTER TABLE "AiRun" ADD CONSTRAINT "AiRun_dealId_fkey" FOREIGN KEY ("dealId") RE
 -- AddForeignKey
 ALTER TABLE "AiRun" ADD CONSTRAINT "AiRun_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "Job" ADD CONSTRAINT "Job_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MailboxConnection" ADD CONSTRAINT "MailboxConnection_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 
 -- ---------------------------------------------------------------------------
 -- Hand-written additions (see prisma/migrations/README.md)
 -- ---------------------------------------------------------------------------
 
--- Row-level security: every tenant-scoped table is filtered by app.tenant_id, which the
--- application sets with `SET LOCAL app.tenant_id = '<id>'` inside each transaction
--- (packages/db/src/tenant.ts). Note: the table owner / superusers bypass RLS unless FORCE is
--- set, so production must connect as a non-owner application role.
+-- 1. Row-level security on EVERY table. On Supabase, tables in "public" are reachable through the
+--    Data API with the anon / authenticated roles. RLS with no policy for those roles means the
+--    browser can read or write nothing; the app only talks to Postgres from the server via
+--    Prisma (Supabase's "postgres" role, which bypasses RLS).
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['User','Lead','Merchant','Deal','Document','Funder','Activity','Task','Sequence','Commission']
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;
+
+-- 2. Remove Data API grants when the Supabase roles exist (skipped on plain local Postgres).
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated']
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM %I', r);
+      EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM %I', r);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM %I', r);
+    END IF;
+  END LOOP;
+END $$;
+
+-- 3. Tenant isolation policies, effective for any future non-owner application role that sets
+--    `SET LOCAL app.tenant_id` (packages/db/src/tenant.ts).
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['User','Lead','Merchant','Deal','Document','Funder','Activity','Task','Sequence','Commission','Job','MailboxConnection']
+  LOOP
     EXECUTE format(
       'CREATE POLICY tenant_isolation ON %I USING ("tenantId" = current_setting(''app.tenant_id'', true)) WITH CHECK ("tenantId" = current_setting(''app.tenant_id'', true))',
       t);
   END LOOP;
 END $$;
 
--- AiRun may be recorded without a tenant (evals, system jobs).
-ALTER TABLE "AiRun" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "AiRun"
   USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true))
   WITH CHECK ("tenantId" IS NULL OR "tenantId" = current_setting('app.tenant_id', true));
 
--- Append-only tables: disclosure delivery proof (NY 23 NYCRR 600) and the deal timeline.
+-- 4. Append-only tables: disclosure delivery proof (NY 23 NYCRR 600) and the deal timeline.
+-- Updates are never allowed. Deletes only inside a transaction that explicitly opts in with
+-- SET LOCAL app.allow_purge = 'on' (retention purge after the 4-year hold, test cleanup).
 CREATE OR REPLACE FUNCTION forbid_mutation() RETURNS trigger AS $$
 BEGIN
+  IF TG_OP = 'DELETE' AND current_setting('app.allow_purge', true) = 'on' THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'table % is append-only', TG_TABLE_NAME;
 END;
 $$ LANGUAGE plpgsql;

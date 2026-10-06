@@ -1,5 +1,5 @@
-import { ClaudeClient, textBlock, type StructuredCallResult } from "../client";
-import { MODELS } from "../models";
+import { textBlock, type StructuredCallResult, type LlmClient } from "../llm";
+
 import { FunderReplySchema, type FunderReply } from "../schemas/funderReply";
 
 export const A8_PROMPT_VERSION = "a8.v1";
@@ -37,7 +37,7 @@ export interface A8Input {
 }
 
 export async function runFunderReplyParsing(
-  client: ClaudeClient,
+  client: LlmClient,
   input: A8Input,
 ): Promise<StructuredCallResult<FunderReply>> {
   const header =
@@ -49,9 +49,9 @@ export async function runFunderReplyParsing(
     system: A8_SYSTEM,
     user: [textBlock(`${header}\n\n--- BODY ---\n${input.body}`)],
     schema: FunderReplySchema,
-    // Offers carry money; use the primary model. Haiku is fine for pure classification but
-    // we do not know the intent before parsing, so default to primary at low effort.
-    model: MODELS.primary,
+    // High-volume (every funder email): fast tier. Offers are re-checked by a human on the
+    // confirm screen before they become Offer rows, so a cheaper model is acceptable here.
+    tier: "fast",
     effort: "low",
     maxTokens: 8_000,
     tenantId: input.tenantId,

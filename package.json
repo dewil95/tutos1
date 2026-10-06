@@ -2,7 +2,7 @@
   "name": "mca-crm",
   "private": true,
   "version": "0.1.0",
-  "description": "AI-native CRM for Merchant Cash Advance brokers, built on the Anthropic Claude API",
+  "description": "AI-native CRM for Merchant Cash Advance brokers (Next.js on Vercel, Supabase, Google Workspace, Gemini API)",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=22"

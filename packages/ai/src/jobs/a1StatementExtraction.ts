@@ -1,5 +1,5 @@
-import { ClaudeClient, pdfBlock, textBlock, type StructuredCallResult } from "../client";
-import { MODELS } from "../models";
+import { pdfBlock, textBlock, type StructuredCallResult, type LlmClient } from "../llm";
+
 import { StatementExtractionSchema, type StatementExtraction } from "../schemas/statement";
 
 export const A1_PROMPT_VERSION = "a1.v1";
@@ -26,7 +26,7 @@ export interface A1Input {
 }
 
 export async function runStatementExtraction(
-  client: ClaudeClient,
+  client: LlmClient,
   input: A1Input,
 ): Promise<StructuredCallResult<StatementExtraction>> {
   if (input.files.length === 0) throw new Error("at least one file is required");
@@ -42,7 +42,7 @@ export async function runStatementExtraction(
     system: A1_SYSTEM,
     user,
     schema: StatementExtractionSchema,
-    model: MODELS.primary,
+    tier: "primary",
     effort: "high",
     maxTokens: 32_000,
     tenantId: input.tenantId,

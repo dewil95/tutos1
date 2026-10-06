@@ -1,5 +1,5 @@
-import { ClaudeClient, textBlock, type StructuredCallResult } from "../client";
-import { MODELS } from "../models";
+import { textBlock, type StructuredCallResult, type LlmClient } from "../llm";
+
 import { PositionDetectionSchema, type PositionDetection } from "../schemas/positions";
 import type { MonthlyRow } from "../schemas/statement";
 
@@ -25,7 +25,7 @@ export interface A2Input {
 }
 
 export async function runPositionDetection(
-  client: ClaudeClient,
+  client: LlmClient,
   input: A2Input,
 ): Promise<StructuredCallResult<PositionDetection>> {
   const debits = input.months.map((m) => ({ month: m.month, recurringDebits: m.recurringDebits }));
@@ -39,7 +39,7 @@ export async function runPositionDetection(
     system: A2_SYSTEM,
     user,
     schema: PositionDetectionSchema,
-    model: MODELS.primary,
+    tier: "primary",
     effort: "medium",
     tenantId: input.tenantId,
     dealId: input.dealId,

@@ -1,4 +1,5 @@
 import { getPrisma, type DealStage } from "@mca/db";
+import { requireUser } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,11 @@ interface BoardDeal {
   updatedAt: Date;
 }
 
-async function loadDeals(): Promise<{ deals: BoardDeal[]; error: string | null }> {
+async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error: string | null }> {
   try {
     const prisma = getPrisma();
     const rows = await prisma.deal.findMany({
-      where: { stage: { in: STAGES } },
+      where: { tenantId, stage: { in: STAGES } },
       include: {
         merchant: { select: { legalName: true, dba: true } },
         owner: { select: { name: true } },
@@ -56,15 +57,15 @@ async function loadDeals(): Promise<{ deals: BoardDeal[]; error: string | null }
 }
 
 export default async function DealBoardPage() {
-  const { deals, error } = await loadDeals();
+  const user = await requireUser();
+  const { deals, error } = await loadDeals(user.tenantId);
   return (
     <>
       <h1 style={{ fontSize: 20, margin: "4px 0 12px" }}>Deal board</h1>
       {error ? (
         <p className="empty">
-          Database not reachable ({error}). Start infra with{" "}
-          <code>docker compose -f infra/docker-compose.yml up</code> and run{" "}
-          <code>pnpm db:migrate</code>.
+          Database not reachable ({error}). Check DATABASE_URL and run <code>pnpm db:migrate</code>{" "}
+          (see README).
         </p>
       ) : null}
       <div className="board">
@@ -77,7 +78,7 @@ export default async function DealBoardPage() {
               </h3>
               {inStage.length === 0 ? <p className="empty">—</p> : null}
               {inStage.map((d) => (
-                <article className="card" key={d.id}>
+                <a className="card" key={d.id} href={`/deals/${d.id}`}>
                   <div>{d.merchantName}</div>
                   <div className="meta">
                     {d.requestedAmount
@@ -86,7 +87,7 @@ export default async function DealBoardPage() {
                     {d.paperGrade ? ` · grade ${d.paperGrade}` : ""}
                     {d.ownerName ? ` · ${d.ownerName}` : ""}
                   </div>
-                </article>
+                </a>
               ))}
             </section>
           );

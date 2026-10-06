@@ -1,5 +1,5 @@
 import { computeBankMetrics, gradePaper, type BankMetrics, type GradeResult } from "@mca/domain";
-import type { ClaudeClient } from "./client";
+import type { LlmClient } from "./llm";
 import { runStatementExtraction, type A1Input } from "./jobs/a1StatementExtraction";
 import { runPositionDetection } from "./jobs/a2PositionDetection";
 import { runPreUnderwriting, type A3Input } from "./jobs/a3PreUnderwriting";
@@ -30,7 +30,7 @@ export interface StatementAnalysisResult {
  * `statement-analysis` job runs. Each stage records its own AiRun through the client sink.
  */
 export async function analyseStatements(
-  client: ClaudeClient,
+  client: LlmClient,
   input: StatementAnalysisInput,
 ): Promise<StatementAnalysisResult> {
   const ctx = { tenantId: input.tenantId, dealId: input.dealId };
