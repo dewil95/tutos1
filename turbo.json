@@ -23,7 +23,13 @@
     "MAIL_FROM",
     "TEAM_CC",
     "TENANT_SLUG",
-    "DB_POOL_MAX"
+    "DB_POOL_MAX",
+    "WHATSAPP_ENABLED",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_TOKEN",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_GRAPH_VERSION"
   ],
   "tasks": {
     "generate": {

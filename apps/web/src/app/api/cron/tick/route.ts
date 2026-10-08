@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { enqueueJob, getPrisma } from "@mca/db";
 import { runDueJobs } from "@/server/jobs/runner";
+import { whatsappConfigured } from "@/server/whatsapp/config";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -41,6 +42,15 @@ async function tick(req: Request) {
       payload: {},
       dedupeKey: `rules:${t.id}`,
     });
+    // WhatsApp applications: reminders and any message left unprocessed.
+    if (whatsappConfigured()) {
+      await enqueueJob(prisma, {
+        tenantId: t.id,
+        type: "WHATSAPP_NUDGES",
+        payload: {},
+        dedupeKey: `wanudge:${t.id}`,
+      });
+    }
   }
   const result = await runDueJobs(prisma, { budgetMs: 45_000 });
   return Response.json({

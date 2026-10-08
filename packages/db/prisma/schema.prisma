@@ -19,34 +19,38 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
   // Broker registration numbers per state (e.g. {"VA":"CFB-1234","TX":"..."}) printed on docs
   stateRegistrations Json     @default("{}")
-  settings  Json     @default("{}")
+  settings           Json     @default("{}")
   /// Address submissions are sent from, e.g. funding@ascendfund.co
-  fromAddress String?
+  fromAddress        String?
   /// Team members copied on every lender submission (after the lender's own CC addresses)
-  teamCc    String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  teamCc             String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  users          User[]
-  leads          Lead[]
-  merchants      Merchant[]
-  deals          Deal[]
-  funders        Funder[]
-  documents      Document[]
-  activities     Activity[]
-  tasks          Task[]
-  sequences      Sequence[]
-  aiRuns         AiRun[]
-  commissions    Commission[]
-  jobs           Job[]
-  mailboxes      MailboxConnection[]
-  apiKeys        ApiKey[]
-  emailRules     EmailRule[]
+  users                 User[]
+  leads                 Lead[]
+  merchants             Merchant[]
+  deals                 Deal[]
+  funders               Funder[]
+  documents             Document[]
+  activities            Activity[]
+  tasks                 Task[]
+  sequences             Sequence[]
+  aiRuns                AiRun[]
+  commissions           Commission[]
+  jobs                  Job[]
+  mailboxes             MailboxConnection[]
+  apiKeys               ApiKey[]
+  emailRules            EmailRule[]
+  whatsappConversations WhatsAppConversation[]
+  whatsappMessages      WhatsAppMessage[]
+  secureFormTokens      SecureFormToken[]
+  applicationSignatures ApplicationSignature[]
 }
 
 enum UserRole {
@@ -59,25 +63,25 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email        String
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email      String
   /// Supabase Auth user id (auth.users.id)
-  authUserId   String?  @unique
-  name         String
-  role         UserRole @default(OPENER)
-  phone        String?
-  timezone     String   @default("America/New_York")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  authUserId String?  @unique
+  name       String
+  role       UserRole @default(OPENER)
+  phone      String?
+  timezone   String   @default("America/New_York")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  ownedLeads    Lead[]       @relation("LeadOwner")
-  ownedDeals    Deal[]       @relation("DealOwner")
+  ownedLeads    Lead[]     @relation("LeadOwner")
+  ownedDeals    Deal[]     @relation("DealOwner")
   activities    Activity[]
-  tasks         Task[]       @relation("TaskAssignee")
-  aiRunVerdicts AiRun[]      @relation("AiRunReviewer")
+  tasks         Task[]     @relation("TaskAssignee")
+  aiRunVerdicts AiRun[]    @relation("AiRunReviewer")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -110,41 +114,41 @@ enum LeadStatus {
 }
 
 model Lead {
-  id          String     @id @default(cuid())
-  tenantId    String
-  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  ownerId     String?
-  owner       User?      @relation("LeadOwner", fields: [ownerId], references: [id])
-  source      LeadSource @default(MANUAL)
-  sourceDetail String?   // vendor name, campaign, list file
-  status      LeadStatus @default(NEW)
-  score       Int?       // 0-100 from A12
-  scoreReason String?
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerId      String?
+  owner        User?      @relation("LeadOwner", fields: [ownerId], references: [id])
+  source       LeadSource @default(MANUAL)
+  sourceDetail String? // vendor name, campaign, list file
+  status       LeadStatus @default(NEW)
+  score        Int? // 0-100 from A12
+  scoreReason  String?
 
-  businessName String
-  contactName  String?
-  phone        String?
-  email        String?
-  state        String?   // 2-letter
-  timezone     String?
-  industry     String?
-  naics        String?
-  statedMonthlyRevenue Decimal? @db.Decimal(14, 2)
+  businessName               String
+  contactName                String?
+  phone                      String?
+  email                      String?
+  state                      String? // 2-letter
+  timezone                   String?
+  industry                   String?
+  naics                      String?
+  statedMonthlyRevenue       Decimal? @db.Decimal(14, 2)
   statedTimeInBusinessMonths Int?
-  requestedAmount Decimal? @db.Decimal(14, 2)
+  requestedAmount            Decimal? @db.Decimal(14, 2)
 
-  dncScrubbedAt   DateTime?
-  dncStatus       String?    // clean | dnc | litigator | unknown
-  rawPayload      Json?      // original import row
+  dncScrubbedAt DateTime?
+  dncStatus     String? // clean | dnc | litigator | unknown
+  rawPayload    Json? // original import row
 
-  merchantId   String?
-  merchant     Merchant?  @relation(fields: [merchantId], references: [id])
+  merchantId String?
+  merchant   Merchant? @relation(fields: [merchantId], references: [id])
 
-  consents    Consent[]
-  activities  Activity[]
-  tasks       Task[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  consents   Consent[]
+  activities Activity[]
+  tasks      Task[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@index([tenantId, status])
   @@index([tenantId, phone])
@@ -157,15 +161,15 @@ enum ConsentChannel {
 }
 
 model Consent {
-  id        String         @id @default(cuid())
-  leadId    String
-  lead      Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  channel   ConsentChannel
-  granted   Boolean
-  source    String         // web form id, call recording id, "verbal", etc.
-  text      String?        // exact consent language shown/spoken
-  ipAddress String?
-  capturedAt DateTime      @default(now())
+  id         String         @id @default(cuid())
+  leadId     String
+  lead       Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel    ConsentChannel
+  granted    Boolean
+  source     String // web form id, call recording id, "verbal", etc.
+  text       String? // exact consent language shown/spoken
+  ipAddress  String?
+  capturedAt DateTime       @default(now())
   revokedAt  DateTime?
 
   @@index([leadId, channel])
@@ -188,7 +192,7 @@ model Merchant {
   legalName     String
   dba           String?
   entityType    EntityType?
-  einEncrypted  String?     // field-level encrypted
+  einEncrypted  String? // field-level encrypted
   einLast4      String?
   naics         String?
   industry      String?
@@ -201,43 +205,43 @@ model Merchant {
   city          String?
   state         String?
   postalCode    String?
-  sosStatus     String?     // from Cobalt/Middesk
+  sosStatus     String? // from Cobalt/Middesk
   sosCheckedAt  DateTime?
   bankName      String?
   processorName String?
   /// Merchant asked not to get automated emails (stip chases, reminders).
   emailOptOut   Boolean     @default(false)
 
-  owners        Owner[]
-  leads         Lead[]
-  deals         Deal[]
-  documents     Document[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  owners    Owner[]
+  leads     Lead[]
+  deals     Deal[]
+  documents Document[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([tenantId, legalName])
 }
 
 model Owner {
-  id             String   @id @default(cuid())
-  merchantId     String
-  merchant       Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  firstName      String
-  lastName       String
-  ownershipPct   Decimal? @db.Decimal(5, 2)
-  ssnEncrypted   String?
-  ssnLast4       String?
-  dobEncrypted   String?
-  phone          String?
-  email          String?
-  addressLine1   String?
-  city           String?
-  state          String?
-  postalCode     String?
-  ficoEstimate   Int?
-  isPrimary      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String   @id @default(cuid())
+  merchantId   String
+  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  firstName    String
+  lastName     String
+  ownershipPct Decimal? @db.Decimal(5, 2)
+  ssnEncrypted String?
+  ssnLast4     String?
+  dobEncrypted String?
+  phone        String?
+  email        String?
+  addressLine1 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  ficoEstimate Int?
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([merchantId])
 }
@@ -264,61 +268,63 @@ enum DealStage {
 }
 
 model Deal {
-  id              String     @id @default(cuid())
-  tenantId        String
-  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  merchantId      String
-  merchant        Merchant   @relation(fields: [merchantId], references: [id])
-  ownerId         String?
-  owner           User?      @relation("DealOwner", fields: [ownerId], references: [id])
-  stage           DealStage  @default(INTAKE)
-  stageChangedAt  DateTime   @default(now())
-  requestedAmount Decimal?   @db.Decimal(14, 2)
-  useOfFunds      String?
-  isRenewal       Boolean    @default(false)
-  parentDealId    String?
-  parentDeal      Deal?      @relation("DealRenewal", fields: [parentDealId], references: [id])
-  renewals        Deal[]     @relation("DealRenewal")
-  paperGrade      String?    // A-D from A3 / human override
-  lostReason      String?
+  id                  String    @id @default(cuid())
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  merchantId          String
+  merchant            Merchant  @relation(fields: [merchantId], references: [id])
+  ownerId             String?
+  owner               User?     @relation("DealOwner", fields: [ownerId], references: [id])
+  stage               DealStage @default(INTAKE)
+  stageChangedAt      DateTime  @default(now())
+  requestedAmount     Decimal?  @db.Decimal(14, 2)
+  useOfFunds          String?
+  isRenewal           Boolean   @default(false)
+  parentDealId        String?
+  parentDeal          Deal?     @relation("DealRenewal", fields: [parentDealId], references: [id])
+  renewals            Deal[]    @relation("DealRenewal")
+  paperGrade          String? // A-D from A3 / human override
+  lostReason          String?
   /// Google Drive folder holding every file for this deal
-  driveFolderId   String?
+  driveFolderId       String?
   /// Gmail thread of the merchant's own emails, if the deal came in by email
-  sourceThreadId  String?
+  sourceThreadId      String?
   /// What the closer already sold the merchant before approval (amount / factor / days)
-  soldAmount      Decimal?   @db.Decimal(14, 2)
-  soldFactor      Decimal?   @db.Decimal(6, 4)
-  soldTermDays    Int?
+  soldAmount          Decimal?  @db.Decimal(14, 2)
+  soldFactor          Decimal?  @db.Decimal(6, 4)
+  soldTermDays        Int?
   /// "funder: $balance" lines shown in the submission email (PositionLine[])
-  submissionPositions Json   @default("[]")
-  submissionNote  String?
+  submissionPositions Json      @default("[]")
+  submissionNote      String?
   /// Where the deal came from: website | email | staff | gmail_import
-  source          String     @default("staff")
+  source              String    @default("staff")
   /// Application id on Ascend's website (POST /api/v1/applications), unique per tenant.
-  externalRef     String?
+  externalRef         String?
   /// A5 application reading output (SSN/DOB masked) and field conflicts for review.
-  applicationData Json?
+  applicationData     Json?
   /// Internal AI Risk Report (never sent to lenders).
-  riskReport      Json?
-  riskReportAt    DateTime?
+  riskReport          Json?
+  riskReportAt        DateTime?
 
-  events          DealEvent[]
-  documents       Document[]
-  bankAnalyses    BankAnalysis[]
-  positions       Position[]
-  submissions     Submission[]
-  offers          Offer[]
-  stipulations    Stipulation[]
-  contracts       Contract[]
+  events               DealEvent[]
+  documents            Document[]
+  bankAnalyses         BankAnalysis[]
+  positions            Position[]
+  submissions          Submission[]
+  offers               Offer[]
+  stipulations         Stipulation[]
+  contracts            Contract[]
   disclosureDeliveries DisclosureDelivery[]
-  funding         Funding?
-  commissions     Commission[]
-  renewal         Renewal?
-  activities      Activity[]
-  tasks           Task[]
-  aiRuns          AiRun[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  funding              Funding?
+  commissions          Commission[]
+  renewal              Renewal?
+  activities           Activity[]
+  tasks                Task[]
+  aiRuns               AiRun[]
+  whatsapp             WhatsAppConversation?
+  signatures           ApplicationSignature[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@unique([tenantId, externalRef])
   @@index([tenantId, stage])
@@ -330,8 +336,8 @@ model DealEvent {
   id        String   @id @default(cuid())
   dealId    String
   deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  type      String   // stage_changed | document_uploaded | submission_sent | offer_received | ...
-  actorType String   // user | system | ai
+  type      String // stage_changed | document_uploaded | submission_sent | offer_received | ...
+  actorType String // user | system | ai
   actorId   String?
   payload   Json     @default("{}")
   createdAt DateTime @default(now())
@@ -364,82 +370,82 @@ enum DocumentType {
 }
 
 model Document {
-  id            String       @id @default(cuid())
-  tenantId      String
-  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  merchantId    String?
-  merchant      Merchant?    @relation(fields: [merchantId], references: [id])
-  dealId        String?
-  deal          Deal?        @relation(fields: [dealId], references: [id])
-  type          DocumentType @default(OTHER)
-  typeConfidence Float?      // from A1 classification
-  driveFileId   String       @unique
+  id               String       @id @default(cuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  merchantId       String?
+  merchant         Merchant?    @relation(fields: [merchantId], references: [id])
+  dealId           String?
+  deal             Deal?        @relation(fields: [dealId], references: [id])
+  type             DocumentType @default(OTHER)
+  typeConfidence   Float? // from A1 classification
+  driveFileId      String       @unique
   driveWebViewLink String?
-  fileName      String
-  mimeType      String
-  sizeBytes     Int
-  sha256        String
-  pageCount     Int?
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  pageCount        Int?
   // For bank statements: detected period & account
-  periodStart   DateTime?
-  periodEnd     DateTime?
-  bankName      String?
-  accountLast4  String?
-  extraction    Json?        // raw structured extraction (A1/A5)
-  fraudFlags    Json?        // A4 output
-  uploadedById  String?
-  uploadedVia   String       @default("staff") // staff | email | funder_email
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  bankName         String?
+  accountLast4     String?
+  extraction       Json? // raw structured extraction (A1/A5)
+  fraudFlags       Json? // A4 output
+  uploadedById     String?
+  uploadedVia      String       @default("staff") // staff | email | funder_email
   /// Set when the file arrived as an email attachment
-  gmailMessageId String?
+  gmailMessageId   String?
   /// Internal files (AI Risk Report) can never be put in a lender package.
-  internalOnly  Boolean      @default(false)
+  internalOnly     Boolean      @default(false)
   /// When A1 extraction finished for this file (bank scrub, one job per document).
-  extractedAt   DateTime?
-  createdAt     DateTime     @default(now())
+  extractedAt      DateTime?
+  createdAt        DateTime     @default(now())
 
   @@index([tenantId, dealId])
   @@index([sha256])
 }
 
 model BankAnalysis {
-  id              String   @id @default(cuid())
-  dealId          String
-  deal            Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  documentIds     String[] // statements included
-  monthlyRows     Json     // MonthlyRow[] (packages/ai schema)
-  metrics         Json     // BankMetrics (packages/domain)
+  id                     String    @id @default(cuid())
+  dealId                 String
+  deal                   Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  documentIds            String[] // statements included
+  monthlyRows            Json // MonthlyRow[] (packages/ai schema)
+  metrics                Json // BankMetrics (packages/domain)
   trueRevenueAdjustments Json? // transfers / loan proceeds excluded
-  paperGrade      String?
-  redFlags        Json?
-  maxAdvanceEstimate Decimal? @db.Decimal(14, 2)
-  summary         String?
+  paperGrade             String?
+  redFlags               Json?
+  maxAdvanceEstimate     Decimal?  @db.Decimal(14, 2)
+  summary                String?
   /// Bank scrub report (packages/domain scrubStatements) + per-file integrity checks.
-  scrub           Json?
-  aiRunId         String?
-  verifiedById    String?
-  verifiedAt      DateTime?
-  createdAt       DateTime @default(now())
+  scrub                  Json?
+  aiRunId                String?
+  verifiedById           String?
+  verifiedAt             DateTime?
+  createdAt              DateTime  @default(now())
 
   @@index([dealId])
 }
 
 model Position {
-  id              String   @id @default(cuid())
-  dealId          String
-  deal            Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  funderGuess     String?
-  funderId        String?
-  funder          Funder?  @relation(fields: [funderId], references: [id])
-  descriptor      String   // ACH descriptor as seen on statement
-  frequency       String   // daily | weekly | monthly
-  paymentAmount   Decimal  @db.Decimal(14, 2)
-  firstSeen       DateTime?
-  lastSeen        DateTime?
-  estimatedBalance Decimal? @db.Decimal(14, 2)
-  confidence      Float
-  isActive        Boolean  @default(true)
-  confirmedById   String?
-  createdAt       DateTime @default(now())
+  id               String    @id @default(cuid())
+  dealId           String
+  deal             Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderGuess      String?
+  funderId         String?
+  funder           Funder?   @relation(fields: [funderId], references: [id])
+  descriptor       String // ACH descriptor as seen on statement
+  frequency        String // daily | weekly | monthly
+  paymentAmount    Decimal   @db.Decimal(14, 2)
+  firstSeen        DateTime?
+  lastSeen         DateTime?
+  estimatedBalance Decimal?  @db.Decimal(14, 2)
+  confidence       Float
+  isActive         Boolean   @default(true)
+  confirmedById    String?
+  createdAt        DateTime  @default(now())
 
   @@index([dealId])
 }
@@ -449,31 +455,31 @@ model Position {
 // ---------------------------------------------------------------------------
 
 model Funder {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  website     String?
+  id                   String   @id @default(cuid())
+  tenantId             String
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                 String
+  website              String?
   /// Main submission inbox: goes in To
-  submissionTo String?
+  submissionTo         String?
   /// Other addresses at this lender: go in CC on the same email (never BCC)
-  submissionCc String[]
+  submissionCc         String[]
   /// Sender domains used to match lender replies to this funder
-  emailDomains String[]
-  achDescriptors String[] // used by A2 to recognise positions
-  isoAgreementNotes String?
+  emailDomains         String[]
+  achDescriptors       String[] // used by A2 to recognise positions
+  isoAgreementNotes    String?
   renewalCommissionPct Decimal? @db.Decimal(5, 2)
-  clawbackDays Int?
-  backdoorProtection Boolean @default(false)
-  isActive    Boolean  @default(true)
+  clawbackDays         Int?
+  backdoorProtection   Boolean  @default(false)
+  isActive             Boolean  @default(true)
 
   programs    FunderProgram[]
   contacts    FunderContact[]
   submissions Submission[]
   offers      Offer[]
   positions   Position[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   @@unique([tenantId, name])
 }
@@ -485,32 +491,32 @@ enum SubmissionChannel {
 }
 
 model FunderProgram {
-  id          String   @id @default(cuid())
-  funderId    String
-  funder      Funder   @relation(fields: [funderId], references: [id], onDelete: Cascade)
-  name        String
-  channel     SubmissionChannel @default(EMAIL)
-  submissionEmail String?
-  portalUrl   String?
-  paperGrades String[] // ["A","B"]
-  minMonthlyRevenue Decimal? @db.Decimal(14, 2)
+  id                      String            @id @default(cuid())
+  funderId                String
+  funder                  Funder            @relation(fields: [funderId], references: [id], onDelete: Cascade)
+  name                    String
+  channel                 SubmissionChannel @default(EMAIL)
+  submissionEmail         String?
+  portalUrl               String?
+  paperGrades             String[] // ["A","B"]
+  minMonthlyRevenue       Decimal?          @db.Decimal(14, 2)
   minTimeInBusinessMonths Int?
-  minFico     Int?
-  maxExistingPositions Int?
-  positionAppetite String[] // ["1st","2nd"]
-  minAdvance  Decimal? @db.Decimal(14, 2)
-  maxAdvance  Decimal? @db.Decimal(14, 2)
-  maxFactorSell Decimal? @db.Decimal(5, 4)
-  buyRateFloor Decimal? @db.Decimal(5, 4)
-  maxPoints   Decimal? @db.Decimal(5, 2)
-  allowedStates String[]
-  excludedStates String[]
-  excludedNaics String[]
-  requiredDocs  String[]
-  typicalTurnaroundHours Int?
-  renewalEligibilityPct Decimal? @db.Decimal(5, 2)
-  notes       String?
-  isActive    Boolean  @default(true)
+  minFico                 Int?
+  maxExistingPositions    Int?
+  positionAppetite        String[] // ["1st","2nd"]
+  minAdvance              Decimal?          @db.Decimal(14, 2)
+  maxAdvance              Decimal?          @db.Decimal(14, 2)
+  maxFactorSell           Decimal?          @db.Decimal(5, 4)
+  buyRateFloor            Decimal?          @db.Decimal(5, 4)
+  maxPoints               Decimal?          @db.Decimal(5, 2)
+  allowedStates           String[]
+  excludedStates          String[]
+  excludedNaics           String[]
+  requiredDocs            String[]
+  typicalTurnaroundHours  Int?
+  renewalEligibilityPct   Decimal?          @db.Decimal(5, 2)
+  notes                   String?
+  isActive                Boolean           @default(true)
 
   submissions Submission[]
 
@@ -540,32 +546,32 @@ enum SubmissionStatus {
 }
 
 model Submission {
-  id            String            @id @default(cuid())
-  dealId        String
-  deal          Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  funderId      String
-  funder        Funder            @relation(fields: [funderId], references: [id])
-  programId     String?
-  program       FunderProgram?    @relation(fields: [programId], references: [id])
-  channel       SubmissionChannel
-  status        SubmissionStatus  @default(DRAFT)
-  sentAt        DateTime?
-  sentById      String?
-  externalRef   String?           // funder portal id
-  gmailThreadId String?
-  gmailMessageId String?
-  toAddresses   String[]
-  ccAddresses   String[]
-  packageDocumentIds String[]
-  watermarkTag  String?           // for backdoor tracing
-  declineReason String?
-  slaDueAt      DateTime?
+  id                  String            @id @default(cuid())
+  dealId              String
+  deal                Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderId            String
+  funder              Funder            @relation(fields: [funderId], references: [id])
+  programId           String?
+  program             FunderProgram?    @relation(fields: [programId], references: [id])
+  channel             SubmissionChannel
+  status              SubmissionStatus  @default(DRAFT)
+  sentAt              DateTime?
+  sentById            String?
+  externalRef         String? // funder portal id
+  gmailThreadId       String?
+  gmailMessageId      String?
+  toAddresses         String[]
+  ccAddresses         String[]
+  packageDocumentIds  String[]
+  watermarkTag        String? // for backdoor tracing
+  declineReason       String?
+  slaDueAt            DateTime?
   lastFunderMessageAt DateTime?
-  rawStatusLog  Json              @default("[]")
+  rawStatusLog        Json              @default("[]")
 
-  offers        Offer[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  offers    Offer[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([dealId, status])
   @@index([funderId])
@@ -589,39 +595,39 @@ enum OfferStatus {
 }
 
 model Offer {
-  id             String           @id @default(cuid())
-  dealId         String
-  deal           Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  submissionId   String?
-  submission     Submission?      @relation(fields: [submissionId], references: [id])
-  funderId       String
-  funder         Funder           @relation(fields: [funderId], references: [id])
-  status         OfferStatus      @default(RECEIVED)
-  advanceAmount  Decimal          @db.Decimal(14, 2)
-  buyRate        Decimal          @db.Decimal(6, 4)  // factor at zero commission
-  sellRate       Decimal          @db.Decimal(6, 4)  // factor presented to merchant
-  paybackAmount  Decimal          @db.Decimal(14, 2) // advance * sellRate
-  termMonths     Decimal?         @db.Decimal(5, 2)
+  id               String           @id @default(cuid())
+  dealId           String
+  deal             Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  submissionId     String?
+  submission       Submission?      @relation(fields: [submissionId], references: [id])
+  funderId         String
+  funder           Funder           @relation(fields: [funderId], references: [id])
+  status           OfferStatus      @default(RECEIVED)
+  advanceAmount    Decimal          @db.Decimal(14, 2)
+  buyRate          Decimal          @db.Decimal(6, 4) // factor at zero commission
+  sellRate         Decimal          @db.Decimal(6, 4) // factor presented to merchant
+  paybackAmount    Decimal          @db.Decimal(14, 2) // advance * sellRate
+  termMonths       Decimal?         @db.Decimal(5, 2)
   numberOfPayments Int?
   paymentFrequency PaymentFrequency
-  paymentAmount  Decimal          @db.Decimal(14, 2)
-  holdbackPct    Decimal?         @db.Decimal(5, 2)
-  originationFee Decimal?         @db.Decimal(14, 2)
-  otherFees      Json?            // [{name, amount}]
-  psfAmount      Decimal?         @db.Decimal(14, 2) // broker fee to merchant
-  commissionPoints Decimal?       @db.Decimal(5, 2)
-  commissionAmount Decimal?       @db.Decimal(14, 2)
-  estimatedApr   Decimal?         @db.Decimal(8, 4)
-  position       Int?
-  expiresAt      DateTime?
-  rawText        String?          // original offer email / sheet text
+  paymentAmount    Decimal          @db.Decimal(14, 2)
+  holdbackPct      Decimal?         @db.Decimal(5, 2)
+  originationFee   Decimal?         @db.Decimal(14, 2)
+  otherFees        Json? // [{name, amount}]
+  psfAmount        Decimal?         @db.Decimal(14, 2) // broker fee to merchant
+  commissionPoints Decimal?         @db.Decimal(5, 2)
+  commissionAmount Decimal?         @db.Decimal(14, 2)
+  estimatedApr     Decimal?         @db.Decimal(8, 4)
+  position         Int?
+  expiresAt        DateTime?
+  rawText          String? // original offer email / sheet text
   sourceDocumentId String?
-  aiRunId        String?
-  confirmedById  String?          // human confirmed AI-parsed numbers
-  stipulations   Stipulation[]
-  contract       Contract?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  aiRunId          String?
+  confirmedById    String? // human confirmed AI-parsed numbers
+  stipulations     Stipulation[]
+  contract         Contract?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([dealId, status])
 }
@@ -635,21 +641,21 @@ enum StipStatus {
 }
 
 model Stipulation {
-  id          String     @id @default(cuid())
-  dealId      String
-  deal        Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  offerId     String?
-  offer       Offer?     @relation(fields: [offerId], references: [id])
-  name        String     // "Voided check", "MTD statement", "Landlord call"
+  id           String        @id @default(cuid())
+  dealId       String
+  deal         Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId      String?
+  offer        Offer?        @relation(fields: [offerId], references: [id])
+  name         String // "Voided check", "MTD statement", "Landlord call"
   documentType DocumentType?
-  status      StipStatus @default(REQUESTED)
-  ownerUserId String?
-  documentId  String?
-  nextChaseAt DateTime?
-  chaseCount  Int        @default(0)
-  notes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  status       StipStatus    @default(REQUESTED)
+  ownerUserId  String?
+  documentId   String?
+  nextChaseAt  DateTime?
+  chaseCount   Int           @default(0)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@index([dealId, status])
 }
@@ -667,52 +673,52 @@ enum ContractStatus {
 }
 
 model Contract {
-  id            String         @id @default(cuid())
-  dealId        String
-  deal          Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  offerId       String         @unique
-  offer         Offer          @relation(fields: [offerId], references: [id])
-  status        ContractStatus @default(SENT)
-  esignProvider String?        // dropbox_sign | docusign
+  id              String         @id @default(cuid())
+  dealId          String
+  deal            Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId         String         @unique
+  offer           Offer          @relation(fields: [offerId], references: [id])
+  status          ContractStatus @default(SENT)
+  esignProvider   String? // dropbox_sign | docusign
   esignEnvelopeId String?
-  documentId    String?
-  sentAt        DateTime?
-  signedAt      DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  documentId      String?
+  sentAt          DateTime?
+  signedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 // Immutable: rows are inserted once, never updated. Enforced by trigger in migration.
 model DisclosureDelivery {
-  id            String   @id @default(cuid())
-  dealId        String
-  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  offerId       String?
-  state         String   // disclosure jurisdiction
-  documentId    String
+  id             String   @id @default(cuid())
+  dealId         String
+  deal           Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId        String?
+  state          String // disclosure jurisdiction
+  documentId     String
   documentSha256 String
-  channel       String   // email | esign | portal | in_person
-  recipient     String
-  deliveredAt   DateTime @default(now())
-  deliveredById String?
-  aiCheck       Json?    // A15 output
+  channel        String // email | esign | portal | in_person
+  recipient      String
+  deliveredAt    DateTime @default(now())
+  deliveredById  String?
+  aiCheck        Json? // A15 output
 }
 
 model Funding {
-  id            String   @id @default(cuid())
-  dealId        String   @unique
-  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  offerId       String
-  fundedAt      DateTime
-  fundedAmount  Decimal  @db.Decimal(14, 2)
-  netToMerchant Decimal? @db.Decimal(14, 2)
-  paybackAmount Decimal  @db.Decimal(14, 2)
-  paymentAmount Decimal  @db.Decimal(14, 2)
-  paymentFrequency PaymentFrequency
-  firstPaymentAt DateTime?
-  uccFiledAt    DateTime?
+  id                   String           @id @default(cuid())
+  dealId               String           @unique
+  deal                 Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  offerId              String
+  fundedAt             DateTime
+  fundedAmount         Decimal          @db.Decimal(14, 2)
+  netToMerchant        Decimal?         @db.Decimal(14, 2)
+  paybackAmount        Decimal          @db.Decimal(14, 2)
+  paymentAmount        Decimal          @db.Decimal(14, 2)
+  paymentFrequency     PaymentFrequency
+  firstPaymentAt       DateTime?
+  uccFiledAt           DateTime?
   clawbackWindowEndsAt DateTime?
-  createdAt     DateTime @default(now())
+  createdAt            DateTime         @default(now())
 }
 
 enum CommissionStatus {
@@ -725,43 +731,43 @@ enum CommissionStatus {
 }
 
 model Commission {
-  id            String           @id @default(cuid())
-  tenantId      String
-  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dealId        String
-  deal          Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  funderName    String
-  points        Decimal          @db.Decimal(5, 2)
-  expectedAmount Decimal         @db.Decimal(14, 2)
-  receivedAmount Decimal?        @db.Decimal(14, 2)
-  psfAmount     Decimal?         @db.Decimal(14, 2)
-  status        CommissionStatus @default(EXPECTED)
-  expectedAt    DateTime?
-  receivedAt    DateTime?
+  id                   String           @id @default(cuid())
+  tenantId             String
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dealId               String
+  deal                 Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  funderName           String
+  points               Decimal          @db.Decimal(5, 2)
+  expectedAmount       Decimal          @db.Decimal(14, 2)
+  receivedAmount       Decimal?         @db.Decimal(14, 2)
+  psfAmount            Decimal?         @db.Decimal(14, 2)
+  status               CommissionStatus @default(EXPECTED)
+  expectedAt           DateTime?
+  receivedAt           DateTime?
   clawbackWindowEndsAt DateTime?
-  clawedBackAt  DateTime?
-  clawbackAmount Decimal?        @db.Decimal(14, 2)
-  repSplits     Json?            // [{userId, pct}]
-  notes         String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  clawedBackAt         DateTime?
+  clawbackAmount       Decimal?         @db.Decimal(14, 2)
+  repSplits            Json? // [{userId, pct}]
+  notes                String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   @@index([tenantId, status])
 }
 
 model Renewal {
-  id                String   @id @default(cuid())
-  dealId            String   @unique
-  deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  paybackAmount     Decimal  @db.Decimal(14, 2)
-  paidToDate        Decimal  @db.Decimal(14, 2) @default(0)
-  paidDownPct       Decimal  @db.Decimal(5, 2)  @default(0)
-  eligibilityPct    Decimal  @db.Decimal(5, 2)  @default(50)
+  id                  String    @id @default(cuid())
+  dealId              String    @unique
+  deal                Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  paybackAmount       Decimal   @db.Decimal(14, 2)
+  paidToDate          Decimal   @default(0) @db.Decimal(14, 2)
+  paidDownPct         Decimal   @default(0) @db.Decimal(5, 2)
+  eligibilityPct      Decimal   @default(50) @db.Decimal(5, 2)
   projectedEligibleAt DateTime?
-  eligibleAt        DateTime?
-  outreachStartedAt DateTime?
-  renewalDealId     String?
-  lastCheckedAt     DateTime?
+  eligibleAt          DateTime?
+  outreachStartedAt   DateTime?
+  renewalDealId       String?
+  lastCheckedAt       DateTime?
 }
 
 // ---------------------------------------------------------------------------
@@ -795,11 +801,11 @@ model Activity {
   deal        Deal?             @relation(fields: [dealId], references: [id])
   subject     String?
   body        String?
-  externalId  String?           // Twilio SID, Gmail message id
+  externalId  String? // Twilio SID, Gmail message id
   threadId    String?
   fromAddress String?
   toAddress   String?
-  aiSummary   Json?             // A8 output
+  aiSummary   Json? // A8 output
   occurredAt  DateTime          @default(now())
   createdAt   DateTime          @default(now())
 
@@ -837,29 +843,29 @@ model Task {
 }
 
 model Sequence {
-  id          String         @id @default(cuid())
-  tenantId    String
-  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  trigger     String         // lead_created | docs_requested | stip_requested | renewal_eligible
-  requiresApproval Boolean   @default(true) // Draft mode (v1) vs Auto
-  isActive    Boolean        @default(true)
-  steps       SequenceStep[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name             String
+  trigger          String // lead_created | docs_requested | stip_requested | renewal_eligible
+  requiresApproval Boolean        @default(true) // Draft mode (v1) vs Auto
+  isActive         Boolean        @default(true)
+  steps            SequenceStep[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@unique([tenantId, name])
 }
 
 model SequenceStep {
-  id          String   @id @default(cuid())
-  sequenceId  String
-  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  order       Int
-  channel     ActivityType // EMAIL (sequences send email drafts only)
-  delayMinutes Int
-  template    String   // may contain {{merchant.name}} etc.; AI personalises within template
-  aiPersonalise Boolean @default(false)
+  id            String       @id @default(cuid())
+  sequenceId    String
+  sequence      Sequence     @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  order         Int
+  channel       ActivityType // EMAIL (sequences send email drafts only)
+  delayMinutes  Int
+  template      String // may contain {{merchant.name}} etc.; AI personalises within template
+  aiPersonalise Boolean      @default(false)
 
   @@unique([sequenceId, order])
 }
@@ -876,31 +882,31 @@ enum AiVerdict {
 }
 
 model AiRun {
-  id            String    @id @default(cuid())
-  tenantId      String?
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
-  dealId        String?
-  deal          Deal?     @relation(fields: [dealId], references: [id])
-  job           String    // A1_STATEMENT_EXTRACTION, A2_POSITION_DETECTION, ...
-  promptVersion String
-  model         String
-  effort        String?
-  inputHash     String
-  inputTokens   Int
-  outputTokens  Int
-  cacheReadTokens Int     @default(0)
-  cacheWriteTokens Int    @default(0)
-  costUsd       Decimal   @db.Decimal(10, 6)
-  latencyMs     Int
-  stopReason    String?
-  output        Json?
-  error         String?
-  verdict       AiVerdict @default(PENDING)
-  reviewerId    String?
-  reviewer      User?     @relation("AiRunReviewer", fields: [reviewerId], references: [id])
-  reviewedAt    DateTime?
-  correction    Json?
-  createdAt     DateTime  @default(now())
+  id               String    @id @default(cuid())
+  tenantId         String?
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id])
+  dealId           String?
+  deal             Deal?     @relation(fields: [dealId], references: [id])
+  job              String // A1_STATEMENT_EXTRACTION, A2_POSITION_DETECTION, ...
+  promptVersion    String
+  model            String
+  effort           String?
+  inputHash        String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int       @default(0)
+  cacheWriteTokens Int       @default(0)
+  costUsd          Decimal   @db.Decimal(10, 6)
+  latencyMs        Int
+  stopReason       String?
+  output           Json?
+  error            String?
+  verdict          AiVerdict @default(PENDING)
+  reviewerId       String?
+  reviewer         User?     @relation("AiRunReviewer", fields: [reviewerId], references: [id])
+  reviewedAt       DateTime?
+  correction       Json?
+  createdAt        DateTime  @default(now())
 
   @@index([tenantId, job, createdAt])
   @@index([dealId])
@@ -922,7 +928,7 @@ model Job {
   id          String    @id @default(cuid())
   tenantId    String
   tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  type        String    // SEND_SUBMISSION | INBOX_SYNC | PARSE_REPLY | STATEMENT_ANALYSIS
+  type        String // SEND_SUBMISSION | INBOX_SYNC | PARSE_REPLY | STATEMENT_ANALYSIS
   payload     Json      @default("{}")
   status      JobStatus @default(QUEUED)
   runAt       DateTime  @default(now())
@@ -940,9 +946,9 @@ model Job {
 
 /// The Google account the CRM uses for Gmail (read + send) and Drive. One per tenant.
 model MailboxConnection {
-  id                    String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   tenantId              String
-  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email                 String
   /// AES-256-GCM encrypted with PII_ENCRYPTION_KEY
   encryptedRefreshToken String
@@ -951,8 +957,8 @@ model MailboxConnection {
   lastSyncedAt          DateTime?
   driveRootFolderId     String?
   connectedById         String?
-  connectedAt           DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  connectedAt           DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([tenantId, email])
 }
@@ -963,17 +969,17 @@ model MailboxConnection {
 
 /// Key the Ascend website uses to post applications. Only a SHA-256 hash is stored.
 model ApiKey {
-  id         String    @id @default(cuid())
-  tenantId   String
-  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name       String
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
   /// First characters shown in Settings, e.g. "ak_live_3F9c"
-  prefix     String
-  hashedKey  String    @unique
+  prefix      String
+  hashedKey   String    @unique
   createdById String?
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   @@index([tenantId])
 }
@@ -996,4 +1002,115 @@ model EmailRule {
   updatedAt        DateTime @updatedAt
 
   @@unique([tenantId, kind])
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp applications (merchant sends a PDF, the bot fills Ascend's application)
+// ---------------------------------------------------------------------------
+
+/// One merchant's application chat on the Ascend WhatsApp number.
+model WhatsAppConversation {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Digits only with country code, as WhatsApp sends it (wa_id), e.g. 13055550123
+  phone                String
+  /// en | es (null until the merchant picks)
+  language             String?
+  /// ACTIVE | READING | SECURE_FORM | REVIEW | SIGN_NAME | SIGN_CONFIRM | SIGNED | HANDOFF | ABANDONED
+  status               String    @default("ACTIVE")
+  /// Field key the bot is waiting on (see apps/web/src/server/whatsapp/questions.ts)
+  step                 String?
+  /// Application being built (ApplicationPayload shape) with SSN and DOB removed
+  answers              Json      @default("{}")
+  /// field key -> "ask" | "confirm" | "ok"
+  fieldState           Json      @default("{}")
+  /// SSN and DOB per owner, AES-256-GCM encrypted JSON
+  piiEncrypted         String?
+  /// Name the merchant typed, waiting for the "I agree" tap
+  pendingSignerName    String?
+  pendingNameMessageId String?
+  dealId               String?   @unique
+  deal                 Deal?     @relation(fields: [dealId], references: [id])
+  lastInboundAt        DateTime?
+  nudgeCount           Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  messages WhatsAppMessage[]
+  tokens   SecureFormToken[]
+
+  @@index([tenantId, phone, status])
+  @@index([tenantId, status, lastInboundAt])
+}
+
+model WhatsAppMessage {
+  id             String               @id @default(cuid())
+  tenantId       String
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// in | out
+  direction      String
+  /// WhatsApp message id; Meta can deliver the same message twice
+  waMessageId    String?              @unique
+  /// text | button | document | image | other
+  kind           String
+  text           String?
+  /// Reply-button id the merchant tapped
+  buttonId       String?
+  mediaId        String?
+  mimeType       String?
+  fileName       String?
+  documentId     String?
+  /// Outbound: sent | dry_run | failed
+  status         String?
+  error          String?
+  processedAt    DateTime?
+  createdAt      DateTime             @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// One-time link for SSN and date of birth, so they are never typed in the chat.
+model SecureFormToken {
+  id             String               @id @default(cuid())
+  tenantId       String
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the token in the link
+  hashedToken    String               @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime             @default(now())
+
+  @@index([conversationId])
+}
+
+/// Proof of an electronic signature (ESIGN/UETA): who typed what, when, on which text and file.
+/// Append-only.
+model ApplicationSignature {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dealId         String
+  deal           Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  /// whatsapp
+  channel        String
+  conversationId String?
+  signerName     String
+  /// Owner on the application the name was matched to
+  ownerName      String
+  phone          String
+  consentText    String
+  consentSha256  String
+  nameMessageId  String?
+  agreeMessageId String?
+  documentId     String
+  pdfSha256      String
+  signedAt       DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, dealId])
 }

@@ -32,6 +32,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Public: login + OAuth callbacks, cron/health endpoints (secret-protected), static assets.
-  matcher: ["/((?!login|auth/|api/cron|api/health|api/v1|_next/static|_next/image|favicon.ico).*)"],
+  // Public: login + OAuth callbacks, cron/health endpoints (secret-protected), the website API
+  // (API key), the WhatsApp webhook (Meta signature), the merchant's one-time SSN/DOB page
+  // (single-use token) and static assets.
+  matcher: [
+    "/((?!login|auth/|api/cron|api/health|api/v1|api/whatsapp|apply/|_next/static|_next/image|favicon.ico).*)",
+  ],
 };

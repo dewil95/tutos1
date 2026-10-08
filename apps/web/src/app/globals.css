@@ -1022,3 +1022,57 @@ code.secret {
     overflow: visible;
   }
 }
+
+/* ---------- WhatsApp ---------- */
+.tag.wa {
+  justify-self: start;
+  border-color: transparent;
+  background: var(--good-soft);
+  color: var(--good);
+}
+.tag.wa.attention {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+/* Newest at the bottom and in view: the list is rendered newest-first in a reversed column. */
+.chat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  max-height: 460px;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.chat .msg {
+  align-self: flex-start;
+  max-width: 78%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.chat .msg.out {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.chat .msg .when {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.chat .event {
+  align-self: center;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.chat .msg.failed {
+  border-color: var(--bad);
+}

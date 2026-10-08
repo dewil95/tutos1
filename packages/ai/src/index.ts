@@ -15,3 +15,5 @@ export * from "./schemas/documentQa";
 export * from "./jobs/a4DocumentQa";
 export * from "./schemas/riskReport";
 export * from "./jobs/riskReport";
+export * from "./schemas/chatAnswer";
+export * from "./jobs/chatAnswer";

@@ -5,9 +5,9 @@ import {
   type ApplicationReading,
 } from "../schemas/application";
 
-export const A5_PROMPT_VERSION = "a5.v1";
+export const A5_PROMPT_VERSION = "a5.v2";
 
-export const A5_SYSTEM = `You read merchant cash advance (MCA) funding applications for a broker and copy their fields into JSON per the schema. The application may be the broker's own web form exported to PDF, a scanned paper form, or a photo.
+export const A5_SYSTEM = `You read merchant cash advance (MCA) funding applications for a broker and copy their fields into JSON per the schema. The application may be the broker's own web form exported to PDF, another broker's or lender's application form, a scanned paper form, or photos of its pages.
 
 Rules:
 - Copy values exactly as written; normalise only formats: dates to YYYY-MM-DD, states to 2-letter codes, money to plain numbers (strip $ and commas; "35k" = 35000).
@@ -16,6 +16,7 @@ Rules:
 - existingAdvances: only open advances/loans the applicant listed on the form.
 - signed = true only if a signature mark is visible on a signature line.
 - List the dotted paths of anything you were unsure about in lowConfidenceFields.
+- Read only the applicant's business and owner details. Ignore the names, addresses and phone numbers of whatever company printed the form.
 - If the document is not an application at all, set isApplication=false and leave the rest null/empty.`;
 
 export interface A5Input {

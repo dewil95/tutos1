@@ -22,7 +22,8 @@ export type AiJob =
   | "A13_DEAL_DESK"
   | "A14_BATCH"
   | "A15_DISCLOSURE_CHECK"
-  | "RISK_REPORT";
+  | "RISK_REPORT"
+  | "WHATSAPP_ANSWER";
 
 /** What gets persisted to the AiRun table. The sink is injected so this package has no DB dep. */
 export interface AiRunRecord {

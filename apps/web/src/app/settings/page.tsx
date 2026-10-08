@@ -6,6 +6,7 @@ import { emailDryRun } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
+import { WhatsAppSection } from "./WhatsAppSection";
 import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
@@ -154,33 +155,37 @@ export default async function SettingsPage({
         {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
 
+      <WhatsAppSection tenantId={user.tenantId} canEdit={isAdmin} />
+
       <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
 
       <section className="panel">
         <h2>Lenders ({funders.filter((f) => f.isActive).length} active)</h2>
-        <table className="grid">
-          <thead>
-            <tr>
-              <th>Lender</th>
-              <th>To</th>
-              <th>CC</th>
-              <th>Reply domains</th>
-            </tr>
-          </thead>
-          <tbody>
-            {funders.map((f) => (
-              <tr key={f.id} className={f.isActive ? "" : "muted"}>
-                <td>
-                  {f.name}
-                  {f.isActive ? "" : " (inactive)"}
-                </td>
-                <td className="small">{f.submissionTo ?? "—"}</td>
-                <td className="small">{f.submissionCc.join(", ") || "—"}</td>
-                <td className="small">{f.emailDomains.join(", ")}</td>
+        <div className="tablewrap">
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>Lender</th>
+                <th>To</th>
+                <th>CC</th>
+                <th>Reply domains</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {funders.map((f) => (
+                <tr key={f.id} className={f.isActive ? "" : "muted"}>
+                  <td>
+                    {f.name}
+                    {f.isActive ? "" : " (inactive)"}
+                  </td>
+                  <td className="small">{f.submissionTo ?? "—"}</td>
+                  <td className="small">{f.submissionCc.join(", ") || "—"}</td>
+                  <td className="small">{f.emailDomains.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className="small muted">
           Lender addresses come from docs/funder-appetite-matrix.csv (<code>pnpm db:seed</code>).
         </p>

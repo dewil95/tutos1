@@ -15,6 +15,8 @@ import { handleSendSubmission } from "./sendSubmission";
 import { handleRiskReport } from "./riskReport";
 import { handleStatementExtract } from "./statementExtract";
 import { handleStatementScrub } from "./statementScrub";
+import { handleWhatsAppMessage, handleWhatsAppNudges } from "../whatsapp/chat";
+import { handleWhatsAppAppRead } from "../whatsapp/read";
 
 export type JobHandler = (prisma: PrismaClient, job: ClaimedJob) => Promise<void>;
 
@@ -27,10 +29,19 @@ const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   STATEMENT_SCRUB: handleStatementScrub,
   RISK_REPORT: handleRiskReport,
   EMAIL_RULES: handleEmailRules,
+  WHATSAPP_MESSAGE: handleWhatsAppMessage,
+  WHATSAPP_APP_READ: handleWhatsAppAppRead,
+  WHATSAPP_NUDGES: handleWhatsAppNudges,
 };
 
 /** Jobs that read whole PDFs with the primary model can take up to ~40 s. */
-const SLOW: JobType[] = ["APPLICATION_READ", "STATEMENT_EXTRACT", "STATEMENT_SCRUB", "RISK_REPORT"];
+const SLOW: JobType[] = [
+  "APPLICATION_READ",
+  "STATEMENT_EXTRACT",
+  "STATEMENT_SCRUB",
+  "RISK_REPORT",
+  "WHATSAPP_APP_READ",
+];
 const SLOW_JOB_MS = 40_000;
 
 /** Never start a slow AI job the request cannot finish; quick jobs (sends, inbox) still run. */

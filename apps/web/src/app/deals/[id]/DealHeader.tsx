@@ -11,6 +11,7 @@ const STEPS: { label: string; stages: DealStage[] }[] = [
 
 const SECTIONS = [
   ["merchant", "Merchant"],
+  ["whatsapp", "WhatsApp"],
   ["lenders", "Lender status"],
   ["ship", "Ship the file"],
   ["files", "Files"],
@@ -93,11 +94,13 @@ export function DealHeader(p: DealHeaderProps) {
         </ol>
       </header>
       <nav className="subnav" aria-label="Deal sections">
-        {SECTIONS.map(([id, label]) => (
-          <a key={id} href={`#${id}`}>
-            {label}
-          </a>
-        ))}
+        {SECTIONS.filter(([id]) => id !== "whatsapp" || p.source === "whatsapp").map(
+          ([id, label]) => (
+            <a key={id} href={`#${id}`}>
+              {label}
+            </a>
+          ),
+        )}
       </nav>
     </>
   );

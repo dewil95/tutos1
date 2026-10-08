@@ -9,7 +9,10 @@ export type JobType =
   | "STATEMENT_EXTRACT"
   | "STATEMENT_SCRUB"
   | "RISK_REPORT"
-  | "EMAIL_RULES";
+  | "EMAIL_RULES"
+  | "WHATSAPP_MESSAGE"
+  | "WHATSAPP_APP_READ"
+  | "WHATSAPP_NUDGES";
 
 export interface ClaimedJob {
   id: string;

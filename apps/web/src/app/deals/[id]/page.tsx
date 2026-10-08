@@ -14,6 +14,7 @@ import { DealHeader } from "./DealHeader";
 import { BankScrubPanel } from "./BankScrubPanel";
 import { RiskReportPanel } from "./RiskReportPanel";
 import { ContractRequestForm } from "./ContractRequestForm";
+import { WhatsAppPanel } from "./WhatsAppPanel";
 import {
   analyseDealStatements,
   confirmClawback,
@@ -90,6 +91,14 @@ export default async function DealPage({
       prisma.bankAnalysis.findFirst({ where: { dealId: id }, orderBy: { createdAt: "desc" } }),
       prisma.mailboxConnection.findFirst({ where: { tenantId: user.tenantId } }),
     ]);
+  const whatsapp = await prisma.whatsAppConversation.findUnique({
+    where: { dealId: id },
+    include: { messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 300 } },
+  });
+  const signature = await prisma.applicationSignature.findFirst({
+    where: { dealId: id },
+    orderBy: { signedAt: "desc" },
+  });
   const jobs = await prisma.job.findMany({
     where: { dedupeKey: { in: submissions.map((s) => `send:${s.id}`) } },
     select: { dedupeKey: true, status: true, lastError: true, runAt: true },
@@ -179,6 +188,7 @@ export default async function DealPage({
           {emailDryRun() ? " (dry run: written to the timeline)" : ""}.
         </p>
       ) : null}
+      {flash.wa ? <p className="notice ok">{flash.wa}</p> : null}
       {flash.risk ? (
         <p className="notice ok">Risk report is being regenerated. Refresh in a minute.</p>
       ) : null}
@@ -190,6 +200,20 @@ export default async function DealPage({
       ) : null}
 
       <MerchantPanel deal={deal} merchant={deal.merchant} owners={deal.merchant.owners} />
+
+      {whatsapp ? (
+        <WhatsAppPanel
+          dealId={id}
+          conv={whatsapp}
+          messages={whatsapp.messages}
+          source={
+            allDocuments.find(
+              (d) => d.id === (whatsapp.fieldState as { sourceDocId?: string }).sourceDocId,
+            ) ?? null
+          }
+          signature={signature}
+        />
+      ) : null}
 
       <section className="panel" id="lenders">
         <h2>Lender status</h2>

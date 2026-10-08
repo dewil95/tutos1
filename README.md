@@ -15,8 +15,12 @@ Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO
   with a traceable watermark.
 - Sends routine emails on its own: missing documents, stip chases, lender follow-ups; contract
   requests and clawback confirmations are one click.
-- Runs on free tiers: Vercel (app), Supabase (database, sign-in, cron), Google Workspace (Gmail, Drive).
-  No phone or SMS features, no Salesforce, no e-signature (the website handles the application).
+- Takes applications on WhatsApp: a merchant sends the signed application they already have from
+  another company; the bot fills in Ascend's application from it, asks only what is missing (SSN
+  and date of birth through a one-time private link, never in the chat), shows the filled PDF and
+  the merchant signs by typing their name and tapping "I agree, sign".
+- Runs on free tiers: Vercel (app), Supabase (database, sign-in, cron), Google Workspace (Gmail, Drive),
+  Meta's WhatsApp Cloud API. No calls or SMS, no Salesforce.
 
 How it fits together: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Research and roadmap:
 [`docs/PLAN.md`](docs/PLAN.md).
@@ -102,6 +106,46 @@ Vercel also calls the same route once a day (`apps/web/vercel.json`) as a fallba
 
 Try a few deals with `MCA_EMAIL_DRY_RUN=true`: each "sent" email appears on the deal timeline
 with its exact To and CC. When it looks right, set `MCA_EMAIL_DRY_RUN=false` in Vercel and redeploy.
+
+### 6. WhatsApp applications (optional)
+
+How it works for the merchant: they message Ascend's WhatsApp number (or tap a
+`wa.me/<number>?text=Apply` link on the website), pick English or Spanish and send the signed
+application they already have from another company, plus bank statements. The CRM reads it,
+fills in Ascend's application, asks only for what is missing, sends a private link for the SSN
+and date of birth, shows the filled application as a PDF and asks them to type their name and
+tap **I agree, sign**. The deal appears on the board with a WhatsApp badge and the signed
+`Ascend-Fund-Application-<Merchant>.pdf` ready for lenders. The other company's PDF is kept as
+an internal file and is never sent to lenders. Anyone can type _agent_ to get a person; reps
+answer from the deal page.
+
+Setup (about an hour, once):
+
+1. **Number.** Buy a US number in Telnyx (about $1/month). Don't use it in the WhatsApp app on a
+   phone. Meta verifies it with a code by SMS or phone call: in Telnyx, forward the number's calls
+   to your mobile and choose "phone call" when Meta asks.
+2. **Meta app.** On developers.facebook.com create an app (type _Business_) linked to Ascend's
+   Meta Business account, add the **WhatsApp** product, then _API Setup → Add phone number_ with
+   the Telnyx number and the display name "Ascend Fund". Meta reviews the display name.
+3. **Permanent token.** Meta Business Settings → System users → add one, give it the app and the
+   WhatsApp account, generate a token with `whatsapp_business_messaging` and
+   `whatsapp_business_management`.
+4. **Vercel environment variables** (then redeploy): `WHATSAPP_PHONE_NUMBER_ID` (API Setup page),
+   `WHATSAPP_TOKEN` (step 3), `WHATSAPP_APP_SECRET` (App settings → Basic),
+   `WHATSAPP_VERIFY_TOKEN` (any random string, `openssl rand -hex 16`), `APP_URL` (the CRM's
+   public address; the private SSN/DOB links use it), and keep `WHATSAPP_ENABLED=false` for now.
+5. **Webhook.** Meta app → WhatsApp → Configuration: Callback URL
+   `https://<your-app>/api/whatsapp/webhook`, Verify token = `WHATSAPP_VERIFY_TOKEN`, then
+   subscribe to the **messages** field.
+6. **Settings → WhatsApp applications** in the CRM: enter the number (for the website link) and
+   paste the exact authorization wording from Ascend's current application, in English and
+   Spanish. Until you do, a default wording is used.
+7. **Test.** Message the number from your own phone. With `WHATSAPP_ENABLED=false` the bot's
+   replies only appear on the deal page (marked "not sent"). When the flow looks right, set
+   `WHATSAPP_ENABLED=true` and redeploy; the bot now answers on WhatsApp.
+
+Cost: Meta charges nothing for replies within 24 hours of the merchant's last message, which is
+all the bot sends (two reminders included). Reading one application with Gemini is a few cents.
 
 ### Free plans while testing, and when to upgrade
 

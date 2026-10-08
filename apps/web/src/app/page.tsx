@@ -26,7 +26,22 @@ interface BoardDeal {
   ownerName: string | null;
   updatedAt: Date;
   stageChangedAt: Date;
+  /** WhatsApp application chat state, if the deal came in on WhatsApp. */
+  whatsapp: string | null;
 }
+
+/** Board badge for WhatsApp deals: what the chat is waiting on. */
+const WA_LABEL: Record<string, string> = {
+  ACTIVE: "WhatsApp · in progress",
+  READING: "WhatsApp · reading",
+  SECURE_FORM: "WhatsApp · in progress",
+  REVIEW: "WhatsApp · reviewing",
+  SIGN_NAME: "WhatsApp · signing",
+  SIGN_CONFIRM: "WhatsApp · signing",
+  SIGNED: "WhatsApp · signed",
+  HANDOFF: "WhatsApp · needs a person",
+  ABANDONED: "WhatsApp · went quiet",
+};
 
 async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error: string | null }> {
   try {
@@ -36,6 +51,7 @@ async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error:
       include: {
         merchant: { select: { legalName: true, dba: true } },
         owner: { select: { name: true } },
+        whatsapp: { select: { status: true } },
       },
       orderBy: { updatedAt: "desc" },
       take: 200,
@@ -50,6 +66,7 @@ async function loadDeals(tenantId: string): Promise<{ deals: BoardDeal[]; error:
         ownerName: d.owner?.name ?? null,
         updatedAt: d.updatedAt,
         stageChangedAt: d.stageChangedAt,
+        whatsapp: d.whatsapp?.status ?? null,
       })),
       error: null,
     };
@@ -116,6 +133,13 @@ export default async function DealBoardPage() {
               {inStage.map((d) => (
                 <a className="card" key={d.id} href={`/deals/${d.id}`}>
                   <span className="name">{d.merchantName}</span>
+                  {d.whatsapp ? (
+                    <span
+                      className={`tag wa ${["HANDOFF", "ABANDONED"].includes(d.whatsapp) ? "attention" : ""}`}
+                    >
+                      {WA_LABEL[d.whatsapp] ?? "WhatsApp"}
+                    </span>
+                  ) : null}
                   <span className="amount">
                     {d.requestedAmount ? (
                       money(d.requestedAmount)

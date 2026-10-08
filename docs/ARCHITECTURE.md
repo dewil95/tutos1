@@ -2,7 +2,8 @@
 
 The CRM runs on free tiers: the app on **Vercel**, the database, sign-in and scheduler on
 **Supabase**, files in **Google Drive**, email through the **Gmail** account
-`funding@ascendfund.co`, and AI on the **Google Gemini API**. There is no phone or SMS part.
+`funding@ascendfund.co`, AI on the **Google Gemini API**, and merchant applications on
+**WhatsApp** (Meta's Cloud API). There are no calls or SMS.
 
 ## 1. The pieces
 
@@ -27,6 +28,7 @@ flowchart TB
   end
 
   gemini["Gemini API<br/>3.1 Pro · 3 Flash"]
+  wa["WhatsApp Cloud API<br/>Ascend number (Telnyx)"]
   lenders["Lenders"]
   merchant["Merchant"]
 
@@ -40,6 +42,8 @@ flowchart TB
   tick --> gemini
   gmail <--> lenders
   merchant -- "statements, MTD, DL/VC" --> gmail
+  merchant <-- "application chat" --> wa
+  wa -- "webhook (signed)" --> app
 ```
 
 ## 2. Ship the file: one email per lender
@@ -191,6 +195,44 @@ classDiagram
   LlmClient <|.. ClaudeClient
 ```
 
+## 7. WhatsApp applications
+
+The merchant sends the signed application they already have from another company. The bot fills
+in Ascend's application from it and the merchant signs Ascend's application by typing their name.
+The other company's signature is never copied, and its PDF stays internal.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant M as Merchant (WhatsApp)
+  participant W as /api/whatsapp/webhook
+  participant B as Chat job
+  participant R as PDF reader (A5, Gemini)
+  participant P as Private page /apply/…
+  M->>W: "Hi" · picks English / Español
+  M->>W: Other company's signed application (PDF or photos) + statements
+  W->>B: message stored once (signature checked), job queued
+  B->>R: read the application
+  R-->>B: fields + SSN/DOB (encrypted) · file marked internal only
+  B->>M: "I just need 2 more details" → one question at a time
+  B->>M: one-time link for SSN and date of birth
+  M->>P: SSN + DOB (never typed in the chat)
+  B->>M: filled Ascend application (PDF, SSN hidden) · Looks good / Fix something
+  M->>B: types full name · taps "I agree, sign"
+  B->>B: signed PDF → Drive, deal filled (same path as the website API),<br/>ApplicationSignature row (name, phone, consent text, message ids, PDF hash)
+  B->>M: signed copy
+```
+
+- Every inbound message and every background result (PDF read, private page, reminder) is a
+  `WhatsAppMessage` row handled in order by one `WHATSAPP_MESSAGE` job per chat, so two things
+  never change the same chat at once.
+- The bot asks only required fields the PDF left empty; values the reader or the answer parser
+  was unsure of are read back for a yes/no. "back", "fix" and "agent" work at any point.
+- Two reminders inside WhatsApp's free 24-hour window (after 2 h and 20 h); after a day the chat
+  is marked "went quiet" on the board and the team follows up.
+- With `WHATSAPP_ENABLED` off, replies are written to the chat on the deal page instead of being
+  sent.
+
 ## Where things live in the code
 
 | Concern                                      | Path                                                             |
@@ -204,6 +246,8 @@ classDiagram
 | Bank scrub checks, risk score, lender rank   | `packages/domain/src/scrub.ts`, `riskScore.ts`, `funderMatch.ts` |
 | Watermark, PDF checks, report PDF            | `packages/connectors/src/pdf/`                                   |
 | Email automation                             | `apps/web/src/server/email/`, `server/jobs/emailRules.ts`        |
+| WhatsApp bot, questions, signature           | `apps/web/src/server/whatsapp/`, `app/api/whatsapp/webhook/`     |
+| WhatsApp Cloud API client, application PDF   | `packages/connectors/src/whatsapp/`, `pdf/application.ts`        |
 | Deal page                                    | `apps/web/src/app/deals/[id]/`                                   |
 | Gemini client                                | `packages/ai/src/providers/gemini.ts`                            |
 | Database schema and RLS                      | `packages/db/prisma/`                                            |
