@@ -122,6 +122,15 @@ answer from the deal page.
 Setup (about an hour, once; the CRM must already be online with funding@ connected, because
 the bot saves the merchant's files to Drive):
 
+> **Already have a number in the WhatsApp Business app?** Use it instead of a Telnyx number:
+>
+> - In the app: Settings → Account → **Delete my account**. A number can't be on the app and on
+>   the CRM at the same time.
+> - Wait a few minutes, and keep the phone and SIM so you can receive Meta's SMS or call code.
+> - Skip step 1, and add that number in step 3.
+> - Choose any new 6-digit PIN at Register number (step 7); the app's old two-step PIN goes away
+>   with the deleted account.
+
 1. **Number.** A US number in Telnyx (about $1/month), not used in any WhatsApp app on a phone.
    Meta verifies it with a code by SMS or phone call: in Telnyx, forward the number's calls to
    your mobile and choose "phone call" when Meta asks.
