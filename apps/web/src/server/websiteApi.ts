@@ -227,6 +227,25 @@ export async function storeApiFiles(
   return docs;
 }
 
+/** A returning merchant: same legal name (any case) and, when known, the same EIN last 4. */
+export async function findMerchantMatch(
+  prisma: PrismaClient,
+  tenantId: string,
+  legalName: string,
+  ein: string | undefined,
+  excludeId?: string,
+) {
+  const einLast4 = ein?.replace(/\D/g, "").slice(-4) ?? null;
+  return prisma.merchant.findFirst({
+    where: {
+      tenantId,
+      legalName: { equals: legalName, mode: "insensitive" },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      ...(einLast4 ? { OR: [{ einLast4 }, { einLast4: null }] } : {}),
+    },
+  });
+}
+
 /**
  * Creates (or, for a repeated externalId, returns) the deal for a website application.
  * The merchant is matched on EIN last 4 + legal name so a returning merchant keeps one record.
@@ -242,15 +261,9 @@ export async function ingestApplication(
   if (existing) return { deal: existing, created: false, documents: [] };
 
   const files = decodeFiles(p.files);
-  const einLast4 = p.business.ein?.replace(/\D/g, "").slice(-4) ?? null;
   const merchant =
-    (await prisma.merchant.findFirst({
-      where: {
-        tenantId,
-        legalName: { equals: p.business.legalName, mode: "insensitive" },
-        ...(einLast4 ? { OR: [{ einLast4 }, { einLast4: null }] } : {}),
-      },
-    })) ?? (await prisma.merchant.create({ data: { tenantId, legalName: p.business.legalName } }));
+    (await findMerchantMatch(prisma, tenantId, p.business.legalName, p.business.ein)) ??
+    (await prisma.merchant.create({ data: { tenantId, legalName: p.business.legalName } }));
 
   const hasStatements = files.some((f) => f.type === "BANK_STATEMENT");
   const deal = await prisma.deal.create({

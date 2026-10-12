@@ -39,7 +39,7 @@ export function BankScrubPanel({
 }) {
   if (!analysis?.scrub) {
     return (
-      <section className="panel">
+      <section className="panel" id="scrub">
         <h2>Bank scrub</h2>
         <p className="empty">
           {pending
@@ -66,7 +66,7 @@ export function BankScrubPanel({
   ]);
 
   return (
-    <section className="panel">
+    <section className="panel" id="scrub">
       <h2>Bank scrub</h2>
       <div className="stats">
         <div>

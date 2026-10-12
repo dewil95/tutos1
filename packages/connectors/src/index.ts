@@ -8,3 +8,6 @@ export * from "./storage/drive";
 export * from "./pdf/watermark";
 export * from "./pdf/metadata";
 export * from "./pdf/report";
+export * from "./whatsapp/cloudApi";
+export * from "./pdf/images";
+export * from "./pdf/application";

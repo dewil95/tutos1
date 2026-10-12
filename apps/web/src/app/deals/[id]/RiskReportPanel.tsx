@@ -23,7 +23,7 @@ export function RiskReportPanel({
 }) {
   const r = report as StoredRiskReport | null;
   return (
-    <section className="panel">
+    <section className="panel" id="risk">
       <h2>
         AI Risk Report <span className="tag">internal</span>
       </h2>

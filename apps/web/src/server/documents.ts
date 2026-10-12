@@ -30,7 +30,7 @@ export interface StoreFileInput {
   dealId: string;
   merchantId: string | null;
   file: Attachment;
-  uploadedVia: "staff" | "email" | "funder_email" | "website";
+  uploadedVia: "staff" | "email" | "funder_email" | "website" | "whatsapp";
   uploadedById?: string | null;
   gmailMessageId?: string | null;
   type?: DocumentType;

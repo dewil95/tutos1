@@ -99,6 +99,15 @@ export class DriveProvider implements StorageProvider {
     return Buffer.from(await res.arrayBuffer());
   }
 
+  /** Renames a file or folder (e.g. a deal folder once the merchant's real name is known). */
+  async rename(fileId: string, name: string): Promise<void> {
+    await this.auth.json<DriveFile>(`${API}/files/${encodeURIComponent(fileId)}?fields=id`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: safeFolderName(name) }),
+    });
+  }
+
   async list(folderId: string): Promise<StoredFile[]> {
     const q = `${driveQuoted(folderId)} in parents and trashed = false and mimeType != '${FOLDER}'`;
     const out: StoredFile[] = [];

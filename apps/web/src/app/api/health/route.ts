@@ -24,12 +24,24 @@ export async function GET() {
   checks.encryptionKey = present("PII_ENCRYPTION_KEY");
   checks.cronSecret = present("CRON_SECRET");
   const healthy = Object.values(checks).every((v) => v === "ok");
+  // WhatsApp is optional: reported for setup, never makes the CRM "degraded".
+  const whatsapp = Object.fromEntries(
+    [
+      "WHATSAPP_PHONE_NUMBER_ID",
+      "WHATSAPP_TOKEN",
+      "WHATSAPP_APP_SECRET",
+      "WHATSAPP_VERIFY_TOKEN",
+      "WHATSAPP_BUSINESS_ACCOUNT_ID",
+      "APP_URL",
+    ].map((name) => [name, present(name)]),
+  );
   return Response.json(
     {
       status: healthy ? "ok" : "degraded",
       ai: { provider, primary: MODELS.primary, fast: MODELS.fast },
       emailDryRun: process.env.MCA_EMAIL_DRY_RUN !== "false",
       checks,
+      whatsapp: { ...whatsapp, sending: process.env.WHATSAPP_ENABLED === "true" },
     },
     { status: healthy ? 200 : 503 },
   );

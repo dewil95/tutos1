@@ -10,13 +10,21 @@ export default async function LoginPage({
 }) {
   const { error } = await searchParams;
   return (
-    <section className="login">
-      <h1>Sign in</h1>
-      <p>Use your @{process.env.ALLOWED_EMAIL_DOMAIN ?? "ascendfund.co"} Google account.</p>
-      {error ? <p className="error">{ERRORS[error] ?? error}</p> : null}
-      <a className="button primary" href="/auth/login">
-        Continue with Google
-      </a>
-    </section>
+    <div className="login-page">
+      <section className="login">
+        <span className="brand">
+          <span className="brand-mark">A</span>
+          <span className="brand-name">Ascend CRM</span>
+        </span>
+        <h1>Sign in</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          Use your @{process.env.ALLOWED_EMAIL_DOMAIN ?? "ascendfund.co"} Google account.
+        </p>
+        {error ? <p className="notice error">{ERRORS[error] ?? error}</p> : null}
+        <a className="button primary" href="/auth/login">
+          Continue with Google
+        </a>
+      </section>
+    </div>
   );
 }
