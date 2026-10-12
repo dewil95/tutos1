@@ -43,22 +43,26 @@ export class WhatsAppApiError extends Error {
   }
 }
 
+async function checkResponse(res: Response, what: string): Promise<void> {
+  if (res.ok) return;
+  let detail = "";
+  try {
+    const j = (await res.json()) as { error?: { message?: string; code?: number } };
+    detail = j.error?.message
+      ? `: ${j.error.message}${j.error.code ? ` (code ${j.error.code})` : ""}`
+      : "";
+  } catch {
+    /* body was not JSON */
+  }
+  throw new WhatsAppApiError(res.status, `WhatsApp ${what} failed (${res.status})${detail}`);
+}
+
 export function createWhatsAppClient(cfg: WhatsAppConfig): WhatsAppClient {
   const f = cfg.fetch ?? fetch;
   const base = `https://graph.facebook.com/${cfg.graphVersion ?? "v23.0"}`;
   const auth = { Authorization: `Bearer ${cfg.token}` };
 
-  const check = async (res: Response, what: string) => {
-    if (res.ok) return;
-    let detail = "";
-    try {
-      const j = (await res.json()) as { error?: { message?: string; code?: number } };
-      detail = j.error?.message ? `: ${j.error.message}` : "";
-    } catch {
-      /* body was not JSON */
-    }
-    throw new WhatsAppApiError(res.status, `WhatsApp ${what} failed (${res.status})${detail}`);
-  };
+  const check = checkResponse;
 
   const post = async (payload: Record<string, unknown>) => {
     const res = await f(`${base}/${cfg.phoneNumberId}/messages`, {
@@ -136,6 +140,88 @@ export function createWhatsAppClient(cfg: WhatsAppConfig): WhatsAppClient {
       return { data: Buffer.from(await res.arrayBuffer()), mimeType: mime_type };
     },
   };
+}
+
+// --- One-time setup calls (Settings → WhatsApp applications) -------------------------
+
+export interface WhatsAppSetupConfig extends WhatsAppConfig {
+  /** WhatsApp Business Account id (WHATSAPP_BUSINESS_ACCOUNT_ID), for webhook subscription. */
+  businessAccountId?: string;
+}
+
+export interface WhatsAppNumberInfo {
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  /** Display-name review: APPROVED, PENDING_REVIEW, DECLINED, … */
+  nameStatus: string | null;
+  qualityRating: string | null;
+  /** VERIFIED once Meta's SMS/call code was entered. */
+  codeVerificationStatus: string | null;
+}
+
+function setup(cfg: WhatsAppSetupConfig) {
+  const f = cfg.fetch ?? fetch;
+  const base = `https://graph.facebook.com/${cfg.graphVersion ?? "v23.0"}`;
+  const headers = { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" };
+  const call = async <T>(path: string, what: string, body?: unknown): Promise<T> => {
+    const res = await f(`${base}/${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    await checkResponse(res, what);
+    return (await res.json()) as T;
+  };
+  const waba = () => {
+    if (!cfg.businessAccountId) throw new Error("WHATSAPP_BUSINESS_ACCOUNT_ID is not set");
+    return encodeURIComponent(cfg.businessAccountId);
+  };
+  return { call, waba, phone: encodeURIComponent(cfg.phoneNumberId) };
+}
+
+/** Checks the token and phone number id: the number, its approved name and status. */
+export async function whatsappNumberInfo(cfg: WhatsAppSetupConfig): Promise<WhatsAppNumberInfo> {
+  const s = setup(cfg);
+  const j = await s.call<Record<string, string | undefined>>(
+    `${s.phone}?fields=display_phone_number,verified_name,name_status,quality_rating,code_verification_status`,
+    "number check",
+  );
+  return {
+    displayPhoneNumber: j.display_phone_number ?? null,
+    verifiedName: j.verified_name ?? null,
+    nameStatus: j.name_status ?? null,
+    qualityRating: j.quality_rating ?? null,
+    codeVerificationStatus: j.code_verification_status ?? null,
+  };
+}
+
+/**
+ * Registers the number for the Cloud API (required once; the PIN becomes its two-step
+ * verification PIN). Meta allows 10 attempts per 72 hours.
+ */
+export async function registerWhatsAppNumber(cfg: WhatsAppSetupConfig, pin: string): Promise<void> {
+  if (!/^\d{6}$/.test(pin)) throw new Error("The PIN must be 6 digits");
+  const s = setup(cfg);
+  await s.call(`${s.phone}/register`, "number registration", {
+    messaging_product: "whatsapp",
+    pin,
+  });
+}
+
+/** Subscribes this Meta app to the business account's webhooks (messages then reach the CRM). */
+export async function subscribeWhatsAppWebhooks(cfg: WhatsAppSetupConfig): Promise<void> {
+  const s = setup(cfg);
+  await s.call(`${s.waba()}/subscribed_apps`, "webhook subscription", {});
+}
+
+/** Names of the apps subscribed to the business account's webhooks. */
+export async function whatsappSubscribedApps(cfg: WhatsAppSetupConfig): Promise<string[]> {
+  const s = setup(cfg);
+  const j = await s.call<{ data?: { whatsapp_business_api_data?: { name?: string } }[] }>(
+    `${s.waba()}/subscribed_apps`,
+    "webhook subscription check",
+  );
+  return (j.data ?? []).map((a) => a.whatsapp_business_api_data?.name ?? "(unnamed app)");
 }
 
 const clip = (s: string, max: number) => (s.length <= max ? s : s.slice(0, max - 1) + "…");

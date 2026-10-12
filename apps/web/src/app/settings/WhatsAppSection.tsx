@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/server/auth";
 import { DEFAULT_CONSENT } from "@/server/whatsapp/copy";
 import { whatsappConfigured, whatsappSettings } from "@/server/whatsapp/config";
+import { whatsappSetupStep } from "./whatsappSetupActions";
 
 interface WhatsAppTenantSettings {
   /** Ascend's WhatsApp number as merchants see it, digits with country code. */
@@ -45,9 +46,12 @@ async function saveWhatsApp(form: FormData) {
 export async function WhatsAppSection({
   tenantId,
   canEdit,
+  flash,
 }: {
   tenantId: string;
   canEdit: boolean;
+  /** Result of the last setup button (from the redirect). */
+  flash?: { ok?: string; error?: string };
 }) {
   const tenant = await getPrisma().tenant.findUniqueOrThrow({ where: { id: tenantId } });
   const wa = ((tenant.settings ?? {}) as { whatsapp?: WhatsAppTenantSettings }).whatsapp ?? {};
@@ -55,7 +59,7 @@ export async function WhatsAppSection({
   const appUrl = (process.env.APP_URL ?? "").replace(/\/$/, "");
   const link = wa.number ? `https://wa.me/${wa.number}?text=${encodeURIComponent("Apply")}` : null;
   return (
-    <section className="panel">
+    <section className="panel" id="whatsapp">
       <h2>WhatsApp applications</h2>
       <p className="small muted">
         Merchants send their signed application from another company (or answer questions); the bot
@@ -88,6 +92,43 @@ export async function WhatsAppSection({
           </li>
         ) : null}
       </ul>
+      {flash?.ok ? <p className="notice ok">{flash.ok}</p> : null}
+      {flash?.error ? <p className="notice error">{flash.error}</p> : null}
+      {canEdit ? (
+        <div className="stack" style={{ marginBottom: 16 }}>
+          <p className="small muted" style={{ margin: 0 }}>
+            One-time setup, in this order, after the Vercel variables are in place:
+          </p>
+          <div className="row">
+            <form action={whatsappSetupStep.bind(null, "check")} className="inline">
+              <button type="submit">1. Check connection</button>
+            </form>
+            <form action={whatsappSetupStep.bind(null, "register")} className="row inline">
+              <input
+                name="pin"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                placeholder="6-digit PIN"
+                required
+                autoComplete="off"
+                style={{ width: 120 }}
+              />
+              <button type="submit">2. Register number</button>
+            </form>
+            <form action={whatsappSetupStep.bind(null, "webhooks")} className="inline">
+              <button type="submit" disabled={!s.businessAccountId}>
+                3. Connect webhooks
+              </button>
+            </form>
+          </div>
+          {!s.businessAccountId ? (
+            <p className="small muted" style={{ margin: 0 }}>
+              Step 3 needs WHATSAPP_BUSINESS_ACCOUNT_ID (Meta app → WhatsApp → API Setup).
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {canEdit ? (
         <form action={saveWhatsApp} className="stack">
           <label className="field">

@@ -10,6 +10,8 @@ export function whatsappSettings() {
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
     appSecret: process.env.WHATSAPP_APP_SECRET ?? "",
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? "",
+    /** WhatsApp Business Account id, only for the one-time webhook subscription. */
+    businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? "",
     graphVersion: process.env.WHATSAPP_GRAPH_VERSION || undefined,
   };
 }

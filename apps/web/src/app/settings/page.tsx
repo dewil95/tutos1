@@ -155,7 +155,11 @@ export default async function SettingsPage({
         {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
 
-      <WhatsAppSection tenantId={user.tenantId} canEdit={isAdmin} />
+      <WhatsAppSection
+        tenantId={user.tenantId}
+        canEdit={isAdmin}
+        flash={{ ok: flash.wa, error: flash.waError }}
+      />
 
       <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
 

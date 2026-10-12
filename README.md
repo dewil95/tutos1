@@ -119,30 +119,50 @@ tap **I agree, sign**. The deal appears on the board with a WhatsApp badge and t
 an internal file and is never sent to lenders. Anyone can type _agent_ to get a person; reps
 answer from the deal page.
 
-Setup (about an hour, once):
+Setup (about an hour, once; the CRM must already be online with funding@ connected, because
+the bot saves the merchant's files to Drive):
 
-1. **Number.** Buy a US number in Telnyx (about $1/month). Don't use it in the WhatsApp app on a
-   phone. Meta verifies it with a code by SMS or phone call: in Telnyx, forward the number's calls
-   to your mobile and choose "phone call" when Meta asks.
-2. **Meta app.** On developers.facebook.com create an app (type _Business_) linked to Ascend's
-   Meta Business account, add the **WhatsApp** product, then _API Setup → Add phone number_ with
-   the Telnyx number and the display name "Ascend Fund". Meta reviews the display name.
-3. **Permanent token.** Meta Business Settings → System users → add one, give it the app and the
+1. **Number.** A US number in Telnyx (about $1/month), not used in any WhatsApp app on a phone.
+   Meta verifies it with a code by SMS or phone call: in Telnyx, forward the number's calls to
+   your mobile and choose "phone call" when Meta asks.
+2. **Meta Business portfolio** (business.facebook.com) for Ascend Fund: legal name, website
+   ascendfund.co, business email and address.
+3. **Meta app.** On developers.facebook.com create an app (type _Business_) in that portfolio,
+   add the **WhatsApp** product, then _API Setup → Add phone number_ with the Telnyx number and
+   the display name "Ascend Fund" (it must match the website, or Meta declines it). Add the
+   logo, description, website and email to the WhatsApp profile. Switch the app to **Live** mode.
+4. **Permanent token.** Meta Business Settings → System users → add one, give it the app and the
    WhatsApp account, generate a token with `whatsapp_business_messaging` and
    `whatsapp_business_management`.
-4. **Vercel environment variables** (then redeploy): `WHATSAPP_PHONE_NUMBER_ID` (API Setup page),
-   `WHATSAPP_TOKEN` (step 3), `WHATSAPP_APP_SECRET` (App settings → Basic),
-   `WHATSAPP_VERIFY_TOKEN` (any random string, `openssl rand -hex 16`), `APP_URL` (the CRM's
-   public address; the private SSN/DOB links use it), and keep `WHATSAPP_ENABLED=false` for now.
-5. **Webhook.** Meta app → WhatsApp → Configuration: Callback URL
+5. **Vercel environment variables** (then redeploy):
+   - `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_BUSINESS_ACCOUNT_ID` (both on the API Setup page)
+   - `WHATSAPP_TOKEN` (step 4)
+   - `WHATSAPP_APP_SECRET` (App settings → Basic)
+   - `WHATSAPP_VERIFY_TOKEN` (any random string, `openssl rand -hex 16`)
+   - `APP_URL` (the CRM's public address; the private SSN/DOB links use it)
+   - keep `WHATSAPP_ENABLED=false` for now.
+
+   Check: `https://<your-app>/api/health` lists each of them as `ok` under `whatsapp`.
+
+6. **Webhook.** Meta app → WhatsApp → Configuration: Callback URL
    `https://<your-app>/api/whatsapp/webhook`, Verify token = `WHATSAPP_VERIFY_TOKEN`, then
    subscribe to the **messages** field.
-6. **Settings → WhatsApp applications** in the CRM: enter the number (for the website link) and
-   paste the exact authorization wording from Ascend's current application, in English and
-   Spanish. Until you do, a default wording is used.
-7. **Test.** Message the number from your own phone. With `WHATSAPP_ENABLED=false` the bot's
-   replies only appear on the deal page (marked "not sent"). When the flow looks right, set
-   `WHATSAPP_ENABLED=true` and redeploy; the bot now answers on WhatsApp.
+7. **Settings → WhatsApp applications** in the CRM, in order:
+   1. **Check connection**: shows the number, the display name and its review status.
+   2. **Register number** with a 6-digit PIN you keep (it becomes the number's two-step PIN;
+      Meta allows 10 tries per 72 hours).
+   3. **Connect webhooks**: without this, Meta may accept the webhook URL but never send messages.
+      Press Check connection again: it should list your app.
+
+   Then enter the number (for the website link) and paste the exact authorization wording from
+   Ascend's current application, in English and Spanish. Until you do, a default wording is used.
+
+8. **Test in test mode.** Message the number from your own phone with a made-up application PDF.
+   With `WHATSAPP_ENABLED=false` the bot's replies only appear on the deal page (marked "not
+   sent"), and the file appears in the deal's Drive folder.
+9. **Turn on.** Set `WHATSAPP_ENABLED=true` and redeploy; run the whole flow from your phone to the
+   signature, check the signed PDF in Drive, then again in Spanish. Then add the `wa.me` button
+   (shown in Settings) to the website.
 
 Cost: Meta charges nothing for replies within 24 hours of the merchant's last message, which is
 all the bot sends (two reminders included). Reading one application with Gemini is a few cents.
