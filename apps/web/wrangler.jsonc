@@ -2,15 +2,14 @@
   // Ascend CRM on Cloudflare Workers (Next.js through @opennextjs/cloudflare).
   // Deploy: .github/workflows/deploy.yml (or `pnpm --filter @mca/web cf:deploy`).
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ascend-crm",
+  "name": "crm",
   "main": "worker.ts",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  // Only reachable through crm.ascendfund.co, which sits behind Cloudflare Access.
-  "workers_dev": false,
+  // Only reachable through crm.dewilarieldiazbonilla.workers.dev, which sits behind Cloudflare Access.
+  "workers_dev": true,
   "preview_urls": false,
-  "routes": [{ "pattern": "crm.ascendfund.co", "custom_domain": true }],
   "d1_databases": [
     {
       "binding": "DB",
@@ -25,7 +24,7 @@
   "limits": { "cpu_ms": 120000 },
   "observability": { "enabled": true },
   "vars": {
-    "APP_URL": "https://crm.ascendfund.co",
+    "APP_URL": "https://crm.dewilarieldiazbonilla.workers.dev",
     "ALLOWED_EMAIL_DOMAIN": "ascendfund.co",
     "TENANT_SLUG": "ascend",
     "MCA_EMAIL_DRY_RUN": "true",

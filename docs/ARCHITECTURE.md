@@ -14,7 +14,7 @@ flowchart TB
 
   subgraph cf["Cloudflare (Workers Paid)"]
     access["Access<br/>@ascendfund.co only"]
-    app["Worker ascend-crm (Next.js)<br/>deal board · deal page · lenders · settings"]
+    app["Worker crm (Next.js)<br/>deal board · deal page · lenders · settings"]
     cron["Cron Trigger<br/>every 2 minutes"]
     tick["/api/cron/tick<br/>job runner"]
     db[("D1<br/>deals · lenders · submissions · jobs")]

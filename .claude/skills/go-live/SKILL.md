@@ -7,12 +7,12 @@ disable-model-invocation: true
 # Go live: Ascend CRM on Cloudflare
 
 You are running in Claude Code on the user's own computer, in their copy of this repo. Walk them
-through putting the CRM online at `https://crm.ascendfund.co`. The user is not technical: one
+through putting the CRM online at `https://crm.dewilarieldiazbonilla.workers.dev`. The user is not technical: one
 step at a time, plain words, say what you are about to do and why, and check each step worked
 before the next. Keep a short checklist of the 11 steps and show it when you start and after
 each step.
 
-Background: the app is a Cloudflare Worker named `ascend-crm` (config `apps/web/wrangler.jsonc`)
+Background: the app is a Cloudflare Worker named `crm` (config `apps/web/wrangler.jsonc`)
 with a D1 database `ascend-crm`. It is built and deployed by GitHub Actions
 (`.github/workflows/deploy.yml`) on every push to `main`, never built on this computer.
 README "Go live on Cloudflare" has the same steps for clicking by hand.
@@ -31,7 +31,8 @@ README "Go live on Cloudflare" has the same steps for clicking by hand.
   without piping it into `wrangler secret put`, no `gh secret list` tricks).
 - **Ask before**: merging a pull request, anything that costs money (Google billing), deleting
   anything, or changing DNS. Never touch `ascendfund.co` or `www.ascendfund.co` (the public
-  website); only `crm.ascendfund.co`.
+  website and email stay at GoDaddy); the CRM lives on the free address
+  `crm.dewilarieldiazbonilla.workers.dev`, so no DNS changes are needed.
 - Keep `MCA_EMAIL_DRY_RUN` as `"true"` in `apps/web/wrangler.jsonc`. Turning on real lender
   emails is a separate decision for later (README step 7).
 - Never commit secrets, `.dev.vars`, `.env*` files or real merchant files.
@@ -84,8 +85,8 @@ GitHub needs its own Cloudflare token (the browser login above stays on this com
 
 1. Ask the user to open https://dash.cloudflare.com/profile/api-tokens → **Create Token** →
    template **Edit Cloudflare Workers** → **Use template**. Add permissions:
-   **Account · D1 · Edit** and **Zone · DNS · Edit**. Account resources: their account.
-   Zone resources: Specific zone → `ascendfund.co`. Continue → Create Token → **Copy**.
+   **Account · D1 · Edit**. Account resources: their account. Zone resources: **All zones**
+   (there are none; the CRM uses the free workers.dev address). Continue → Create Token → **Copy**.
 2. In their own terminal window: `gh secret set CLOUDFLARE_API_TOKEN --repo dewil95/tutos1`
    and paste when asked.
 3. Verify: `gh secret list --repo dewil95/tutos1` shows both names (values are never shown).
@@ -135,7 +136,7 @@ With `gcloud`:
    - **Get started**: app name "Ascend CRM", support email funding@ascendfund.co, audience
      **Internal**, contact email theirs, agree, Create.
    - **Clients → Create client**: type **Web application**, name "Ascend CRM", authorized
-     redirect URI `https://crm.ascendfund.co/api/google/callback`, Create.
+     redirect URI `https://crm.dewilarieldiazbonilla.workers.dev/api/google/callback`, Create.
    - In their own terminal window, from `apps/web`: `npx wrangler secret put GOOGLE_CLIENT_ID`
      (paste the Client ID), then `npx wrangler secret put GOOGLE_CLIENT_SECRET` (paste the
      secret).
@@ -147,11 +148,11 @@ Wrangler cannot create Access apps, so guide the clicks at https://one.dash.clou
 1. If asked, pick the **Free** plan and a team name (e.g. `ascendfund`); the team domain is
    `<team>.cloudflareaccess.com`.
 2. Access → Applications → **Add an application → Self-hosted**: name "Ascend CRM", domain
-   `crm.ascendfund.co`; policy "Team": action **Allow**, include **Emails ending in**
+   `crm.dewilarieldiazbonilla.workers.dev`; policy "Team": action **Allow**, include **Emails ending in**
    `@ascendfund.co`; login method **One-time PIN**. Save.
 3. Add another **Self-hosted** application "Ascend CRM public paths" with destinations
-   `crm.ascendfund.co/api/v1/*`, `crm.ascendfund.co/api/health`, `crm.ascendfund.co/apply/*`,
-   `crm.ascendfund.co/api/whatsapp/*`, `crm.ascendfund.co/_next/*`; policy action **Bypass**,
+   `crm.dewilarieldiazbonilla.workers.dev/api/v1/*`, `crm.dewilarieldiazbonilla.workers.dev/api/health`, `crm.dewilarieldiazbonilla.workers.dev/apply/*`,
+   `crm.dewilarieldiazbonilla.workers.dev/api/whatsapp/*`, `crm.dewilarieldiazbonilla.workers.dev/_next/*`; policy action **Bypass**,
    include **Everyone**. Save.
 4. Team domain (not secret), from `apps/web`:
    `printf '%s' '<team>.cloudflareaccess.com' | npx wrangler secret put CF_ACCESS_TEAM_DOMAIN`
@@ -172,13 +173,13 @@ Wrangler cannot create Access apps, so guide the clicks at https://one.dash.clou
 
 ### 10. Check
 
-`curl -s https://crm.ascendfund.co/api/health`: every check should be `ok` (WhatsApp ones may
+`curl -s https://crm.dewilarieldiazbonilla.workers.dev/api/health`: every check should be `ok` (WhatsApp ones may
 say missing; that is fine, it is switched off). If a check is missing, go back to its step.
 New secrets take effect right away; if in doubt, re-run `gh workflow run deploy.yml --ref main`.
 
 ### 11. First sign-in (in the browser, with the user)
 
-1. Open https://crm.ascendfund.co, sign in with the emailed code → **one-time setup** button.
+1. Open https://crm.dewilarieldiazbonilla.workers.dev, sign in with the emailed code → **one-time setup** button.
 2. Settings → **Connect funding@ascendfund.co** (sign in as funding@, allow Gmail and Drive).
 3. Settings → Learn from past email → **Connect a mailbox to learn from** → jonas@ (read-only).
 4. Settings → **Ascend application**: paste the authorization wording from Ascend's current

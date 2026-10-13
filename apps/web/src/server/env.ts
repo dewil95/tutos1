@@ -1,4 +1,4 @@
-/** Server-only environment access with clear errors (Cloudflare → Workers → ascend-crm → Settings → Variables). */
+/** Server-only environment access with clear errors (Cloudflare → Workers → crm → Settings → Variables). */
 
 export function requireEnv(name: string): string {
   const v = process.env[name];
