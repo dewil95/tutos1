@@ -46,11 +46,14 @@ On Windows, commands run in Git Bash, so `|` pipes and `$(...)` work as written.
 
 ### 1. Tools and repo
 
-Check: `node -v` (22 or newer), `git --version`, `gh --version`, `gcloud --version`.
-If one is missing, tell the user the install line for Windows PowerShell:
-`winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli Google.CloudSDK` (Mac:
-`brew install node git gh` and `brew install --cask google-cloud-sdk`), then reopen.
-Then `git fetch origin` and `git status`.
+Required: `node -v` (22 or newer), `git --version`, `gh --version`. Optional:
+`gcloud --version` (Google Cloud CLI, about 1 GB; step 7 works without it in the browser).
+If a required one is missing, tell the user the install line for Windows PowerShell:
+`winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli` (Mac: `brew install node git gh`), then
+reopen the terminal. If winget fails to download, `winget source reset --force` first, or use the
+installer from nodejs.org. If space is short, check it with `Get-PSDrive C` (keep 2 GB free).
+The repo should be in the user's folder (e.g. `C:\Users\<name>\tutos1`), never under
+`C:\WINDOWS\system32`. Then `git fetch origin` and `git status`.
 
 ### 2. GitHub sign-in
 
@@ -97,6 +100,22 @@ Verify from `apps/web`: `npx wrangler d1 list` shows `ascend-crm`; `npx wrangler
 shows a deployment. Until steps 8–9 are done the site lets nobody in; that is expected.
 
 ### 7. Google: Gmail, Drive and Gemini
+
+If `gcloud` is not installed, do this step in the browser instead (use the user's project id
+throughout):
+
+- Create the project at https://console.cloud.google.com/projectcreate (name "Ascend CRM").
+- Billing: https://console.cloud.google.com/billing/linkedaccount?project=<id> (ask first, as
+  below).
+- Enable each API: https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=<id>,
+  https://console.cloud.google.com/apis/library/drive.googleapis.com?project=<id> and
+  https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com?project=<id>
+  → **Enable**.
+- Gemini key: https://aistudio.google.com/apikey → **Create API key** → pick the "Ascend CRM"
+  project → copy. In their own window, from `apps/web`: `npx wrangler secret put GEMINI_API_KEY`.
+- Then item 6 below (the sign-in client) as written.
+
+With `gcloud`:
 
 1. `gcloud auth login` (browser; the user signs in as a Google Workspace admin of ascendfund.co).
 2. Project: `gcloud projects create ascend-crm-<4 random digits> --name="Ascend CRM"`, then

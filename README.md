@@ -79,17 +79,25 @@ Max or Team plan.
 1. **Install the tools.** Open **PowerShell** (Start → type "PowerShell") and run:
 
    ```powershell
-   winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli Google.CloudSDK
+   winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli
    irm https://claude.ai/install.ps1 | iex
    ```
 
+   Keep at least 2 GB free on C: (`Get-PSDrive C` shows it). If winget can't download, run
+   `winget source reset --force` and try again. If the installer says `.local\bin` is not in
+   your PATH, run this once:
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.local\bin", "User")
+   ```
+
    Close PowerShell and open it again. `claude --version` should print a version number.
-   (Mac: `brew install node git gh`, `brew install --cask google-cloud-sdk`, then
-   `curl -fsSL https://claude.ai/install.sh | bash`.)
+   (Mac: `brew install node git gh`, then `curl -fsSL https://claude.ai/install.sh | bash`.)
 
 2. **Get the code and start Claude Code:**
 
    ```powershell
+   cd $HOME
    git clone https://github.com/dewil95/tutos1
    cd tutos1
    claude
