@@ -531,7 +531,7 @@ export default async function DealPage({
           <button type="submit">Upload to Drive</button>
         </form>
         <p className="small muted">
-          Up to 4 MB per upload. Larger files: email them to the funding inbox.
+          Up to 10 MB per upload. Larger files: email them to the funding inbox.
         </p>
         {documents.length ? (
           <details>

@@ -54,7 +54,7 @@ describe("WhatsApp webhook", () => {
   });
 });
 
-describe.runIf(await databaseReady())("WhatsApp webhook (Postgres)", () => {
+describe.runIf(await databaseReady())("WhatsApp webhook (D1)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   const slug = `wa-hook-${Date.now()}`;
