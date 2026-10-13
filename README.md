@@ -1,7 +1,7 @@
 # Ascend CRM
 
 Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO), at
-`https://crm.ascendfund.co`.
+`https://crm.dewilarieldiazbonilla.workers.dev`.
 
 **The everyday flow**
 
@@ -117,16 +117,16 @@ The manual steps below do the same thing by hand.
 
 ## Go live on Cloudflare (about an hour, once)
 
-You need: the Cloudflare account that already has the $5 Workers plan and the `ascendfund.co`
-domain, admin access to this GitHub repo, and a Google Workspace admin. Never paste keys or
+You need: the Cloudflare account that already has the $5 Workers plan, admin access to this
+GitHub repo, and a Google Workspace admin. The CRM runs on the account's free workers.dev
+address, so `ascendfund.co` (website and email, at GoDaddy) is not touched. Never paste keys or
 tokens into a chat; type them straight into the settings pages below.
 
 ### 1. Let GitHub deploy to Cloudflare
 
 1. Cloudflare dashboard → **My Profile → API Tokens → Create Token** → template **Edit
    Cloudflare Workers**. Add the permission **Account → D1 → Edit**. Limit it to your account
-   and the `ascendfund.co` zone. Create it and copy it once. (If the first deploy says it
-   cannot add the `crm.ascendfund.co` domain, edit the token and add **Zone → DNS → Edit**.)
+   (zone resources: all zones). Create it and copy it once.
 2. Cloudflare dashboard home → your account → copy the **Account ID** (right side, or in the
    URL).
 3. GitHub → this repo → **Settings → Secrets and variables → Actions → New repository secret**:
@@ -135,8 +135,8 @@ tokens into a chat; type them straight into the settings pages below.
 Then merge the pull request with these changes into `main`. From then on, every merge to `main`
 runs **Deploy to Cloudflare**
 (`.github/workflows/deploy.yml`): it creates the D1 database `ascend-crm` the first time,
-applies the database migrations, builds and deploys the Worker `ascend-crm` on
-`crm.ascendfund.co`. You can also start it by hand under **Actions → Deploy to Cloudflare →
+applies the database migrations, builds and deploys the Worker `crm` on
+`crm.dewilarieldiazbonilla.workers.dev`. You can also start it by hand under **Actions → Deploy to Cloudflare →
 Run workflow**. Until steps 3 and 4 are done, the site lets nobody in.
 
 ### 2. Google Cloud (owned by the ascendfund.co Workspace)
@@ -145,7 +145,7 @@ Run workflow**. Until steps 3 and 4 are done, the site lets nobody in.
    **Google Drive API**.
 2. **OAuth consent screen**: user type **Internal** (no Google review needed).
 3. **Credentials → Create credentials → OAuth client ID → Web application**, authorized redirect
-   URI `https://crm.ascendfund.co/api/google/callback`. Keep the client ID and secret for step 4.
+   URI `https://crm.dewilarieldiazbonilla.workers.dev/api/google/callback`. Keep the client ID and secret for step 4.
 4. **Gemini**: aistudio.google.com → Get API key, in a Google Cloud project **with billing
    enabled** (so statements are never used to train Google's models).
 
@@ -154,13 +154,13 @@ Run workflow**. Until steps 3 and 4 are done, the site lets nobody in.
 1. Cloudflare dashboard → **Zero Trust** (free for up to 50 users). Pick a team name, e.g.
    `ascendfund` → your team domain is `ascendfund.cloudflareaccess.com`.
 2. **Access → Applications → Add an application → Self-hosted**: name "Ascend CRM", domain
-   `crm.ascendfund.co`. Policy "Team": **Allow**, include **Emails ending in** `@ascendfund.co`.
+   `crm.dewilarieldiazbonilla.workers.dev`. Policy "Team": **Allow**, include **Emails ending in** `@ascendfund.co`.
    Login method: **One-time PIN** works with no setup (a code by email); add Google later if you
    prefer.
 3. Add a second application (or policies) that **bypass** Access for the paths that have their
-   own protection: `crm.ascendfund.co/api/v1/*` (website API key),
-   `crm.ascendfund.co/api/health`, `crm.ascendfund.co/apply/*` (one-time SSN links) and
-   `crm.ascendfund.co/api/whatsapp/*` (Meta signature), plus `crm.ascendfund.co/_next/*` (the
+   own protection: `crm.dewilarieldiazbonilla.workers.dev/api/v1/*` (website API key),
+   `crm.dewilarieldiazbonilla.workers.dev/api/health`, `crm.dewilarieldiazbonilla.workers.dev/apply/*` (one-time SSN links) and
+   `crm.dewilarieldiazbonilla.workers.dev/api/whatsapp/*` (Meta signature), plus `crm.dewilarieldiazbonilla.workers.dev/_next/*` (the
    app's public scripts and styles, which the SSN page needs). Policy action **Bypass**,
    include **Everyone**.
 4. Open the "Ascend CRM" application → **Overview** → copy the **Application Audience (AUD)
@@ -171,7 +171,7 @@ The CRM checks Cloudflare's signed sign-in token on every request and only lets 
 
 ### 4. Secrets
 
-Cloudflare dashboard → **Workers & Pages → ascend-crm → Settings → Variables and Secrets → Add**
+Cloudflare dashboard → **Workers & Pages → crm → Settings → Variables and Secrets → Add**
 (type **Secret**), then **Deploy**. (The Worker appears after the first deploy in step 1; run it
 by hand if needed.)
 
@@ -188,11 +188,11 @@ by hand if needed.)
 Plain settings (`APP_URL`, `ALLOWED_EMAIL_DOMAIN`, `MCA_EMAIL_DRY_RUN`, `WHATSAPP_ENABLED`, time
 budgets) are in `apps/web/wrangler.jsonc` and change with a merge.
 
-Check: `https://crm.ascendfund.co/api/health` → every check `ok`.
+Check: `https://crm.dewilarieldiazbonilla.workers.dev/api/health` → every check `ok`.
 
 ### 5. First sign-in
 
-1. Open `https://crm.ascendfund.co`, sign in with your @ascendfund.co email.
+1. Open `https://crm.dewilarieldiazbonilla.workers.dev`, sign in with your @ascendfund.co email.
 2. The first visit shows **one-time setup**: it creates the team (jonas@, savvy@, david@) and the
    lender roster with each lender's To and CC addresses. You become the admin.
 3. **Settings → Connect funding@ascendfund.co**: sign in as funding@ and allow Gmail and Drive.
@@ -253,7 +253,7 @@ the bot saves the merchant's files to Drive):
 4. **Permanent token.** Meta Business Settings → System users → add one, give it the app and the
    WhatsApp account, generate a token with `whatsapp_business_messaging` and
    `whatsapp_business_management`.
-5. **Cloudflare variables** (Workers → ascend-crm → Settings → Variables and Secrets, or
+5. **Cloudflare variables** (Workers → crm → Settings → Variables and Secrets, or
    `npx wrangler secret put NAME` in `apps/web`):
    - `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_BUSINESS_ACCOUNT_ID` (both on the API Setup page)
    - `WHATSAPP_TOKEN` (step 4)

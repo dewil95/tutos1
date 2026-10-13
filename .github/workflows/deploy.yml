@@ -1,6 +1,6 @@
 name: Deploy to Cloudflare
 
-# Deploys main to Cloudflare Workers (crm.ascendfund.co) with its D1 database.
+# Deploys main to Cloudflare Workers (crm.dewilarieldiazbonilla.workers.dev) with its D1 database.
 # Needs two repository secrets: CLOUDFLARE_API_TOKEN (Workers + D1 edit) and CLOUDFLARE_ACCOUNT_ID.
 on:
   push:
