@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { GmailProvider, parseAddressList, parseGmailMessage } from "../email/gmail";
 import { DriveProvider, dealFolderPath, driveQuoted } from "../storage/drive";
-import { GoogleApiError, GoogleAuth, googleConsentUrl } from "./auth";
+import { GOOGLE_HISTORY_SCOPES, GoogleApiError, GoogleAuth, googleConsentUrl } from "./auth";
 
 type Handler = (
   url: string,
@@ -64,6 +64,21 @@ describe("GoogleAuth", () => {
     expect(url.searchParams.get("scope")).toContain("gmail.modify");
     expect(url.searchParams.get("scope")).toContain("drive.file");
     expect(url.searchParams.get("login_hint")).toBe("funding@ascendfund.co");
+  });
+
+  it("asks a history mailbox for Gmail read access only", () => {
+    const url = new URL(
+      googleConsentUrl(
+        { ...cfg, redirectUri: "https://crm.example/cb" },
+        "h.st",
+        undefined,
+        GOOGLE_HISTORY_SCOPES,
+      ),
+    );
+    const scope = url.searchParams.get("scope")!;
+    expect(scope).toContain("gmail.readonly");
+    expect(scope).not.toContain("gmail.modify");
+    expect(scope).not.toContain("drive");
   });
 });
 

@@ -491,6 +491,7 @@ CREATE TABLE "Activity" (
     "subject" TEXT,
     "body" TEXT,
     "externalId" TEXT,
+    "rfcMessageId" TEXT,
     "threadId" TEXT,
     "fromAddress" TEXT,
     "toAddress" TEXT,
@@ -606,6 +607,8 @@ CREATE TABLE "MailboxConnection" (
     "historyId" TEXT,
     "lastSyncedAt" DATETIME,
     "driveRootFolderId" TEXT,
+    "purpose" TEXT NOT NULL DEFAULT 'send',
+    "importState" JSONB,
     "connectedById" TEXT,
     "connectedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -824,6 +827,9 @@ CREATE INDEX "Activity_tenantId_leadId_occurredAt_idx" ON "Activity"("tenantId",
 
 -- CreateIndex
 CREATE INDEX "Activity_externalId_idx" ON "Activity"("externalId");
+
+-- CreateIndex
+CREATE INDEX "Activity_tenantId_rfcMessageId_idx" ON "Activity"("tenantId", "rfcMessageId");
 
 -- CreateIndex
 CREATE INDEX "Task_tenantId_assigneeId_status_idx" ON "Task"("tenantId", "assigneeId", "status");

@@ -12,7 +12,8 @@ export type JobType =
   | "EMAIL_RULES"
   | "WHATSAPP_MESSAGE"
   | "WHATSAPP_APP_READ"
-  | "WHATSAPP_NUDGES";
+  | "WHATSAPP_NUDGES"
+  | "HISTORY_IMPORT";
 
 export interface ClaimedJob {
   id: string;

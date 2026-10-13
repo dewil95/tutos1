@@ -17,16 +17,28 @@ function authorized(req: Request): boolean {
 
 /**
  * Heartbeat run by the Worker's Cron Trigger every 2 minutes (worker.ts calls it in-process with
- * CRON_SECRET): queues an inbox check per connected mailbox and the automation jobs, then works
+ * CRON_SECRET): queues an inbox check per funding mailbox (and the next batch of any history
+ * import) and the automation jobs, then works
  * through due jobs for TICK_BUDGET_MS.
  */
 async function tick(req: Request) {
   if (!authorized(req)) return Response.json({ error: "unauthorized" }, { status: 401 });
   const prisma = getPrisma();
   const mailboxes = await prisma.mailboxConnection.findMany({
-    select: { id: true, tenantId: true },
+    select: { id: true, tenantId: true, purpose: true, importState: true },
   });
   for (const m of mailboxes) {
+    if (m.purpose === "history") {
+      // Past mail is imported a batch per tick until done.
+      if ((m.importState as { finishedAt?: string } | null)?.finishedAt) continue;
+      await enqueueJob(prisma, {
+        tenantId: m.tenantId,
+        type: "HISTORY_IMPORT",
+        payload: { mailboxId: m.id },
+        dedupeKey: `history:${m.id}`,
+      });
+      continue;
+    }
     await enqueueJob(prisma, {
       tenantId: m.tenantId,
       type: "INBOX_SYNC",

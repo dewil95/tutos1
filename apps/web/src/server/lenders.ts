@@ -41,7 +41,11 @@ export async function lenderHistory(
 ): Promise<Record<string, LenderHistory>> {
   const rows = await prisma.submission.findMany({
     where: { deal: { tenantId }, status: { notIn: ["DRAFT", "WITHDRAWN"] } },
-    select: { funderId: true, status: true, deal: { select: { paperGrade: true } } },
+    select: {
+      funderId: true,
+      status: true,
+      deal: { select: { paperGrade: true, submissionPositions: true } },
+    },
   });
   const out: Record<string, LenderHistory> = {};
   for (const r of rows) {
@@ -53,7 +57,11 @@ export async function lenderHistory(
       approvedSameGrade: 0,
     });
     h.submitted++;
-    if (r.status === "APPROVED") h.approved++;
+    if (r.status === "APPROVED") {
+      h.approved++;
+      const n = Array.isArray(r.deal.submissionPositions) ? r.deal.submissionPositions.length : 0;
+      h.maxPositionsApproved = Math.max(h.maxPositionsApproved ?? 0, n);
+    }
     if (r.status === "DECLINED") h.declined++;
     if (grade && r.deal.paperGrade === grade) {
       h.submittedSameGrade!++;

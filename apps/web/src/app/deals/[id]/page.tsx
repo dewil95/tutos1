@@ -91,7 +91,7 @@ export default async function DealPage({
         take: 60,
       }),
       prisma.bankAnalysis.findFirst({ where: { dealId: id }, orderBy: { createdAt: "desc" } }),
-      prisma.mailboxConnection.findFirst({ where: { tenantId: user.tenantId } }),
+      prisma.mailboxConnection.findFirst({ where: { tenantId: user.tenantId, purpose: "send" } }),
     ]);
   const whatsapp = await prisma.whatsAppConversation.findUnique({
     where: { dealId: id },

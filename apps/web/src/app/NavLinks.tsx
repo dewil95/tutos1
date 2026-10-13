@@ -16,6 +16,11 @@ const icons = {
       <path d="M8 5v6M5 8h6" />
     </svg>
   ),
+  lenders: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M2 13.25h12M3.5 13V7.5M6.5 13V7.5M9.5 13V7.5M12.5 13V7.5M1.75 5.5 8 2.25l6.25 3.25z" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" />
@@ -37,6 +42,12 @@ const LINKS = [
     label: "New deal",
     icon: icons.new,
     match: (p: string) => p === "/deals/new",
+  },
+  {
+    href: "/lenders",
+    label: "Lenders",
+    icon: icons.lenders,
+    match: (p: string) => p.startsWith("/lenders"),
   },
   {
     href: "/settings",

@@ -8,6 +8,7 @@ import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
 import { WhatsAppSection } from "./WhatsAppSection";
 import { ApplicationSection } from "./ApplicationSection";
+import { HistorySection } from "./HistorySection";
 import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +20,18 @@ const ERRORS: Record<string, string> = {
   no_refresh_token:
     "Google did not return offline access. Remove the app from the account's Google permissions and connect again.",
   access_denied: "Access was not granted.",
+  missing_read_permission: "Allow Gmail read access on the Google screen.",
+  already_connected:
+    "That mailbox is already connected for another use. Connect a different one (e.g. jonas@).",
 };
 
 async function checkInboxNow() {
   "use server";
   const user = await requireUser();
   const prisma = getPrisma();
-  const mailboxes = await prisma.mailboxConnection.findMany({ where: { tenantId: user.tenantId } });
+  const mailboxes = await prisma.mailboxConnection.findMany({
+    where: { tenantId: user.tenantId, purpose: "send" },
+  });
   const ids: string[] = [];
   for (const m of mailboxes) {
     ids.push(
@@ -54,7 +60,7 @@ export default async function SettingsPage({
   const user = await requireUser();
   const flash = await searchParams;
   const prisma = getPrisma();
-  const [tenant, mailboxes, funders, failedJobs, apiKeys] = await Promise.all([
+  const [tenant, allMailboxes, funders, failedJobs, apiKeys] = await Promise.all([
     prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId } }),
     prisma.mailboxConnection.findMany({ where: { tenantId: user.tenantId } }),
     prisma.funder.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),
@@ -66,13 +72,18 @@ export default async function SettingsPage({
     prisma.apiKey.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: "desc" } }),
   ]);
   const isAdmin = user.role === "ADMIN" || user.role === "MANAGER";
+  const mailboxes = allMailboxes.filter((m) => m.purpose !== "history");
+  const historyMailboxes = allMailboxes.filter((m) => m.purpose === "history");
 
   return (
     <>
       <h1>Settings</h1>
       {flash.error ? <p className="notice error">{ERRORS[flash.error] ?? flash.error}</p> : null}
       {flash.connected ? (
-        <p className="notice ok">Connected {flash.connected}. First inbox check is queued.</p>
+        <p className="notice ok">
+          Connected {flash.connected}.{" "}
+          {flash.history ? "Reading its past email now." : "First inbox check is queued."}
+        </p>
       ) : null}
       {flash.checking ? (
         <p className="notice ok">Checking the inbox now. Refresh in a minute.</p>
@@ -156,6 +167,8 @@ export default async function SettingsPage({
         ) : null}
         {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
+
+      <HistorySection mailboxes={historyMailboxes} canEdit={isAdmin} />
 
       <ApplicationSection tenantId={user.tenantId} canEdit={isAdmin} />
 

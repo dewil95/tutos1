@@ -9,6 +9,7 @@ import {
 import { PermanentJobError } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
 import { handleEmailRules } from "./emailRules";
+import { handleHistoryImport } from "./historyImport";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
@@ -23,6 +24,7 @@ export type JobHandler = (prisma: PrismaClient, job: ClaimedJob) => Promise<void
 const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   SEND_SUBMISSION: handleSendSubmission,
   INBOX_SYNC: handleInboxSync,
+  HISTORY_IMPORT: handleHistoryImport,
   PARSE_REPLY: handleParseReply,
   APPLICATION_READ: handleApplicationRead,
   STATEMENT_EXTRACT: handleStatementExtract,
@@ -41,6 +43,7 @@ const SLOW: JobType[] = [
   "STATEMENT_SCRUB",
   "RISK_REPORT",
   "WHATSAPP_APP_READ",
+  "HISTORY_IMPORT",
 ];
 const SLOW_JOB_MS = 40_000;
 

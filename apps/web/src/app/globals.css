@@ -1093,3 +1093,11 @@ ol.steps > li > form {
 .appform .row {
   flex-wrap: wrap;
 }
+
+/* Lenders playbook */
+ul.habits {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+}

@@ -791,30 +791,33 @@ enum ActivityDirection {
 }
 
 model Activity {
-  id          String            @id @default(cuid())
-  tenantId    String
-  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  type        ActivityType
-  direction   ActivityDirection @default(INTERNAL)
-  userId      String?
-  user        User?             @relation(fields: [userId], references: [id])
-  leadId      String?
-  lead        Lead?             @relation(fields: [leadId], references: [id])
-  dealId      String?
-  deal        Deal?             @relation(fields: [dealId], references: [id])
-  subject     String?
-  body        String?
-  externalId  String? // Twilio SID, Gmail message id
-  threadId    String?
-  fromAddress String?
-  toAddress   String?
-  aiSummary   Json? // A8 output
-  occurredAt  DateTime          @default(now())
-  createdAt   DateTime          @default(now())
+  id           String            @id @default(cuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type         ActivityType
+  direction    ActivityDirection @default(INTERNAL)
+  userId       String?
+  user         User?             @relation(fields: [userId], references: [id])
+  leadId       String?
+  lead         Lead?             @relation(fields: [leadId], references: [id])
+  dealId       String?
+  deal         Deal?             @relation(fields: [dealId], references: [id])
+  subject      String?
+  body         String?
+  externalId   String? // Twilio SID, Gmail message id
+  /// RFC 5322 Message-ID: the same email read from two mailboxes is stored once.
+  rfcMessageId String?
+  threadId     String?
+  fromAddress  String?
+  toAddress    String?
+  aiSummary    Json? // A8 output
+  occurredAt   DateTime          @default(now())
+  createdAt    DateTime          @default(now())
 
   @@index([tenantId, dealId, occurredAt])
   @@index([tenantId, leadId, occurredAt])
   @@index([externalId])
+  @@index([tenantId, rfcMessageId])
 }
 
 enum TaskStatus {
@@ -947,7 +950,8 @@ model Job {
   @@index([status, runAt])
 }
 
-/// The Google account the CRM uses for Gmail (read + send) and Drive. One per tenant.
+/// Google accounts the CRM uses: the funding mailbox (Gmail read + send, Drive) and any
+/// read-only history mailboxes.
 model MailboxConnection {
   id                    String    @id @default(cuid())
   tenantId              String
@@ -959,6 +963,11 @@ model MailboxConnection {
   historyId             String?
   lastSyncedAt          DateTime?
   driveRootFolderId     String?
+  /// "send": the funding mailbox (inbox check, sending, Drive). "history": a team member's
+  /// mailbox read once, read-only, to learn past deals, lender answers and positions.
+  purpose               String    @default("send")
+  /// History import progress: { ids, done, total, startedAt, finishedAt }.
+  importState           Json?
   connectedById         String?
   connectedAt           DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

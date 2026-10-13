@@ -11,6 +11,13 @@ export const GOOGLE_SCOPES = [
   "email",
 ];
 
+/** A mailbox the CRM only learns from: read-only Gmail, no Drive, never sends. */
+export const GOOGLE_HISTORY_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "openid",
+  "email",
+];
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface GoogleOAuthConfig {
@@ -23,12 +30,13 @@ export function googleConsentUrl(
   cfg: GoogleOAuthConfig,
   state: string,
   loginHint?: string,
+  scopes: string[] = GOOGLE_SCOPES,
 ): string {
   const p = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
     response_type: "code",
-    scope: GOOGLE_SCOPES.join(" "),
+    scope: scopes.join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
