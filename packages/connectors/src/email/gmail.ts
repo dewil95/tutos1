@@ -135,6 +135,22 @@ export class GmailProvider implements EmailProvider {
     return (r.messages ?? []).map((m) => m.id);
   }
 
+  /** Every message id matching a search, newest first, following Gmail's pages. */
+  async searchAll(q: string, opts: { max?: number } = {}): Promise<string[]> {
+    const max = opts.max ?? 5000;
+    const ids: string[] = [];
+    let pageToken: string | undefined;
+    do {
+      const page = await this.auth.json<{ messages?: { id: string }[]; nextPageToken?: string }>(
+        `${API}/messages?q=${encodeURIComponent(q)}&maxResults=500` +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""),
+      );
+      for (const m of page.messages ?? []) if (!ids.includes(m.id)) ids.push(m.id);
+      pageToken = page.nextPageToken;
+    } while (pageToken && ids.length < max);
+    return ids.slice(0, max);
+  }
+
   async getAttachment(messageId: string, attachmentId: string): Promise<Buffer> {
     const r = await this.auth.json<{ data: string }>(
       `${API}/messages/${messageId}/attachments/${attachmentId}`,

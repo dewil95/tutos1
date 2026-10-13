@@ -1,7 +1,16 @@
 import type { InboundEmail } from "@mca/connectors";
-import { enqueueJob, type ClaimedJob, type PrismaClient } from "@mca/db";
+import {
+  asList,
+  enqueueJob,
+  merchantIdsByName,
+  type ClaimedJob,
+  type MailboxConnection,
+  type Prisma,
+  type PrismaClient,
+} from "@mca/db";
 import { allowedEmailDomain } from "../env";
 import { storeDealFile } from "../documents";
+import { positionsFromSubmissionBody } from "../submissions";
 import { mailboxFor, type Mailbox } from "../google";
 import {
   domainOf,
@@ -19,12 +28,40 @@ export interface InboxSyncPayload {
 const CLOSED_STAGES = ["FUNDED", "DECLINED", "DEAD"] as const;
 const MAX_BODY = 50_000;
 
-interface Ctx {
+export interface InboxCtx {
   prisma: PrismaClient;
   mailbox: Mailbox;
   tenantId: string;
   funders: FunderDomains[];
   ownDomain: string;
+  /**
+   * Reading a history mailbox: deals, lenders, replies and positions only. No merchant mail,
+   * no attachments (files live in the funding mailbox's Drive).
+   */
+  history: boolean;
+  /** What this run imported (shown in Settings for history imports). */
+  stats: { submissions: number; replies: number; positions: number };
+}
+type Ctx = InboxCtx;
+
+export async function inboxContext(
+  prisma: PrismaClient,
+  connection: MailboxConnection,
+  opts: { history: boolean },
+): Promise<InboxCtx> {
+  const funders = await prisma.funder.findMany({
+    where: { tenantId: connection.tenantId, isActive: true },
+    select: { id: true, name: true, emailDomains: true },
+  });
+  return {
+    prisma,
+    mailbox: mailboxFor(connection),
+    tenantId: connection.tenantId,
+    funders: funders.map((f) => ({ ...f, emailDomains: asList(f.emailDomains) })),
+    ownDomain: domainOf(connection.email) || allowedEmailDomain(),
+    history: opts.history,
+    stats: { submissions: 0, replies: 0, positions: 0 },
+  };
 }
 
 /**
@@ -38,21 +75,10 @@ export async function handleInboxSync(prisma: PrismaClient, job: ClaimedJob): Pr
   const { mailboxId } = job.payload as unknown as InboxSyncPayload;
   const connection = await prisma.mailboxConnection.findUnique({ where: { id: mailboxId } });
   if (!connection) throw new PermanentJobError(`mailbox ${mailboxId} not found`);
-  const mailbox = mailboxFor(connection);
+  if (connection.purpose === "history") return; // read by HISTORY_IMPORT instead
+  const ctx = await inboxContext(prisma, connection, { history: false });
 
-  const funders = await prisma.funder.findMany({
-    where: { tenantId: connection.tenantId, isActive: true },
-    select: { id: true, name: true, emailDomains: true },
-  });
-  const ctx: Ctx = {
-    prisma,
-    mailbox,
-    tenantId: connection.tenantId,
-    funders,
-    ownDomain: domainOf(connection.email) || allowedEmailDomain(),
-  };
-
-  const { messages, nextCursor } = await mailbox.gmail.sync(connection.historyId);
+  const { messages, nextCursor } = await ctx.mailbox.gmail.sync(connection.historyId);
   for (const m of messages) await ingest(ctx, m);
   await prisma.mailboxConnection.update({
     where: { id: connection.id },
@@ -60,17 +86,25 @@ export async function handleInboxSync(prisma: PrismaClient, job: ClaimedJob): Pr
   });
 }
 
-async function ingest(ctx: Ctx, m: InboundEmail): Promise<void> {
+/** Files one email. Safe to repeat, and the same email read from two mailboxes counts once. */
+export async function ingest(ctx: Ctx, m: InboundEmail): Promise<void> {
   const { prisma } = ctx;
-  if (
-    await prisma.activity.findFirst({ where: { tenantId: ctx.tenantId, externalId: m.messageId } })
-  )
-    return;
+  const seen = await prisma.activity.findFirst({
+    where: {
+      tenantId: ctx.tenantId,
+      OR: [
+        { externalId: m.messageId },
+        ...(m.rfcMessageId ? [{ rfcMessageId: m.rfcMessageId }] : []),
+      ],
+    },
+  });
+  if (seen) return;
 
   const route = routeMessage(m, ctx);
   if (route.kind === "ignore") return;
   if (route.kind === "outbound_submission") return importOutbound(ctx, m, route.merchantName);
   if (route.kind === "funder") return ingestFunderMail(ctx, m, route.funderId);
+  if (ctx.history) return; // merchants' mail stays in the funding inbox's hands
   return ingestExternal(ctx, m);
 }
 
@@ -89,6 +123,7 @@ async function logActivity(
       subject: m.subject.slice(0, 500),
       body: m.text.slice(0, MAX_BODY),
       externalId: m.messageId,
+      rfcMessageId: m.rfcMessageId,
       threadId: m.threadId,
       fromAddress: m.from,
       toAddress: [...m.to, ...m.cc.map((c) => `cc:${c}`)].join(", ").slice(0, 2000),
@@ -126,16 +161,10 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
   // Sent by the CRM itself: already tracked.
   if (await prisma.submission.findFirst({ where: { gmailMessageId: m.messageId } })) return;
 
+  const [matchId] = await merchantIdsByName(prisma, tenantId, merchantName, { includeDba: true });
   const merchant =
-    (await prisma.merchant.findFirst({
-      where: {
-        tenantId,
-        OR: [
-          { legalName: { equals: merchantName, mode: "insensitive" } },
-          { dba: { equals: merchantName, mode: "insensitive" } },
-        ],
-      },
-    })) ?? (await prisma.merchant.create({ data: { tenantId, legalName: merchantName } }));
+    (matchId ? await prisma.merchant.findUnique({ where: { id: matchId } }) : null) ??
+    (await prisma.merchant.create({ data: { tenantId, legalName: merchantName } }));
 
   const deal =
     (await prisma.deal.findFirst({
@@ -143,11 +172,39 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
       orderBy: { createdAt: "desc" },
     })) ??
     (await prisma.deal.create({
-      data: { tenantId, merchantId: merchant.id, stage: "SUBMITTED", sourceThreadId: m.threadId },
+      data: {
+        tenantId,
+        merchantId: merchant.id,
+        stage: "SUBMITTED",
+        sourceThreadId: m.threadId,
+        ...(ctx.history ? { source: "email_history" } : {}),
+        createdAt: m.receivedAt,
+      },
     }));
 
   await logActivity(ctx, m, deal.id, "OUTBOUND");
-  const documentIds = await saveAttachments(ctx, m, deal, "email");
+  const documentIds = ctx.history ? [] : await saveAttachments(ctx, m, deal, "email");
+
+  // The positions the team told lenders: the newest email's block is the current one.
+  const positions = positionsFromSubmissionBody(m.text);
+  if (positions.length) {
+    await prisma.deal.update({
+      where: { id: deal.id },
+      data: { submissionPositions: positions as unknown as Prisma.InputJsonArray },
+    });
+    await prisma.dealEvent.create({
+      data: {
+        dealId: deal.id,
+        type: "positions_from_email",
+        actorType: "system",
+        payload: {
+          at: m.receivedAt.toISOString(),
+          positions: positions as unknown as Prisma.InputJsonArray,
+        },
+      },
+    });
+    ctx.stats.positions++;
+  }
 
   for (const f of fundersAddressed(m, ctx.funders)) {
     const exists = await prisma.submission.findFirst({
@@ -162,8 +219,10 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
         channel: "EMAIL",
         status: "SENT",
         sentAt: m.receivedAt,
-        gmailThreadId: m.threadId,
-        gmailMessageId: m.messageId,
+        // A history mailbox's thread ids mean nothing to the funding mailbox: leave them empty
+        // so no follow-up or contract request is ever sent into them.
+        gmailThreadId: ctx.history ? null : m.threadId,
+        gmailMessageId: ctx.history ? null : m.messageId,
         toAddresses: lenderAddrs.slice(0, 1),
         ccAddresses: [
           ...lenderAddrs.slice(1),
@@ -173,6 +232,7 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
         rawStatusLog: [{ at: m.receivedAt.toISOString(), status: "SENT", importedFromGmail: true }],
       },
     });
+    ctx.stats.submissions++;
   }
   if (
     deal.stage === "INTAKE" ||
@@ -210,7 +270,7 @@ async function ingestFunderMail(ctx: Ctx, m: InboundEmail, funderId: string) {
   const activity = await logActivity(ctx, m, sub?.dealId ?? null, "INBOUND");
   if (!sub) return; // lender blast or unknown deal: kept in the inbox list, not parsed
 
-  if (m.attachments.length) await saveAttachments(ctx, m, sub.deal, "funder_email");
+  if (m.attachments.length && !ctx.history) await saveAttachments(ctx, m, sub.deal, "funder_email");
   await prisma.submission.update({
     where: { id: sub.id },
     data: { lastFunderMessageAt: m.receivedAt },
@@ -218,9 +278,14 @@ async function ingestFunderMail(ctx: Ctx, m: InboundEmail, funderId: string) {
   await enqueueJob(prisma, {
     tenantId: ctx.tenantId,
     type: "PARSE_REPLY",
-    payload: { activityId: activity.id, submissionId: sub.id },
-    dedupeKey: `reply:${m.messageId}`,
+    payload: {
+      activityId: activity.id,
+      submissionId: sub.id,
+      ...(ctx.history ? { history: true } : {}),
+    },
+    dedupeKey: `reply:${m.rfcMessageId ?? m.messageId}`,
   });
+  ctx.stats.replies++;
 }
 
 /** Merchant sending statements/MTD/stips: file them on the merchant's open deal. */
@@ -230,8 +295,9 @@ async function ingestExternal(ctx: Ctx, m: InboundEmail) {
     where: {
       tenantId,
       OR: [
-        { email: { equals: m.from, mode: "insensitive" } },
-        { owners: { some: { email: { equals: m.from, mode: "insensitive" } } } },
+        // Emails are stored lower-case.
+        { email: m.from.toLowerCase() },
+        { owners: { some: { email: m.from.toLowerCase() } } },
       ],
     },
   });

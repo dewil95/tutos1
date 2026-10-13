@@ -127,7 +127,7 @@ function fakes() {
   return { files, sent, media, drive, sender };
 }
 
-describe.runIf(await databaseReady())("WhatsApp application (Postgres)", () => {
+describe.runIf(await databaseReady())("WhatsApp application (D1)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let f: ReturnType<typeof fakes>;

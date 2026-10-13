@@ -1,32 +1,46 @@
 import type { PrismaClient } from "./generated/client";
 
-type TxClient = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
-
 /**
- * Runs `fn` inside a transaction with the Postgres session variable `app.tenant_id` set, so
- * row-level security policies (see prisma/migrations/README.md) scope every query to the tenant.
- */
-export async function withTenant<T>(
-  prisma: PrismaClient,
-  tenantId: string,
-  fn: (tx: TxClient) => Promise<T>,
-): Promise<T> {
-  if (!/^[A-Za-z0-9_-]+$/.test(tenantId)) {
-    throw new Error("invalid tenantId");
-  }
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
-    return fn(tx);
-  });
-}
-
-/**
- * Deletes a tenant and everything it owns, including append-only audit rows. Only for the
- * retention purge and test cleanup; the explicit opt-in keeps normal code from erasing history.
+ * Deletes a tenant and everything it owns, including append-only history. Only for the
+ * retention purge and test cleanup. The append-only triggers allow deletes only while the
+ * `PurgeFlag` row is on. Rows go children-first: SQLite checks RESTRICT links during cascades,
+ * so leaving the order to cascades can fail half-way.
  */
 export async function purgeTenant(prisma: PrismaClient, tenantId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.allow_purge = 'on'`);
-    await tx.tenant.delete({ where: { id: tenantId } });
-  });
+  const deal = { deal: { tenantId } };
+  await prisma.$executeRaw`UPDATE "PurgeFlag" SET "on" = 1 WHERE "id" = 1`;
+  try {
+    await prisma.whatsAppMessage.deleteMany({ where: { tenantId } });
+    await prisma.secureFormToken.deleteMany({ where: { tenantId } });
+    await prisma.applicationSignature.deleteMany({ where: { tenantId } });
+    await prisma.whatsAppConversation.deleteMany({ where: { tenantId } });
+    await prisma.commission.deleteMany({ where: { tenantId } });
+    await prisma.disclosureDelivery.deleteMany({ where: deal });
+    await prisma.contract.deleteMany({ where: deal });
+    await prisma.funding.deleteMany({ where: deal });
+    await prisma.stipulation.deleteMany({ where: deal });
+    await prisma.offer.deleteMany({ where: deal });
+    await prisma.submission.deleteMany({ where: deal });
+    await prisma.position.deleteMany({ where: deal });
+    await prisma.bankAnalysis.deleteMany({ where: deal });
+    await prisma.renewal.deleteMany({ where: deal });
+    await prisma.dealEvent.deleteMany({ where: deal });
+    await prisma.activity.deleteMany({ where: { tenantId } });
+    await prisma.task.deleteMany({ where: { tenantId } });
+    await prisma.aiRun.deleteMany({ where: { tenantId } });
+    await prisma.document.deleteMany({ where: { tenantId } });
+    await prisma.deal.deleteMany({ where: { tenantId } });
+    await prisma.consent.deleteMany({ where: { lead: { tenantId } } });
+    await prisma.lead.deleteMany({ where: { tenantId } });
+    await prisma.owner.deleteMany({ where: { merchant: { tenantId } } });
+    await prisma.merchant.deleteMany({ where: { tenantId } });
+    await prisma.funderContact.deleteMany({ where: { funder: { tenantId } } });
+    await prisma.funderProgram.deleteMany({ where: { funder: { tenantId } } });
+    await prisma.funder.deleteMany({ where: { tenantId } });
+    await prisma.sequenceStep.deleteMany({ where: { sequence: { tenantId } } });
+    await prisma.sequence.deleteMany({ where: { tenantId } });
+    await prisma.tenant.delete({ where: { id: tenantId } });
+  } finally {
+    await prisma.$executeRaw`UPDATE "PurgeFlag" SET "on" = 0 WHERE "id" = 1`;
+  }
 }

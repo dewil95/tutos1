@@ -7,7 +7,7 @@ import {
   type PositionLine,
   type SubmissionPackage,
 } from "@mca/connectors";
-import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
+import { asList, type ClaimedJob, type Prisma, type PrismaClient } from "@mca/db";
 import { emailDryRun } from "../env";
 import { tenantMailbox } from "../google";
 import { PermanentJobError } from "./errors";
@@ -33,17 +33,20 @@ export async function handleSendSubmission(prisma: PrismaClient, job: ClaimedJob
   });
   if (!sub) throw new PermanentJobError(`submission ${submissionId} not found`);
   if (sub.status !== "DRAFT") return; // already sent (or withdrawn): never send twice
-  if (sub.toAddresses.length !== 1) {
+  const toAddresses = asList(sub.toAddresses);
+  const packageIds = asList(sub.packageDocumentIds);
+  const lenderCc = asList(sub.funder.submissionCc);
+  if (toAddresses.length !== 1) {
     throw new PermanentJobError(`submission ${submissionId} must have exactly one To address`);
   }
 
   const deal = sub.deal;
   const merchantName = merchantDisplayName(deal.merchant);
-  const recipients = { to: sub.toAddresses, cc: sub.ccAddresses };
+  const recipients = { to: toAddresses, cc: asList(sub.ccAddresses) };
   const docs = await prisma.document.findMany({
-    where: { id: { in: sub.packageDocumentIds }, dealId: deal.id },
+    where: { id: { in: packageIds }, dealId: deal.id },
   });
-  if (docs.length !== sub.packageDocumentIds.length) {
+  if (docs.length !== packageIds.length) {
     throw new PermanentJobError("some selected files are no longer on this deal");
   }
   const basePkg: Omit<SubmissionPackage, "attachments"> = {
@@ -132,7 +135,7 @@ export async function handleSendSubmission(prisma: PrismaClient, job: ClaimedJob
     // Share each file with this lender's own addresses only (named people, never a public link).
     const lenderAddresses = [
       ...recipients.to,
-      ...recipients.cc.filter((e) => sub.funder.submissionCc.includes(e)),
+      ...recipients.cc.filter((e) => lenderCc.includes(e)),
     ];
     for (const d of docs) await mailbox.drive.shareWith(d.driveFileId, lenderAddresses);
     links = docs.map((d) => ({

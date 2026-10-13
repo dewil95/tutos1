@@ -64,7 +64,7 @@ describe("website payload", () => {
   });
 });
 
-describe.runIf(await databaseReady())("website API (Postgres)", () => {
+describe.runIf(await databaseReady())("website API (D1)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let key: string;

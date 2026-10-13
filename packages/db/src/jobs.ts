@@ -12,7 +12,8 @@ export type JobType =
   | "EMAIL_RULES"
   | "WHATSAPP_MESSAGE"
   | "WHATSAPP_APP_READ"
-  | "WHATSAPP_NUDGES";
+  | "WHATSAPP_NUDGES"
+  | "HISTORY_IMPORT";
 
 export interface ClaimedJob {
   id: string;
@@ -68,32 +69,61 @@ export async function enqueueJob(prisma: PrismaClient, input: EnqueueInput): Pro
 }
 
 /**
- * Atomically claims up to `limit` due jobs. `FOR UPDATE SKIP LOCKED` means two overlapping
- * cron ticks (or a tick plus an inline run after a button click) never take the same job.
- * Jobs stuck in RUNNING longer than `staleAfterMs` (function timed out) are reclaimed.
+ * Claims up to `limit` due jobs. Each claim is a conditional update (still QUEUED, or still the
+ * same stale RUNNING lock), so two overlapping cron runs, or a cron run plus an inline run after
+ * a click, never take the same job: D1 applies writes one at a time and only one update matches.
+ * Jobs stuck in RUNNING longer than `staleAfterMs` (the request was cut off) are reclaimed.
  */
 export async function claimJobs(
   prisma: PrismaClient,
-  opts: { limit: number; types?: JobType[]; ids?: string[]; staleAfterMs?: number },
+  opts: {
+    limit: number;
+    types?: JobType[];
+    ids?: string[];
+    staleAfterMs?: number;
+    now?: Date;
+  },
 ): Promise<ClaimedJob[]> {
-  const staleSeconds = Math.round((opts.staleAfterMs ?? 10 * 60_000) / 1000);
-  const types = opts.types ?? null;
-  const ids = opts.ids ?? null;
-  return prisma.$queryRaw<ClaimedJob[]>`
-    UPDATE "Job" SET status = 'RUNNING', "lockedAt" = now(), attempts = attempts + 1, "updatedAt" = now()
-    WHERE id IN (
-      SELECT id FROM "Job"
-      WHERE (
-        (status = 'QUEUED' AND "runAt" <= now())
-        OR (status = 'RUNNING' AND "lockedAt" < now() - make_interval(secs => ${staleSeconds}))
-      )
-      AND (${types}::text[] IS NULL OR type = ANY(${types}::text[]))
-      AND (${ids}::text[] IS NULL OR id = ANY(${ids}::text[]))
-      ORDER BY "runAt"
-      LIMIT ${opts.limit}
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING id, "tenantId", type, payload, attempts, "maxAttempts"`;
+  const now = opts.now ?? new Date();
+  const stale = new Date(now.getTime() - (opts.staleAfterMs ?? 10 * 60_000));
+  const candidates = await prisma.job.findMany({
+    where: {
+      OR: [
+        { status: "QUEUED", runAt: { lte: now } },
+        { status: "RUNNING", lockedAt: { lt: stale } },
+      ],
+      ...(opts.types ? { type: { in: opts.types } } : {}),
+      ...(opts.ids ? { id: { in: opts.ids } } : {}),
+    },
+    orderBy: { runAt: "asc" },
+    take: opts.limit * 3,
+    select: { id: true, status: true, lockedAt: true },
+  });
+  const claimed: ClaimedJob[] = [];
+  for (const c of candidates) {
+    if (claimed.length >= opts.limit) break;
+    const won = await prisma.job.updateMany({
+      where:
+        c.status === "QUEUED"
+          ? { id: c.id, status: "QUEUED" }
+          : { id: c.id, status: "RUNNING", lockedAt: c.lockedAt },
+      data: { status: "RUNNING", lockedAt: now, attempts: { increment: 1 } },
+    });
+    if (won.count !== 1) continue; // someone else got it first
+    const j = await prisma.job.findUniqueOrThrow({
+      where: { id: c.id },
+      select: {
+        id: true,
+        tenantId: true,
+        type: true,
+        payload: true,
+        attempts: true,
+        maxAttempts: true,
+      },
+    });
+    claimed.push({ ...j, type: j.type as JobType });
+  }
+  return claimed;
 }
 
 export async function completeJob(prisma: PrismaClient, id: string): Promise<void> {

@@ -1,8 +1,9 @@
 import type { FunderReply } from "@mca/ai";
 import type { PositionLine } from "@mca/connectors";
-import { getPrisma, type DocumentType } from "@mca/db";
+import { asList, getPrisma, type DocumentType } from "@mca/db";
 import type { BankMetrics } from "@mca/domain";
 import { notFound } from "next/navigation";
+import { dealApplication, missingFields } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
@@ -15,6 +16,7 @@ import { BankScrubPanel } from "./BankScrubPanel";
 import { RiskReportPanel } from "./RiskReportPanel";
 import { ContractRequestForm } from "./ContractRequestForm";
 import { WhatsAppPanel } from "./WhatsAppPanel";
+import { AscendApplicationPanel } from "./AscendApplicationPanel";
 import {
   analyseDealStatements,
   confirmClawback,
@@ -89,7 +91,7 @@ export default async function DealPage({
         take: 60,
       }),
       prisma.bankAnalysis.findFirst({ where: { dealId: id }, orderBy: { createdAt: "desc" } }),
-      prisma.mailboxConnection.findFirst({ where: { tenantId: user.tenantId } }),
+      prisma.mailboxConnection.findFirst({ where: { tenantId: user.tenantId, purpose: "send" } }),
     ]);
   const whatsapp = await prisma.whatsAppConversation.findUnique({
     where: { dealId: id },
@@ -99,8 +101,28 @@ export default async function DealPage({
     where: { dealId: id },
     orderBy: { signedAt: "desc" },
   });
+  // Ascend application: the merchant's own form (team only) and the signed Ascend copy.
+  const newestFirst = <T extends { createdAt: Date }>(a: T, b: T) =>
+    b.createdAt.getTime() - a.createdAt.getTime();
+  const sourceApp =
+    allDocuments.filter((d) => d.internalOnly && d.type === "APPLICATION").sort(newestFirst)[0] ??
+    allDocuments.find(
+      (d) => d.id === (deal.applicationData as { documentId?: string } | null)?.documentId,
+    ) ??
+    null;
+  const signedApp =
+    allDocuments.filter((d) => !d.internalOnly && d.type === "APPLICATION").sort(newestFirst)[0] ??
+    null;
+  const application = (await dealApplication(prisma, user.tenantId, id))!;
   const jobs = await prisma.job.findMany({
-    where: { dedupeKey: { in: submissions.map((s) => `send:${s.id}`) } },
+    where: {
+      dedupeKey: {
+        in: [
+          ...submissions.map((s) => `send:${s.id}`),
+          ...(sourceApp ? [`appread:${sourceApp.id}`] : []),
+        ],
+      },
+    },
     select: { dedupeKey: true, status: true, lastError: true, runAt: true },
   });
 
@@ -112,6 +134,20 @@ export default async function DealPage({
       d.id === (deal.riskReport as { pdfDocumentId?: string } | null)?.pdfDocumentId,
   );
   const merchantName = deal.merchant.dba ?? deal.merchant.legalName;
+  const appData = deal.applicationData as {
+    documentId?: string;
+    notAnApplication?: boolean;
+  } | null;
+  const readJob = sourceApp ? jobs.find((j) => j.dedupeKey === `appread:${sourceApp.id}`) : null;
+  const reading = !sourceApp
+    ? null
+    : readJob?.status === "QUEUED" || readJob?.status === "RUNNING"
+      ? { state: "reading" as const }
+      : readJob?.status === "FAILED"
+        ? { state: "failed" as const, error: readJob.lastError ?? "" }
+        : appData?.documentId === sourceApp.id
+          ? { state: appData.notAnApplication ? ("not_application" as const) : ("done" as const) }
+          : null;
   const preselected = new Set(defaultPackage(documents));
   const submittedFunderIds = new Set(
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
@@ -189,6 +225,13 @@ export default async function DealPage({
         </p>
       ) : null}
       {flash.wa ? <p className="notice ok">{flash.wa}</p> : null}
+      {flash.reading ? (
+        <p className="notice ok">AI is reading the application. Refresh in a minute.</p>
+      ) : null}
+      {flash.saved ? <p className="notice ok">Application details saved.</p> : null}
+      {flash.signed ? (
+        <p className="notice ok">Signed application saved. It is ticked for lenders below.</p>
+      ) : null}
       {flash.risk ? (
         <p className="notice ok">Risk report is being regenerated. Refresh in a minute.</p>
       ) : null}
@@ -200,6 +243,17 @@ export default async function DealPage({
       ) : null}
 
       <MerchantPanel deal={deal} merchant={deal.merchant} owners={deal.merchant.owners} />
+
+      <AscendApplicationPanel
+        dealId={id}
+        draft={application.draft}
+        pii={application.pii}
+        ownerIds={application.owners.map((o) => o.id)}
+        missing={missingFields(application.draft, application.pii)}
+        source={sourceApp}
+        signed={signedApp}
+        reading={reading}
+      />
 
       {whatsapp ? (
         <WhatsAppPanel
@@ -256,9 +310,9 @@ export default async function DealPage({
                       </td>
                       <td className="small">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
                       <td className="addr">
-                        <div>To: {s.toAddresses.join(", ")}</div>
-                        {s.ccAddresses.length ? (
-                          <div className="muted">CC: {s.ccAddresses.join(", ")}</div>
+                        <div>To: {asList(s.toAddresses).join(", ")}</div>
+                        {asList(s.ccAddresses).length ? (
+                          <div className="muted">CC: {asList(s.ccAddresses).join(", ")}</div>
                         ) : null}
                       </td>
                       <td className="small">
@@ -336,6 +390,13 @@ export default async function DealPage({
 
       <form action={sendToLenders.bind(null, id)} className="panel" id="ship">
         <h2>Ship the file</h2>
+        {!signedApp ? (
+          <p className="notice warn">
+            Ascend application not signed yet. Download it in{" "}
+            <a href="#ascend-application">Ascend application</a>, have the merchant sign it, then
+            upload the signed copy so it goes to lenders.
+          </p>
+        ) : null}
         <div className="cols">
           <div>
             <h3>1. Files from Google Drive</h3>
@@ -387,7 +448,7 @@ export default async function DealPage({
             <h3>3. Lenders — one separate email each</h3>
             <p className="small muted">
               To = the lender&apos;s first address · CC = its other addresses + team (
-              {tenant.teamCc.join(", ") || "none"}) · never BCC
+              {asList(tenant.teamCc).join(", ") || "none"}) · never BCC
             </p>
             <SelectTopLenders />
             <ul className="lenders">
@@ -470,7 +531,7 @@ export default async function DealPage({
           <button type="submit">Upload to Drive</button>
         </form>
         <p className="small muted">
-          Up to 4 MB per upload. Larger files: email them to the funding inbox.
+          Up to 10 MB per upload. Larger files: email them to the funding inbox.
         </p>
         {documents.length ? (
           <details>

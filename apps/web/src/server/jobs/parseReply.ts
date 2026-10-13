@@ -6,6 +6,8 @@ import { PermanentJobError } from "./errors";
 export interface ParseReplyPayload {
   activityId: string;
   submissionId: string;
+  /** Read from a history mailbox: learn from it, but open no stip chases for old requests. */
+  history?: boolean;
 }
 
 /** Lender reply intent → submission status. null = leave the status as is. */
@@ -71,7 +73,7 @@ export function advanceStage(current: DealStage, intent: FunderReply["intent"]):
  * rows automatically.
  */
 export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): Promise<void> {
-  const { activityId, submissionId } = job.payload as unknown as ParseReplyPayload;
+  const { activityId, submissionId, history } = job.payload as unknown as ParseReplyPayload;
   const [activity, sub] = await Promise.all([
     prisma.activity.findUnique({ where: { id: activityId } }),
     prisma.submission.findUnique({
@@ -91,7 +93,8 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
     dealId: sub.dealId,
   });
 
-  const now = new Date();
+  // Dates follow the email, so imported history keeps its real timeline (reply speed, clawback).
+  const now = activity.occurredAt;
   const status = statusForIntent(data.intent, sub.status);
   const stage = advanceStage(sub.deal.stage, data.intent);
   const log = [
@@ -99,7 +102,10 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
     { at: now.toISOString(), intent: data.intent, summary: data.summary, activityId },
   ] as Prisma.InputJsonArray;
 
-  await prisma.$transaction(async (tx) => {
+  // D1 has no multi-statement transactions: these writes run in order; each is idempotent
+  // enough that a retry after a crash in between ends in the same state.
+  {
+    const tx = prisma;
     await tx.activity.update({
       where: { id: activityId },
       data: { aiSummary: data as unknown as Prisma.InputJsonObject },
@@ -120,7 +126,7 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
     if (stage) {
       await tx.deal.update({ where: { id: sub.dealId }, data: { stage, stageChangedAt: now } });
     }
-    if (data.intent === "STIP_REQUEST") {
+    if (data.intent === "STIP_REQUEST" && !history) {
       for (const name of data.stips) {
         await tx.stipulation.create({
           data: {
@@ -161,5 +167,5 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
         },
       },
     });
-  });
+  }
 }

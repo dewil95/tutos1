@@ -7,31 +7,35 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    },
+    "./vitest-wasm": {
+      "types": "./vitest-wasm.ts",
+      "default": "./vitest-wasm.ts"
     }
   },
   "scripts": {
     "generate": "prisma generate",
     "validate": "prisma validate",
-    "migrate:dev": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "build": "echo 'db: nothing to build'",
     "test": "vitest run",
-    "seed": "tsx prisma/seed.ts"
+    "schema:sql": "node scripts/schema-sql.mjs"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/adapter-d1": "7.10.0",
     "@prisma/client": "7.10.0",
-    "dotenv": "^17.2.3",
-    "pg": "^8.16.3"
+    "dotenv": "^17.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
-    "@types/pg": "^8.15.5",
+    "miniflare": "^4.20260730.0",
     "prisma": "7.10.0",
-    "typescript": "^5.9.3",
     "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }
 }

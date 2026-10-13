@@ -1,5 +1,5 @@
 import type { ApplicationReading } from "@mca/ai";
-import type { DocumentType, PrismaClient } from "@mca/db";
+import { merchantIdsByName, type DocumentType, type PrismaClient } from "@mca/db";
 import { z } from "zod";
 import { applyApplication } from "./applicationData";
 import { storeDealFile } from "./documents";
@@ -236,13 +236,16 @@ export async function findMerchantMatch(
   excludeId?: string,
 ) {
   const einLast4 = ein?.replace(/\D/g, "").slice(-4) ?? null;
+  const ids = (await merchantIdsByName(prisma, tenantId, legalName)).filter(
+    (id) => id !== excludeId,
+  );
+  if (ids.length === 0) return null;
   return prisma.merchant.findFirst({
     where: {
-      tenantId,
-      legalName: { equals: legalName, mode: "insensitive" },
-      ...(excludeId ? { id: { not: excludeId } } : {}),
+      id: { in: ids },
       ...(einLast4 ? { OR: [{ einLast4 }, { einLast4: null }] } : {}),
     },
+    orderBy: { createdAt: "asc" },
   });
 }
 

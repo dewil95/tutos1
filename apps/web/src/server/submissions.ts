@@ -1,5 +1,5 @@
 import { newWatermarkTag, planSubmissions, type PositionLine } from "@mca/connectors";
-import { enqueueJob, type PrismaClient } from "@mca/db";
+import { asList, enqueueJob, type PrismaClient } from "@mca/db";
 
 /**
  * "Mazal: $12,500" / "Fundzilla 8000" / "Unknown lender" → position lines for the email body.
@@ -16,6 +16,32 @@ export function parsePositions(text: string): PositionLine[] {
       const n = Number(m[2]!.replace(/,/g, "")) * (m[3] ? 1000 : 1);
       return { funder: m[1]!.trim(), balance: Number.isFinite(n) ? n : null };
     });
+}
+
+const SIGN_OFF =
+  /^(thanks?\b|thank you|best\b|regards|sincerely|confidentiality notice|--\s*$|sent from|on .+ wrote:|from:\s)/i;
+const POSITION_LINE =
+  /^[-•*]?\s*([A-Za-z0-9][^$:\n]{0,60}?)\s*(?::\s*\$?|[-–]?\s*\$)\s?([\d,]+(?:\.\d+)?)\s*([kK])?\.?\s*$/;
+const NOT_A_LENDER =
+  /\b(phone|tel|fax|cell|mobile|office|ext|revenue|deposits?|amount|request(ed)?|monthly|average|avg|total|funding|need(s|ed)?)\b/i;
+
+/**
+ * The positions block of a "New Deal Submission" email ("Mazal: $12,500" lines between the
+ * greeting and the sign-off). Lines without a dollar balance or a "Lender: amount" shape are
+ * left out, so notes, phone numbers and signatures never become positions.
+ */
+export function positionsFromSubmissionBody(text: string): PositionLine[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const start = lines.findIndex((l) => /attached deal|for submission|see attached/i.test(l));
+  const out: PositionLine[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (SIGN_OFF.test(line) || line.startsWith(">")) break;
+    const m = POSITION_LINE.exec(line);
+    if (!m || NOT_A_LENDER.test(m[1]!)) continue;
+    const n = Number(m[2]!.replace(/,/g, "")) * (m[3] ? 1000 : 1);
+    if (Number.isFinite(n) && n > 0) out.push({ funder: m[1]!.trim(), balance: n });
+  }
+  return out;
 }
 
 export function positionsToText(lines: PositionLine[]): string {
@@ -97,9 +123,9 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
     targets.map((f) => ({
       funderId: f.id,
       funderName: f.name,
-      emails: [f.submissionTo, ...f.submissionCc].filter((e): e is string => !!e),
+      emails: [f.submissionTo, ...asList(f.submissionCc)].filter((e): e is string => !!e),
     })),
-    { teamCc: tenant.teamCc, from: tenant.fromAddress ?? undefined },
+    { teamCc: asList(tenant.teamCc), from: tenant.fromAddress ?? undefined },
   );
 
   const submissionIds: string[] = [];

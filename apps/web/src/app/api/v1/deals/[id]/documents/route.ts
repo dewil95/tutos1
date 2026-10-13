@@ -1,4 +1,5 @@
 import { getPrisma } from "@mca/db";
+import { inlineBudgetMs } from "@/server/env";
 import { after } from "next/server";
 import { z } from "zod";
 import { apiError, authenticateApi } from "@/server/apiKeys";
@@ -51,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: { stage: "DOCS_RECEIVED", stageChangedAt: new Date() },
       });
     }
-    after(() => runDueJobs(prisma, { budgetMs: 45_000 }).then(() => undefined));
+    after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs() }).then(() => undefined));
     return Response.json(
       { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, type: d.type })) },
       { status: 201 },

@@ -1,6 +1,7 @@
 import { getPrisma } from "@mca/db";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
+import { createDealFromApplication } from "./actions";
 
 async function createDeal(form: FormData) {
   "use server";
@@ -44,6 +45,35 @@ export default async function NewDealPage({
     <section className="panel narrow">
       <h1>New deal</h1>
       {error ? <p className="notice error">{error}</p> : null}
+
+      <h2>Start from the merchant&apos;s application</h2>
+      <p className="small muted">
+        Upload the application the merchant signed with another company (PDF, or photos of the
+        pages). AI reads it and fills Ascend&apos;s application. That file stays with the team and
+        is never sent to lenders.
+      </p>
+      <form action={createDealFromApplication} className="stack">
+        <label className="field">
+          Application (PDF or JPG/PNG photos) *
+          <input
+            type="file"
+            name="application"
+            accept="application/pdf,image/jpeg,image/png"
+            multiple
+            required
+          />
+        </label>
+        <label className="field">
+          Bank statements (optional, PDF)
+          <input type="file" name="statements" accept="application/pdf" multiple />
+        </label>
+        <p className="small muted">Up to 10 MB in total per upload.</p>
+        <button type="submit" className="primary">
+          Read application and create deal
+        </button>
+      </form>
+
+      <h2>Or type it in</h2>
       <form action={createDeal} className="stack">
         <label className="field">
           Business legal name *
@@ -75,9 +105,7 @@ export default async function NewDealPage({
             <input name="requestedAmount" inputMode="decimal" />
           </label>
         </div>
-        <button type="submit" className="primary">
-          Create deal
-        </button>
+        <button type="submit">Create deal</button>
       </form>
     </section>
   );

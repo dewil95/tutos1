@@ -26,7 +26,8 @@ export class MailboxNotConnectedError extends Error {
 export async function tenantMailbox(prisma: PrismaClient, tenantId: string): Promise<Mailbox> {
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
   const connections = await prisma.mailboxConnection.findMany({
-    where: { tenantId },
+    // History mailboxes are read-only: never used to send or to store files.
+    where: { tenantId, purpose: "send" },
     orderBy: { connectedAt: "desc" },
   });
   const connection =

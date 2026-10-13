@@ -1,4 +1,5 @@
 import { getPrisma } from "@mca/db";
+import { inlineBudgetMs } from "@/server/env";
 import { after } from "next/server";
 import { apiError, authenticateApi } from "@/server/apiKeys";
 import { runDueJobs } from "@/server/jobs/runner";
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
       caller.tenantId,
       parsed.data,
     );
-    if (created) after(() => runDueJobs(prisma, { budgetMs: 45_000 }).then(() => undefined));
+    if (created)
+      after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs() }).then(() => undefined));
     return Response.json(
       {
         dealId: deal.id,

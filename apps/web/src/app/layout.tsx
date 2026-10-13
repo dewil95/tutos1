@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { currentUser } from "@/server/auth";
+import { currentUser, SIGN_OUT_URL } from "@/server/auth";
 import { emailDryRun } from "@/server/env";
 import { NavLinks } from "./NavLinks";
 import "./globals.css";
@@ -14,7 +14,7 @@ async function signedInUser() {
   try {
     return await currentUser();
   } catch {
-    return null; // Supabase not configured yet: render pages without the shell
+    return null; // database or sign-in not set up yet: render pages without the shell
   }
 }
 
@@ -55,11 +55,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   {dryRun ? "Test mode" : "Live sending"}
                 </span>
                 <span>{user.name}</span>
-                <form action="/auth/signout" method="post">
-                  <button type="submit" className="link">
-                    Sign out
-                  </button>
-                </form>
+                <a href={SIGN_OUT_URL} className="link">
+                  Sign out
+                </a>
               </div>
             </aside>
             <main className="content">{children}</main>

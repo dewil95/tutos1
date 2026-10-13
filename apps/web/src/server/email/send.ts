@@ -97,17 +97,16 @@ export async function sentHistory(
   kind: string,
   target: string,
 ) {
-  const events = await prisma.dealEvent.findMany({
-    where: {
-      dealId,
-      type: "email_rule_sent",
-      AND: [
-        { payload: { path: ["kind"], equals: kind } },
-        { payload: { path: ["target"], equals: target } },
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-    select: { createdAt: true },
+  // D1/SQLite has no JSON filters in Prisma: read this deal's rule events and match in code.
+  const events = (
+    await prisma.dealEvent.findMany({
+      where: { dealId, type: "email_rule_sent" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, payload: true },
+    })
+  ).filter((e) => {
+    const p = e.payload as { kind?: string; target?: string } | null;
+    return p?.kind === kind && p?.target === target;
   });
   return { count: events.length, last: events[0]?.createdAt ?? null };
 }

@@ -1,23 +1,11 @@
-import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getPrisma, purgeTenant, type PrismaClient } from "@mca/db";
 import { runDueJobs } from "./jobs/runner";
 import { queueSubmissions } from "./submissions";
+import { databaseReady } from "./testDb";
 
-// End-to-end "ship the file" against Postgres in dry-run mode (no Gmail). Skipped without a DB.
-const url = process.env.DATABASE_URL;
-let reachable = false;
-if (url) {
-  const c = new pg.Client({ connectionString: url, connectionTimeoutMillis: 1500 });
-  try {
-    await c.connect();
-    reachable = Boolean((await c.query(`select to_regclass('public."Job"') as t`)).rows[0]?.t);
-  } catch {
-    reachable = false;
-  } finally {
-    await c.end().catch(() => undefined);
-  }
-}
+// End-to-end "ship the file" on a local D1 in dry-run mode (no Gmail).
+const reachable = await databaseReady();
 
 describe.runIf(reachable)("send to lenders (dry run)", () => {
   let prisma: PrismaClient;

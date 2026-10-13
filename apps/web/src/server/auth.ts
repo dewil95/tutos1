@@ -1,55 +1,86 @@
-import { createServerClient } from "@supabase/ssr";
 import { getPrisma, type User } from "@mca/db";
-import { cookies } from "next/headers";
+import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { allowedEmailDomain, requireEnv } from "./env";
+import { allowedEmailDomain } from "./env";
 
-/** Supabase client bound to the request cookies (Server Components, Route Handlers, Actions). */
-export async function supabaseServer() {
-  const store = await cookies();
-  return createServerClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    {
-      cookies: {
-        getAll: () => store.getAll(),
-        setAll: (list) => {
-          try {
-            for (const c of list) store.set(c.name, c.value, c.options);
-          } catch {
-            // Server Components cannot set cookies; proxy.ts refreshes the session instead.
-          }
-        },
-      },
-    },
-  );
-}
-
+/**
+ * Sign-in is Cloudflare Access: Cloudflare shows the Google login before any request reaches
+ * the CRM and allows only @ascendfund.co accounts. Every request then carries a signed JWT in
+ * `Cf-Access-Jwt-Assertion`; we verify it (team keys, issuer, audience) instead of trusting the
+ * email header, so a request that bypassed Access gets nothing.
+ *
+ * Settings: CF_ACCESS_TEAM_DOMAIN (e.g. "ascendfund.cloudflareaccess.com") and CF_ACCESS_AUD
+ * (the Access application's "Application Audience (AUD) Tag").
+ */
 export function isAllowedEmail(email: string | null | undefined): email is string {
   return !!email && email.toLowerCase().endsWith(`@${allowedEmailDomain()}`);
 }
 
-/**
- * The signed-in CRM user, or null. Identity comes from the verified Supabase JWT (getClaims),
- * then maps to our User row by auth id or email. Only the allowed Workspace domain gets in.
- */
+const jwksCache = new Map<string, JWTVerifyGetKey>();
+
+export interface AccessIdentity {
+  email: string;
+  sub: string;
+}
+
+/** Verifies the Access JWT. `keys` is injectable for tests. */
+export async function verifyAccessJwt(
+  token: string | null | undefined,
+  opts: { teamDomain?: string; audience?: string; keys?: JWTVerifyGetKey } = {},
+): Promise<AccessIdentity | null> {
+  const teamDomain = (opts.teamDomain ?? process.env.CF_ACCESS_TEAM_DOMAIN ?? "").replace(
+    /^https?:\/\//,
+    "",
+  );
+  const audience = opts.audience ?? process.env.CF_ACCESS_AUD;
+  if (!token || !teamDomain || !audience) return null;
+  let keys = opts.keys ?? jwksCache.get(teamDomain);
+  if (!keys) {
+    keys = createRemoteJWKSet(new URL(`https://${teamDomain}/cdn-cgi/access/certs`));
+    jwksCache.set(teamDomain, keys);
+  }
+  try {
+    const { payload } = await jwtVerify(token, keys, {
+      issuer: `https://${teamDomain}`,
+      audience,
+    });
+    const email = typeof payload.email === "string" ? payload.email.toLowerCase() : null;
+    if (!email || !payload.sub) return null;
+    return { email, sub: payload.sub };
+  } catch {
+    return null;
+  }
+}
+
+/** Local development only (`next dev`): act as DEV_USER_EMAIL without Cloudflare Access. */
+function devIdentity(): AccessIdentity | null {
+  const email = process.env.DEV_USER_EMAIL?.toLowerCase();
+  return process.env.NODE_ENV === "development" && email ? { email, sub: `dev:${email}` } : null;
+}
+
+/** The verified Google identity Cloudflare Access let through (any email), or null. */
+export async function currentIdentity(): Promise<AccessIdentity | null> {
+  const h = await headers();
+  return (await verifyAccessJwt(h.get("cf-access-jwt-assertion"))) ?? devIdentity();
+}
+
+/** The signed-in CRM user (an active User row with an allowed email), or null. */
 export async function currentUser(): Promise<User | null> {
-  const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-  const email = typeof claims?.email === "string" ? claims.email.toLowerCase() : null;
-  if (!claims?.sub || !isAllowedEmail(email)) return null;
+  const id = await currentIdentity();
+  if (!id || !isAllowedEmail(id.email)) return null;
   const prisma = getPrisma();
-  const byAuth = await prisma.user.findUnique({ where: { authUserId: claims.sub } });
-  if (byAuth) return byAuth.isActive ? byAuth : null;
-  const byEmail = await prisma.user.findFirst({ where: { email, isActive: true } });
-  if (!byEmail) return null;
-  return prisma.user.update({ where: { id: byEmail.id }, data: { authUserId: claims.sub } });
+  const user = await prisma.user.findFirst({ where: { email: id.email, isActive: true } });
+  if (!user) return null;
+  if (user.authUserId !== id.sub) {
+    return prisma.user.update({ where: { id: user.id }, data: { authUserId: id.sub } });
+  }
+  return user;
 }
 
 export async function requireUser(): Promise<User> {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/no-access");
   return user;
 }
 
@@ -62,3 +93,6 @@ export async function userOrResponse(opts: { admin?: boolean } = {}): Promise<Us
   }
   return user;
 }
+
+/** Cloudflare Access ends the session here. */
+export const SIGN_OUT_URL = "/cdn-cgi/access/logout";

@@ -4,10 +4,10 @@ Ascend's website sends each completed funding application to the CRM. The CRM cr
 the merchant and owners, files the documents in the deal's Google Drive folder and shows it on
 the deal board. No one has to re-type anything.
 
-- Base URL: `https://YOUR-APP.vercel.app/api/v1`
+- Base URL: `https://crm.ascendfund.co/api/v1`
 - Auth: `Authorization: Bearer ak_live_…`. An admin creates a key in **Settings → Website API**;
   it is shown once. Keep it on the website's server, never in browser JavaScript.
-- Body: JSON, at most about 4 MB per request (Vercel limit), 3 MB per file. Larger statements:
+- Body: JSON, at most about 10 MB per request, 3 MB per file. Larger statements:
   have the merchant email them to `funding@ascendfund.co`; the inbox check files them on the deal.
 - Errors: JSON `{ "error": "...", "details": [...] }` with 400 (not JSON), 401 (key), 404,
   413 (file too large), 422 (validation, `details[].path` names the field), 503 (Drive not connected).
@@ -18,7 +18,7 @@ Creates the deal. Re-sending the same `externalId` returns the existing deal (`2
 instead of creating a second one, so retries are safe.
 
 ```bash
-curl -X POST https://YOUR-APP.vercel.app/api/v1/applications \
+curl -X POST https://crm.ascendfund.co/api/v1/applications \
   -H "Authorization: Bearer $ASCEND_API_KEY" \
   -H "Content-Type: application/json" \
   -d @application.json

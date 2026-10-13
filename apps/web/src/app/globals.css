@@ -1076,3 +1076,28 @@ code.secret {
 .chat .msg.failed {
   border-color: var(--bad);
 }
+
+/* Ascend application steps on the deal page */
+ol.steps {
+  margin: 0;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.9rem;
+}
+ol.steps > li > form {
+  margin-top: 0.4rem;
+}
+.appform fieldset {
+  margin-bottom: 0.6rem;
+}
+.appform .row {
+  flex-wrap: wrap;
+}
+
+/* Lenders playbook */
+ul.habits {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+}

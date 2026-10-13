@@ -147,6 +147,22 @@ describe("rankFunders", () => {
     expect(r[0]!.reasons).toContain("approved 7 of 10 sent");
   });
 
+  it("ranks down a lender that never approved this many positions", () => {
+    const twin = { ...programs[1]!, programId: "b-twin", funderName: "Funder B2" };
+    const same = { submitted: 6, approved: 3, declined: 3 };
+    const r = rankFunders({ ...second, existingPositions: 2 }, [programs[1]!, twin], {
+      "b-second": { ...same, maxPositionsApproved: 1 },
+      "b-twin": { ...same, maxPositionsApproved: 2 },
+    });
+    expect(r.map((x) => x.funderName)).toEqual(["Funder B2", "Funder B"]);
+    expect(r[1]!.reasons).toContain("has approved up to 1 positions");
+    // One approval is not enough to judge.
+    const few = rankFunders({ ...second, existingPositions: 2 }, [programs[1]!], {
+      "b-second": { submitted: 2, approved: 1, declined: 1, maxPositionsApproved: 0 },
+    });
+    expect(few[0]!.reasons.some((x) => x.startsWith("has approved up to"))).toBe(false);
+  });
+
   it("still ranks before statements are analysed (no grade or revenue yet)", () => {
     const r = rankFunders({ ...second, paperGrade: null, avgMonthlyTrueRevenue: null }, programs);
     expect(r.find((x) => x.programId === "b-second")!.eligible).toBe(true);

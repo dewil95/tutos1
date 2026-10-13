@@ -16,9 +16,9 @@ const fakeFetch = (routes: Record<string, unknown>) =>
   }) as never;
 
 describe("WhatsApp setup steps", () => {
-  it("names the missing Vercel variables", () => {
+  it("names the missing settings", () => {
     expect(() => setupConfig()).toThrow(
-      "Set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in Vercel",
+      "Set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in Cloudflare",
     );
   });
 

@@ -109,6 +109,8 @@ export interface LenderHistory {
   /** Approvals on deals of the same paper grade (when known). */
   approvedSameGrade?: number;
   submittedSameGrade?: number;
+  /** Most existing positions on a file this lender approved (null: never approved one). */
+  maxPositionsApproved?: number | null;
 }
 
 export interface RankedFunder extends FunderMatch {
@@ -168,6 +170,15 @@ export function rankFunders(
       const rate = (h.approved + 1) / (h.submitted + 2);
       score += (rate - 0.5) * 30 + (sameGrade !== null ? (sameGrade - 0.5) * 10 : 0);
       reasons.push(`approved ${h.approved} of ${h.submitted} sent`);
+      // Two or more approvals show what the lender actually takes.
+      if (h.approved >= 2 && h.maxPositionsApproved != null) {
+        if (deal.existingPositions > h.maxPositionsApproved) {
+          score -= 8;
+          reasons.push(`has approved up to ${h.maxPositionsApproved} positions`);
+        } else if (deal.existingPositions > 0) {
+          score += 4;
+        }
+      }
     }
 
     if (!m.eligible) {

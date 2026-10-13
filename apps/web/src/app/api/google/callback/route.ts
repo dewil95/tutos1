@@ -1,4 +1,4 @@
-import { exchangeCode, GOOGLE_SCOPES } from "@mca/connectors";
+import { exchangeCode, GOOGLE_HISTORY_SCOPES, GOOGLE_SCOPES } from "@mca/connectors";
 import { encryptSecret, enqueueJob, getPrisma } from "@mca/db";
 import { cookies } from "next/headers";
 import { isAllowedEmail, userOrResponse } from "@/server/auth";
@@ -31,15 +31,22 @@ export async function GET(req: Request) {
   const code = params.get("code");
   if (!code) return fail("missing_code");
 
+  const purpose = expected.startsWith("h.") ? "history" : "send";
   const token = await exchangeCode(googleOAuthConfig(req), code);
   const email = emailFromIdToken(token.id_token);
   if (!isAllowedEmail(email)) return fail("wrong_account");
   const granted = (token.scope ?? "").split(" ");
-  const missing = GOOGLE_SCOPES.filter((s) => s.startsWith("https://") && !granted.includes(s));
-  if (missing.length) return fail("missing_permissions");
+  const needed = purpose === "history" ? GOOGLE_HISTORY_SCOPES : GOOGLE_SCOPES;
+  const missing = needed.filter((s) => s.startsWith("https://") && !granted.includes(s));
+  if (missing.length)
+    return fail(purpose === "history" ? "missing_read_permission" : "missing_permissions");
   if (!token.refresh_token) return fail("no_refresh_token");
 
   const prisma = getPrisma();
+  const existing = await prisma.mailboxConnection.findUnique({
+    where: { tenantId_email: { tenantId: user.tenantId, email } },
+  });
+  if (existing && existing.purpose !== purpose) return fail("already_connected");
   const data = {
     encryptedRefreshToken: encryptSecret(token.refresh_token, requireEnv("PII_ENCRYPTION_KEY")),
     scopes: granted,
@@ -48,8 +55,17 @@ export async function GET(req: Request) {
   const connection = await prisma.mailboxConnection.upsert({
     where: { tenantId_email: { tenantId: user.tenantId, email } },
     update: data,
-    create: { ...data, tenantId: user.tenantId, email },
+    create: { ...data, tenantId: user.tenantId, email, purpose },
   });
+  if (purpose === "history") {
+    await enqueueJob(prisma, {
+      tenantId: user.tenantId,
+      type: "HISTORY_IMPORT",
+      payload: { mailboxId: connection.id },
+      dedupeKey: `history:${connection.id}`,
+    });
+    return Response.redirect(`${base}/settings?history=1&connected=${encodeURIComponent(email)}`);
+  }
   const rootId = await mailboxFor(connection).drive.ensureFolderPath(["Ascend CRM", "Deals"]);
   await prisma.mailboxConnection.update({
     where: { id: connection.id },
