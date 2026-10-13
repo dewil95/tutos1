@@ -70,6 +70,43 @@ To run it the way Cloudflare does: `pnpm cf:build && pnpm --filter @mca/web cf:p
 (secrets in `apps/web/.dev.vars`).
 Checks: `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm cf:build`.
 
+## Go live with Claude Code on your PC (easiest)
+
+Claude Code runs the setup commands for you in your computer's terminal and asks you only for
+the sign-ins and the few things Google and Cloudflare make you click. You need a Claude Pro,
+Max or Team plan.
+
+1. **Install the tools.** Open **PowerShell** (Start → type "PowerShell") and run:
+
+   ```powershell
+   winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli Google.CloudSDK
+   irm https://claude.ai/install.ps1 | iex
+   ```
+
+   Close PowerShell and open it again. `claude --version` should print a version number.
+   (Mac: `brew install node git gh`, `brew install --cask google-cloud-sdk`, then
+   `curl -fsSL https://claude.ai/install.sh | bash`.)
+
+2. **Get the code and start Claude Code:**
+
+   ```powershell
+   git clone https://github.com/dewil95/tutos1
+   cd tutos1
+   claude
+   ```
+
+   Sign in to Claude when the browser opens. Until the Cloudflare pull request is merged, use
+   `git clone -b ccr-a084c87c-zub6v3 https://github.com/dewil95/tutos1` instead, so `/go-live`
+   is there.
+
+3. **Type `/go-live`.** Claude follows the checklist in
+   [`.claude/skills/go-live/SKILL.md`](.claude/skills/go-live/SKILL.md): merge the code, deploy,
+   Google, Cloudflare sign-in, secrets, first sign-in and a dry-run test. It never shows or asks
+   you to paste keys into the chat: when a key has to be typed, it gives you a command to run in
+   a second PowerShell window, which hides what you paste.
+
+The manual steps below do the same thing by hand.
+
 ## Go live on Cloudflare (about an hour, once)
 
 You need: the Cloudflare account that already has the $5 Workers plan and the `ascendfund.co`
