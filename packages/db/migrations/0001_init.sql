@@ -136,6 +136,7 @@ CREATE TABLE "Deal" (
     "stageChangedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "requestedAmount" DECIMAL,
     "useOfFunds" TEXT,
+    "statedMonthlyRevenue" DECIMAL,
     "isRenewal" BOOLEAN NOT NULL DEFAULT false,
     "parentDealId" TEXT,
     "paperGrade" TEXT,

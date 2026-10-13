@@ -23,8 +23,10 @@ export interface ApplicationPdfInput {
   sections: ApplicationPdfSection[];
   /** Authorization the signer agrees to; printed above the signature. */
   consentText: string;
-  /** Absent → unsigned preview with an empty signature line. */
+  /** Absent → unsigned, with empty signature and date lines. */
   signature?: ApplicationSignatureBlock;
+  /** Printed under the empty signature line of an unsigned application. */
+  signerName?: string;
   /** Small print under the title, e.g. "Preview - not signed yet". */
   note?: string;
 }
@@ -149,21 +151,35 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   y -= 14;
   need(60);
   const sig = input.signature;
-  if (sig) write(sig.name, { size: 16, f: bold });
-  else y -= 20;
-  page.drawLine({
-    start: { x: M, y: y - 2 },
-    end: { x: M + 260, y: y - 2 },
-    thickness: 0.8,
-    color: ink,
-  });
-  y -= 6;
-  write(
-    sig
-      ? `Signed electronically by ${sig.name} on ${formatSignedAt(sig.signedAt)} via ${sig.via}. Ref ${sig.ref}`
-      : "Signature (not signed yet)",
-    { size: 8, color: muted },
-  );
+  if (sig) {
+    write(sig.name, { size: 16, f: bold });
+    page.drawLine({
+      start: { x: M, y: y - 2 },
+      end: { x: M + 260, y: y - 2 },
+      thickness: 0.8,
+      color: ink,
+    });
+    y -= 6;
+    write(
+      `Signed electronically by ${sig.name} on ${formatSignedAt(sig.signedAt)} via ${sig.via}. Ref ${sig.ref}`,
+      { size: 8, color: muted },
+    );
+  } else {
+    // Empty lines for the merchant to sign (on paper or in an e-sign tool) and date.
+    y -= 24;
+    const line = (x: number, w: number) =>
+      page.drawLine({ start: { x, y }, end: { x: x + w, y }, thickness: 0.8, color: ink });
+    line(M, 260);
+    line(M + 300, 140);
+    const label = (text: string, x: number) =>
+      page.drawText(latin1(text), { x, y: y - 11, size: 8, font, color: muted });
+    label("Owner signature", M);
+    label("Date", M + 300);
+    y -= 22;
+    if (input.signerName) {
+      write(`Print name: ${input.signerName}`, { size: 9, color: ink });
+    }
+  }
 
   const pages = doc.getPages();
   pages.forEach((p, i) =>

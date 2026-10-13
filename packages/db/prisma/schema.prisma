@@ -269,43 +269,45 @@ enum DealStage {
 }
 
 model Deal {
-  id                  String    @id @default(cuid())
-  tenantId            String
-  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  merchantId          String
-  merchant            Merchant  @relation(fields: [merchantId], references: [id])
-  ownerId             String?
-  owner               User?     @relation("DealOwner", fields: [ownerId], references: [id])
-  stage               DealStage @default(INTAKE)
-  stageChangedAt      DateTime  @default(now())
-  requestedAmount     Decimal?
-  useOfFunds          String?
-  isRenewal           Boolean   @default(false)
-  parentDealId        String?
-  parentDeal          Deal?     @relation("DealRenewal", fields: [parentDealId], references: [id])
-  renewals            Deal[]    @relation("DealRenewal")
-  paperGrade          String? // A-D from A3 / human override
-  lostReason          String?
+  id                   String    @id @default(cuid())
+  tenantId             String
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  merchantId           String
+  merchant             Merchant  @relation(fields: [merchantId], references: [id])
+  ownerId              String?
+  owner                User?     @relation("DealOwner", fields: [ownerId], references: [id])
+  stage                DealStage @default(INTAKE)
+  stageChangedAt       DateTime  @default(now())
+  requestedAmount      Decimal?
+  useOfFunds           String?
+  /// Monthly revenue the merchant wrote on the application (the bank scrub gives the real one).
+  statedMonthlyRevenue Decimal?
+  isRenewal            Boolean   @default(false)
+  parentDealId         String?
+  parentDeal           Deal?     @relation("DealRenewal", fields: [parentDealId], references: [id])
+  renewals             Deal[]    @relation("DealRenewal")
+  paperGrade           String? // A-D from A3 / human override
+  lostReason           String?
   /// Google Drive folder holding every file for this deal
-  driveFolderId       String?
+  driveFolderId        String?
   /// Gmail thread of the merchant's own emails, if the deal came in by email
-  sourceThreadId      String?
+  sourceThreadId       String?
   /// What the closer already sold the merchant before approval (amount / factor / days)
-  soldAmount          Decimal?
-  soldFactor          Decimal?
-  soldTermDays        Int?
+  soldAmount           Decimal?
+  soldFactor           Decimal?
+  soldTermDays         Int?
   /// "funder: $balance" lines shown in the submission email (PositionLine[])
-  submissionPositions Json      @default("[]")
-  submissionNote      String?
+  submissionPositions  Json      @default("[]")
+  submissionNote       String?
   /// Where the deal came from: website | email | staff | gmail_import
-  source              String    @default("staff")
+  source               String    @default("staff")
   /// Application id on Ascend's website (POST /api/v1/applications), unique per tenant.
-  externalRef         String?
+  externalRef          String?
   /// A5 application reading output (SSN/DOB masked) and field conflicts for review.
-  applicationData     Json?
+  applicationData      Json?
   /// Internal AI Risk Report (never sent to lenders).
-  riskReport          Json?
-  riskReportAt        DateTime?
+  riskReport           Json?
+  riskReportAt         DateTime?
 
   events               DealEvent[]
   documents            Document[]

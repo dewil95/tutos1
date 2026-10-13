@@ -7,6 +7,7 @@ import { runDueJobs } from "@/server/jobs/runner";
 import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
 import { WhatsAppSection } from "./WhatsAppSection";
+import { ApplicationSection } from "./ApplicationSection";
 import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
@@ -155,6 +156,8 @@ export default async function SettingsPage({
         ) : null}
         {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
       </section>
+
+      <ApplicationSection tenantId={user.tenantId} canEdit={isAdmin} />
 
       <WhatsAppSection
         tenantId={user.tenantId}

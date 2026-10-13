@@ -2,14 +2,20 @@ import { randomBytes, createHash } from "node:crypto";
 import { dealFolderPath, renderApplicationPdf, type ApplicationPdfSection } from "@mca/connectors";
 import type { Prisma } from "@mca/db";
 import { applyApplication } from "../applicationData";
+import {
+  APPLICATION_TITLE,
+  ASCEND_BRAND,
+  applicationFileBase,
+  applicationSections as sharedSections,
+} from "../ascendApplication";
 import { storeDealFile } from "../documents";
 import { ApplicationPayloadSchema, findMerchantMatch, payloadToReading } from "../websiteApi";
 import { handoff, say, sendFile, ownerName, type Ctx } from "./chat";
 import { COPY, DEFAULT_CONSENT, tr } from "./copy";
-import { FIELDS, formatPhone, maskPhone, showAddress, type Lang } from "./questions";
+import { formatPhone, maskPhone, type Lang } from "./questions";
 
-const BRAND = "Ascend Fund";
-const TITLE = "Business Funding Application";
+const BRAND = ASCEND_BRAND;
+const TITLE = APPLICATION_TITLE;
 
 /** The authorization the merchant reads in the chat (tenant setting, or the default). */
 export async function consentFor(x: Ctx, lang: Lang = x.lang): Promise<string> {
@@ -23,67 +29,9 @@ export async function consentFor(x: Ctx, lang: Lang = x.lang): Promise<string> {
   return text?.trim() || DEFAULT_CONSENT[lang];
 }
 
-/** US style for lenders: 2021-04-01 → 04/01/2021. */
-const usDate = (v: string | undefined | null) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v ?? "");
-  return m ? `${m[2]}/${m[3]}/${m[1]}` : (v ?? null);
-};
-
-const label = (key: string) => FIELDS.find((f) => f.key === key)!.label.en;
-const show = (key: string, x: Ctx) => {
-  const f = FIELDS.find((d) => d.key === key)!;
-  return f.show(f.get(x.draft)) || null;
-};
-
-/** Ascend's application sections (English, as lenders read it). */
+/** Ascend's application sections for this chat's answers. */
 export function applicationSections(x: Ctx, opts: { masked: boolean }): ApplicationPdfSection[] {
-  const b = x.draft.business;
-  const sections: ApplicationPdfSection[] = [
-    {
-      heading: "Business",
-      fields: [
-        [label("business.legalName"), b.legalName ?? null],
-        [label("business.dba"), b.dba ?? null],
-        [label("business.entityType"), show("business.entityType", x)],
-        [label("business.ein"), b.ein ?? null],
-        [label("business.startDate"), usDate(b.startDate)],
-        [label("business.industry"), b.industry ?? null],
-        [label("business.address"), showAddress(b.address) || null],
-        [label("business.phone"), b.phone ?? null],
-        [label("business.email"), b.email ?? null],
-        ["Website", b.website ?? null],
-      ],
-    },
-    {
-      heading: "Funding request",
-      fields: [
-        [label("request.amount"), show("request.amount", x)],
-        [label("request.useOfFunds"), x.draft.request.useOfFunds ?? null],
-        [label("request.monthlyRevenue"), show("request.monthlyRevenue", x)],
-        [label("request.existingAdvances"), show("request.existingAdvances", x)],
-      ],
-    },
-  ];
-  x.draft.owners.forEach((o, i) => {
-    const pii = x.pii[i];
-    const ssn = pii?.ssn ? (opts.masked ? `***-**-${pii.ssn.slice(-4)}` : pii.ssn) : null;
-    const dob = pii?.dob ? (opts.masked ? "On file" : usDate(pii.dob)) : null;
-    const phone = o.phone ?? (i === 0 ? formatPhone(x.c.phone) : null);
-    sections.push({
-      heading: x.draft.owners.length > 1 ? `Owner ${i + 1}` : "Owner",
-      fields: [
-        ["Full name", `${o.firstName ?? ""} ${o.lastName ?? ""}`.trim() || null],
-        ["Ownership", o.ownershipPct !== undefined ? `${o.ownershipPct}%` : null],
-        ["Social Security number", ssn],
-        ["Date of birth", dob],
-        ["Home address", showAddress(o.address) || null],
-        ["Email", o.email ?? null],
-        ["Phone", phone],
-        ["Credit score (estimated)", o.creditScore ? String(o.creditScore) : null],
-      ],
-    });
-  });
-  return sections;
+  return sharedSections(x.draft, x.pii, { ...opts, firstOwnerPhone: formatPhone(x.c.phone) });
 }
 
 /** English authorization on the PDF; a Spanish signer also gets the text they agreed to. */
@@ -95,9 +43,7 @@ async function pdfConsent(x: Ctx): Promise<string> {
 }
 
 const fileBase = (x: Ctx) =>
-  `Ascend-Fund-Application-${(x.draft.business.dba ?? x.draft.business.legalName ?? "Merchant")
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-|-$/g, "")}`;
+  applicationFileBase(x.draft.business.dba ?? x.draft.business.legalName);
 
 /** Unsigned preview (masked) for the review step. */
 export async function renderApplication(

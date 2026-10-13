@@ -147,6 +147,9 @@ export async function applyApplication(
   }
   if (r.useOfFunds && (!deal.useOfFunds || mode === "overwrite"))
     dealData.useOfFunds = r.useOfFunds;
+  if (r.statedMonthlyRevenue && (deal.statedMonthlyRevenue === null || mode === "overwrite")) {
+    dealData.statedMonthlyRevenue = r.statedMonthlyRevenue;
+  }
   const positions = (deal.submissionPositions ?? []) as unknown[];
   if (r.existingAdvances.length && positions.length === 0) {
     dealData.submissionPositions = r.existingAdvances.map((x) => ({

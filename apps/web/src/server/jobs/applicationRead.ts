@@ -2,11 +2,18 @@ import { maskApplication, runApplicationReading } from "@mca/ai";
 import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
 import { llmClient } from "../ai";
 import { applyApplication } from "../applicationData";
+import { findMerchantMatch } from "../websiteApi";
 import { tenantMailbox } from "../google";
 import { PermanentJobError } from "./errors";
 
 export interface ApplicationReadPayload {
   documentId: string;
+  /**
+   * The deal was started from this file (another company's application uploaded on "New
+   * deal"): its merchant is a placeholder, so the reading fills everything, and a returning
+   * merchant is matched by name and EIN so they keep one record.
+   */
+  newDeal?: boolean;
 }
 
 /**
@@ -14,7 +21,7 @@ export interface ApplicationReadPayload {
  * deal fields. Differences from what is already saved become conflicts on the deal page.
  */
 export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJob): Promise<void> {
-  const { documentId } = job.payload as unknown as ApplicationReadPayload;
+  const { documentId, newDeal } = job.payload as unknown as ApplicationReadPayload;
   const doc = await prisma.document.findUnique({
     where: { id: documentId },
     include: { deal: { select: { id: true, merchantId: true } } },
@@ -34,13 +41,54 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
       where: { id: doc.id },
       data: { type: "OTHER", typeConfidence: reading.confidence },
     });
+    if (newDeal) {
+      await prisma.deal.update({
+        where: { id: doc.deal.id },
+        data: {
+          applicationData: {
+            documentId: doc.id,
+            readAt: new Date().toISOString(),
+            notAnApplication: true,
+            conflicts: [],
+          },
+        },
+      });
+    }
     return;
+  }
+
+  let merchantId = doc.deal.merchantId;
+  let mode: "fill" | "overwrite" = "fill";
+  if (newDeal) {
+    mode = "overwrite";
+    const legalName = reading.business.legalName?.trim();
+    const match = legalName
+      ? await findMerchantMatch(
+          prisma,
+          doc.tenantId,
+          legalName,
+          reading.business.ein ?? undefined,
+          merchantId,
+        )
+      : null;
+    if (match) {
+      // A returning merchant: move the deal onto their record; what they already have wins
+      // and differences show as conflicts.
+      const placeholder = merchantId;
+      merchantId = match.id;
+      mode = "fill";
+      await prisma.deal.update({ where: { id: doc.deal.id }, data: { merchantId } });
+      await prisma.document.updateMany({ where: { dealId: doc.deal.id }, data: { merchantId } });
+      if (!(await prisma.deal.count({ where: { merchantId: placeholder } }))) {
+        await prisma.merchant.delete({ where: { id: placeholder } }).catch(() => undefined);
+      }
+    }
   }
   const conflicts = await applyApplication(
     prisma,
-    { dealId: doc.deal.id, merchantId: doc.deal.merchantId },
+    { dealId: doc.deal.id, merchantId },
     reading,
-    "fill",
+    mode,
   );
   const masked = maskApplication(reading);
   await prisma.$transaction([
@@ -58,6 +106,7 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
           documentId: doc.id,
           readAt: new Date().toISOString(),
           signed: reading.signed,
+          ...(newDeal ? { fromOtherCompany: true } : {}),
           lowConfidenceFields: reading.lowConfidenceFields,
           conflicts,
         } as unknown as Prisma.InputJsonObject,
@@ -68,7 +117,12 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
         dealId: doc.deal.id,
         type: "application_read",
         actorType: "ai",
-        payload: { documentId: doc.id, conflicts: conflicts.length, signed: reading.signed },
+        payload: {
+          documentId: doc.id,
+          conflicts: conflicts.length,
+          signed: reading.signed,
+          ...(newDeal ? { internalOnly: true } : {}),
+        },
       },
     }),
   ]);
