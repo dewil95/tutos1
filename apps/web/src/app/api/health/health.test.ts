@@ -8,8 +8,8 @@ describe("/api/health", () => {
     const keep = { ...process.env };
     Object.assign(process.env, {
       GEMINI_API_KEY: "x",
-      NEXT_PUBLIC_SUPABASE_URL: "x",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "x",
+      CF_ACCESS_TEAM_DOMAIN: "x",
+      CF_ACCESS_AUD: "x",
       GOOGLE_CLIENT_ID: "x",
       GOOGLE_CLIENT_SECRET: "x",
       PII_ENCRYPTION_KEY: "x",

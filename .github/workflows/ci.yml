@@ -8,24 +8,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: mca
-          POSTGRES_PASSWORD: mca
-          POSTGRES_DB: mca
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U mca"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://mca:mca@localhost:5432/mca?schema=public
-      DIRECT_URL: postgresql://mca:mca@localhost:5432/mca?schema=public
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       # pnpm version comes from "packageManager" in package.json.
@@ -37,10 +20,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mca/db validate
       - run: pnpm --filter @mca/db generate
-      # Applies the same migration Supabase gets (incl. RLS + append-only triggers), so the
-      # job-queue integration tests run against a real Postgres.
-      - run: pnpm --filter @mca/db migrate:deploy
       - run: pnpm typecheck
+      # Database tests run on a local Cloudflare D1 (Miniflare) with packages/db/migrations applied.
       - run: pnpm test
       - run: pnpm format:check
-      - run: pnpm --filter @mca/web build
+      # The Cloudflare Worker build, and its size: Workers Paid allows 10 MiB compressed.
+      - run: pnpm --filter @mca/web cf:build
+      - name: Worker bundle size
+        working-directory: apps/web
+        run: |
+          npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker" | tee "$RUNNER_TEMP/size.txt"
+          kib=$(grep -oE 'gzip: [0-9.]+' "$RUNNER_TEMP/size.txt" | grep -oE '[0-9.]+')
+          echo "compressed: ${kib} KiB"
+          awk -v k="$kib" 'BEGIN { exit (k > 9500) }'

@@ -1,5 +1,5 @@
 import { newWatermarkTag, planSubmissions, type PositionLine } from "@mca/connectors";
-import { enqueueJob, type PrismaClient } from "@mca/db";
+import { asList, enqueueJob, type PrismaClient } from "@mca/db";
 
 /**
  * "Mazal: $12,500" / "Fundzilla 8000" / "Unknown lender" → position lines for the email body.
@@ -97,9 +97,9 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
     targets.map((f) => ({
       funderId: f.id,
       funderName: f.name,
-      emails: [f.submissionTo, ...f.submissionCc].filter((e): e is string => !!e),
+      emails: [f.submissionTo, ...asList(f.submissionCc)].filter((e): e is string => !!e),
     })),
-    { teamCc: tenant.teamCc, from: tenant.fromAddress ?? undefined },
+    { teamCc: asList(tenant.teamCc), from: tenant.fromAddress ?? undefined },
   );
 
   const submissionIds: string[] = [];

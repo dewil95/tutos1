@@ -1,11 +1,18 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { funderSeedsFromCsv, parseCsv } from "./funderCsv";
-import { getPrisma, purgeTenant, type PrismaClient } from "./index";
+import {
+  asList,
+  getPrisma,
+  merchantIdsByName,
+  purgeTenant,
+  seedTenant,
+  type PrismaClient,
+} from "./index";
+import { migrationFiles, splitSql, useTestDatabase } from "./testing";
 import { claimJobs, completeJob, enqueueJob, failJob, retryDelayMs } from "./jobs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,23 +64,56 @@ describe("retryDelayMs", () => {
   });
 });
 
-// Integration tests need Postgres (local cluster or the CI service). Skipped when unavailable.
-const url = process.env.DATABASE_URL;
-let reachable = false;
-if (url) {
-  const c = new pg.Client({ connectionString: url, connectionTimeoutMillis: 1500 });
-  try {
-    await c.connect();
-    const r = await c.query(`select to_regclass('public."Job"') as t`);
-    reachable = Boolean(r.rows[0]?.t);
-  } catch {
-    reachable = false;
-  } finally {
-    await c.end().catch(() => undefined);
-  }
-}
+// Integration tests run on a local Cloudflare D1 (Miniflare, the production engine).
+await useTestDatabase();
 
-describe.runIf(reachable)("job queue (Postgres)", () => {
+describe("migrations", () => {
+  it("split into statements, triggers kept whole", () => {
+    const rules = migrationFiles().find((m) => m.name.startsWith("0002"))!;
+    const stmts = splitSql(rules.sql);
+    expect(stmts.filter((x) => x.startsWith("CREATE TRIGGER"))).toHaveLength(6);
+    expect(stmts.every((x) => !x.startsWith("--"))).toBe(true);
+  });
+
+  it("match the Prisma schema", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const expected = execFileSync("node", [join(here, "../scripts/schema-sql.mjs")], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const init = migrationFiles().find((m) => m.name.startsWith("0001"))!.sql;
+    expect(init.trim()).toBe(expected.trim());
+  }, 60_000);
+});
+
+describe("seed", () => {
+  it("bundles the same roster as the CSV", async () => {
+    const { FUNDER_ROSTER_CSV } = await import("./funderRoster");
+    expect(FUNDER_ROSTER_CSV).toBe(
+      readFileSync(join(here, "../../../docs/funder-appetite-matrix.csv"), "utf8"),
+    );
+  });
+
+  it("creates the tenant, team and lenders once, and is safe to repeat", async () => {
+    const prisma = getPrisma();
+    const slug = `seed-${Date.now()}`;
+    const first = await seedTenant(prisma, { slug });
+    const again = await seedTenant(prisma, { slug });
+    expect(again.tenant.id).toBe(first.tenant.id);
+    expect(await prisma.user.count({ where: { tenantId: first.tenant.id } })).toBe(3);
+    const lenders = await prisma.funder.findMany({
+      where: { tenantId: first.tenant.id },
+      include: { programs: true },
+    });
+    expect(lenders.length).toBe(first.lenders);
+    expect(lenders.every((l) => l.programs.length === 1)).toBe(true);
+    const mazal = lenders.find((l) => l.name === "Mazal Funders")!;
+    expect(asList(mazal.submissionCc)).toEqual(["iso@mazalfunders.com", "nate@mazalfunders.com"]);
+    await purgeTenant(prisma, first.tenant.id);
+  }, 60_000);
+});
+
+describe("job queue (D1)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
 
@@ -87,7 +127,6 @@ describe.runIf(reachable)("job queue (Postgres)", () => {
 
   afterAll(async () => {
     await purgeTenant(prisma, tenantId);
-    await prisma.$disconnect();
   });
 
   it("never hands the same job to two concurrent claimers", async () => {
@@ -176,5 +215,44 @@ describe.runIf(reachable)("job queue (Postgres)", () => {
       prisma.dealEvent.update({ where: { id: ev.id }, data: { type: "edited" } }),
     ).rejects.toThrow(/append-only/);
     await expect(prisma.dealEvent.delete({ where: { id: ev.id } })).rejects.toThrow(/append-only/);
+  });
+
+  it("purges a tenant with its history, and switches the purge back off", async () => {
+    const t = await prisma.tenant.create({ data: { name: "Purge", slug: `purge-${Date.now()}` } });
+    const m = await prisma.merchant.create({ data: { tenantId: t.id, legalName: "Gone LLC" } });
+    const d = await prisma.deal.create({ data: { tenantId: t.id, merchantId: m.id } });
+    await prisma.dealEvent.create({ data: { dealId: d.id, type: "note", actorType: "user" } });
+    await purgeTenant(prisma, t.id);
+    expect(await prisma.dealEvent.count({ where: { dealId: d.id } })).toBe(0);
+    expect((await prisma.purgeFlag.findUniqueOrThrow({ where: { id: 1 } })).on).toBe(false);
+  });
+
+  it("stores lists as JSON and matches merchant names without case", async () => {
+    const t = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { teamCc: ["a@x.test", "b@x.test"] },
+    });
+    expect(asList(t.teamCc)).toEqual(["a@x.test", "b@x.test"]);
+    expect(asList(null)).toEqual([]);
+    const m = await prisma.merchant.create({
+      data: { tenantId, legalName: "Joe's Pizza LLC", dba: "Joe Pizza" },
+    });
+    expect(await merchantIdsByName(prisma, tenantId, "JOE'S PIZZA llc")).toEqual([m.id]);
+    expect(await merchantIdsByName(prisma, tenantId, "joe pizza")).toEqual([]);
+    expect(await merchantIdsByName(prisma, tenantId, "joe pizza", { includeDba: true })).toEqual([
+      m.id,
+    ]);
+  });
+
+  it("keeps dates exact to the millisecond and compares them correctly", async () => {
+    const at = new Date("2026-10-13T12:34:56.789Z");
+    const id = await enqueueJob(prisma, { tenantId, type: "INBOX_SYNC", payload: {}, runAt: at });
+    expect((await prisma.job.findUniqueOrThrow({ where: { id } })).runAt.toISOString()).toBe(
+      at.toISOString(),
+    );
+    expect(
+      await claimJobs(prisma, { limit: 1, ids: [id], now: new Date(at.getTime() - 1) }),
+    ).toEqual([]);
+    expect(await claimJobs(prisma, { limit: 1, ids: [id], now: at })).toHaveLength(1);
   });
 });

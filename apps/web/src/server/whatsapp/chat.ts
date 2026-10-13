@@ -12,7 +12,7 @@ import {
 } from "@mca/db";
 import { llmClient } from "../ai";
 import { classifyFileName, storeDealFile } from "../documents";
-import { requireEnv } from "../env";
+import { inlineBudgetMs, requireEnv } from "../env";
 import { tenantMailbox, type Mailbox } from "../google";
 import { whatsappClient, whatsappSettings } from "./config";
 import { COPY, tr } from "./copy";
@@ -201,8 +201,9 @@ export async function addChatEvent(
 export async function runChatNow(prisma: PrismaClient, ids: string[]): Promise<void> {
   const { runDueJobs } = await import("../jobs/runner");
   const started = Date.now();
-  if (ids.length) await runDueJobs(prisma, { budgetMs: 45_000, ids });
-  const left = 50_000 - (Date.now() - started);
+  const total = inlineBudgetMs();
+  if (ids.length) await runDueJobs(prisma, { budgetMs: total * 0.8, ids });
+  const left = total - (Date.now() - started);
   if (left > 5_000) {
     await runDueJobs(prisma, {
       budgetMs: left,

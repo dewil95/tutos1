@@ -1,5 +1,5 @@
 import type { InboundEmail } from "@mca/connectors";
-import { enqueueJob, type ClaimedJob, type PrismaClient } from "@mca/db";
+import { asList, enqueueJob, merchantIdsByName, type ClaimedJob, type PrismaClient } from "@mca/db";
 import { allowedEmailDomain } from "../env";
 import { storeDealFile } from "../documents";
 import { mailboxFor, type Mailbox } from "../google";
@@ -48,7 +48,7 @@ export async function handleInboxSync(prisma: PrismaClient, job: ClaimedJob): Pr
     prisma,
     mailbox,
     tenantId: connection.tenantId,
-    funders,
+    funders: funders.map((f) => ({ ...f, emailDomains: asList(f.emailDomains) })),
     ownDomain: domainOf(connection.email) || allowedEmailDomain(),
   };
 
@@ -126,16 +126,10 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
   // Sent by the CRM itself: already tracked.
   if (await prisma.submission.findFirst({ where: { gmailMessageId: m.messageId } })) return;
 
+  const [matchId] = await merchantIdsByName(prisma, tenantId, merchantName, { includeDba: true });
   const merchant =
-    (await prisma.merchant.findFirst({
-      where: {
-        tenantId,
-        OR: [
-          { legalName: { equals: merchantName, mode: "insensitive" } },
-          { dba: { equals: merchantName, mode: "insensitive" } },
-        ],
-      },
-    })) ?? (await prisma.merchant.create({ data: { tenantId, legalName: merchantName } }));
+    (matchId ? await prisma.merchant.findUnique({ where: { id: matchId } }) : null) ??
+    (await prisma.merchant.create({ data: { tenantId, legalName: merchantName } }));
 
   const deal =
     (await prisma.deal.findFirst({
@@ -230,8 +224,9 @@ async function ingestExternal(ctx: Ctx, m: InboundEmail) {
     where: {
       tenantId,
       OR: [
-        { email: { equals: m.from, mode: "insensitive" } },
-        { owners: { some: { email: { equals: m.from, mode: "insensitive" } } } },
+        // Emails are stored lower-case.
+        { email: m.from.toLowerCase() },
+        { owners: { some: { email: m.from.toLowerCase() } } },
       ],
     },
   });

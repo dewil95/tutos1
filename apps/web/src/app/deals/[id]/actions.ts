@@ -1,6 +1,6 @@
 "use server";
 
-import { enqueueJob, getPrisma, type DocumentType } from "@mca/db";
+import { asList, enqueueJob, getPrisma, type DocumentType } from "@mca/db";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -10,7 +10,7 @@ import { tenantMailbox } from "@/server/google";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ensureRules, renderTemplate } from "@/server/email/rules";
 import { sendTracked } from "@/server/email/send";
-import { emailDryRun } from "@/server/env";
+import { emailDryRun, inlineBudgetMs } from "@/server/env";
 import { parsePositions, queueSubmissions } from "@/server/submissions";
 
 const back = (dealId: string, params: Record<string, string>) =>
@@ -31,7 +31,9 @@ export async function sendToLenders(dealId: string, form: FormData) {
       positions: parsePositions(String(form.get("positions") ?? "")),
       note: String(form.get("note") ?? "").trim() || null,
     });
-    after(() => runDueJobs(prisma, { budgetMs: 50_000, ids: plan.jobIds }).then(() => undefined));
+    after(() =>
+      runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: plan.jobIds }).then(() => undefined),
+    );
     target = back(dealId, {
       queued: String(plan.jobIds.length),
       ...(plan.skipped.length
@@ -119,7 +121,9 @@ export async function analyseDealStatements(dealId: string, form: FormData) {
       }),
     );
   }
-  after(() => runDueJobs(prisma, { budgetMs: 55_000, ids: jobIds }).then(() => undefined));
+  after(() =>
+    runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: jobIds }).then(() => undefined),
+  );
   redirect(back(dealId, { analysing: "1" }));
 }
 
@@ -138,7 +142,9 @@ export async function retrySubmission(dealId: string, form: FormData) {
       payload: { submissionId: sub.id },
       dedupeKey: `send:${sub.id}`,
     });
-    after(() => runDueJobs(prisma, { budgetMs: 50_000, ids: [jobId] }).then(() => undefined));
+    after(() =>
+      runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
+    );
   }
   redirect(back(dealId, { queued: "1" }));
 }
@@ -210,7 +216,9 @@ export async function regenerateRiskReport(dealId: string) {
     payload: { dealId },
     dedupeKey: `risk:${dealId}`,
   });
-  after(() => runDueJobs(prisma, { budgetMs: 55_000, ids: [jobId] }).then(() => undefined));
+  after(() =>
+    runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
+  );
   redirect(back(dealId, { risk: "1" }));
 }
 
@@ -277,8 +285,8 @@ export async function requestContracts(dealId: string, form: FormData) {
       kind: "CONTRACT_REQUEST",
       target: sub.id,
       from,
-      to: sub.toAddresses,
-      cc: sub.ccAddresses,
+      to: asList(sub.toAddresses),
+      cc: asList(sub.ccAddresses),
       subject: renderTemplate(rule.subject, vars),
       text: renderTemplate(rule.body, vars),
       attachments: emailDryRun()
@@ -340,8 +348,8 @@ export async function confirmClawback(dealId: string, form: FormData) {
       target: activity.id,
       from,
       // Answer whoever sent the funded email, in its thread.
-      to: [activity.fromAddress ?? sub.toAddresses[0]!],
-      cc: sub.ccAddresses,
+      to: [activity.fromAddress ?? asList(sub.toAddresses)[0]!],
+      cc: asList(sub.ccAddresses),
       subject: renderTemplate(rule.subject, vars),
       text: renderTemplate(rule.body, vars),
       threadId: activity.threadId,

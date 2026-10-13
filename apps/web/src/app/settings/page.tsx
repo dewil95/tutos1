@@ -1,8 +1,8 @@
-import { enqueueJob, getPrisma } from "@mca/db";
+import { asList, enqueueJob, getPrisma } from "@mca/db";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
-import { emailDryRun } from "@/server/env";
+import { emailDryRun, inlineBudgetMs } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
@@ -38,8 +38,9 @@ async function checkInboxNow() {
   }
   // Sync first, then any reply parsing it queued.
   after(async () => {
-    await runDueJobs(prisma, { budgetMs: 35_000, ids });
-    await runDueJobs(prisma, { budgetMs: 20_000, types: ["PARSE_REPLY"] });
+    const total = inlineBudgetMs();
+    await runDueJobs(prisma, { budgetMs: total * 0.6, ids });
+    await runDueJobs(prisma, { budgetMs: total * 0.4, types: ["PARSE_REPLY"] });
   });
   redirect("/settings?checking=1");
 }
@@ -80,7 +81,7 @@ export default async function SettingsPage({
         <h2>Funding mailbox (Gmail + Google Drive)</h2>
         <p className="small muted">
           Sends from {tenant.fromAddress ?? "—"} · team CC on every submission:{" "}
-          {tenant.teamCc.join(", ") || "none"} ·{" "}
+          {asList(tenant.teamCc).join(", ") || "none"} ·{" "}
           {emailDryRun() ? <strong>dry-run mode (nothing is emailed)</strong> : "live sending"}
         </p>
         {mailboxes.length === 0 ? <p className="empty">Not connected.</p> : null}
@@ -183,8 +184,8 @@ export default async function SettingsPage({
                     {f.isActive ? "" : " (inactive)"}
                   </td>
                   <td className="small">{f.submissionTo ?? "—"}</td>
-                  <td className="small">{f.submissionCc.join(", ") || "—"}</td>
-                  <td className="small">{f.emailDomains.join(", ")}</td>
+                  <td className="small">{asList(f.submissionCc).join(", ") || "—"}</td>
+                  <td className="small">{asList(f.emailDomains).join(", ")}</td>
                 </tr>
               ))}
             </tbody>

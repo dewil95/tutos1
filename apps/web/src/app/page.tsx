@@ -116,8 +116,8 @@ export default async function DealBoardPage() {
       </header>
       {error ? (
         <p className="notice error">
-          Database not reachable ({error}). Check DATABASE_URL and run <code>pnpm db:deploy</code>{" "}
-          (see README).
+          Database not reachable ({error}). Check the D1 binding in wrangler.jsonc and run{" "}
+          <code>pnpm db:migrate:remote</code> (see README).
         </p>
       ) : null}
       <div className="board">

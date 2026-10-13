@@ -118,7 +118,7 @@ export function hashInput(parts: unknown[]): string {
     else
       h.update(
         JSON.stringify(p, (_k, v: unknown) =>
-          Buffer.isBuffer(v) ? createHash("sha256").update(v).digest("hex") : v,
+          Buffer.isBuffer(v) ? createHash("sha256").update(v as Buffer).digest("hex") : v,
         ),
       );
   }

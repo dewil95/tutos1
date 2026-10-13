@@ -1,4 +1,4 @@
-import type { ClaimedJob, EmailRule, PrismaClient } from "@mca/db";
+import { asList, type ClaimedJob, type EmailRule, type PrismaClient } from "@mca/db";
 import { ensureRules, isWeekendNY, renderTemplate, type RuleKind } from "../email/rules";
 import { sendTracked, sentHistory } from "../email/send";
 
@@ -192,8 +192,8 @@ export async function runEmailRules(
         kind: "LENDER_FOLLOW_UP",
         target: s.id,
         from,
-        to: s.toAddresses,
-        cc: s.ccAddresses,
+        to: asList(s.toAddresses),
+        cc: asList(s.ccAddresses),
         subject: renderTemplate(followRule.subject, vars),
         text: renderTemplate(followRule.body, vars),
         threadId: s.gmailThreadId,

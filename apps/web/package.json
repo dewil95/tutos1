@@ -9,27 +9,31 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cf:build": "pnpm --filter @mca/db generate && opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "db:migrate:local": "wrangler d1 migrations apply ascend-crm --local",
+    "db:migrate:remote": "wrangler d1 migrations apply ascend-crm --remote"
   },
   "dependencies": {
     "@mca/ai": "workspace:*",
     "@mca/connectors": "workspace:*",
     "@mca/db": "workspace:*",
     "@mca/domain": "workspace:*",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.117.2",
+    "jose": "^6.2.12",
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.10",
     "@types/node": "^22.19.0",
-    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "pg": "^8.23.1",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "4.149.0"
   }
 }

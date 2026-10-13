@@ -58,9 +58,9 @@ export interface RunResult {
 }
 
 /**
- * Claims and runs due jobs until `budgetMs` is spent. Called by /api/cron/tick (Supabase Cron
+ * Claims and runs due jobs until `budgetMs` is spent. Called by /api/cron/tick (Cloudflare Cron
  * every 2 minutes) and right after a user action with `ids` so a click is handled immediately.
- * Each job is one unit of work, so a Vercel function never runs into its time limit mid-batch.
+ * Each job is one unit of work, so a Worker request never runs into its time limit mid-batch.
  */
 export async function runDueJobs(
   prisma: PrismaClient,

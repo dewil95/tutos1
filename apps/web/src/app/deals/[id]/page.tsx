@@ -1,6 +1,6 @@
 import type { FunderReply } from "@mca/ai";
 import type { PositionLine } from "@mca/connectors";
-import { getPrisma, type DocumentType } from "@mca/db";
+import { asList, getPrisma, type DocumentType } from "@mca/db";
 import type { BankMetrics } from "@mca/domain";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/server/auth";
@@ -256,9 +256,9 @@ export default async function DealPage({
                       </td>
                       <td className="small">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
                       <td className="addr">
-                        <div>To: {s.toAddresses.join(", ")}</div>
-                        {s.ccAddresses.length ? (
-                          <div className="muted">CC: {s.ccAddresses.join(", ")}</div>
+                        <div>To: {asList(s.toAddresses).join(", ")}</div>
+                        {asList(s.ccAddresses).length ? (
+                          <div className="muted">CC: {asList(s.ccAddresses).join(", ")}</div>
                         ) : null}
                       </td>
                       <td className="small">
@@ -387,7 +387,7 @@ export default async function DealPage({
             <h3>3. Lenders — one separate email each</h3>
             <p className="small muted">
               To = the lender&apos;s first address · CC = its other addresses + team (
-              {tenant.teamCc.join(", ") || "none"}) · never BCC
+              {asList(tenant.teamCc).join(", ") || "none"}) · never BCC
             </p>
             <SelectTopLenders />
             <ul className="lenders">

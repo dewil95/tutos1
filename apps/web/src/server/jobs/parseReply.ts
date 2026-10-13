@@ -99,7 +99,10 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
     { at: now.toISOString(), intent: data.intent, summary: data.summary, activityId },
   ] as Prisma.InputJsonArray;
 
-  await prisma.$transaction(async (tx) => {
+  // D1 has no multi-statement transactions: these writes run in order; each is idempotent
+  // enough that a retry after a crash in between ends in the same state.
+  {
+    const tx = prisma;
     await tx.activity.update({
       where: { id: activityId },
       data: { aiSummary: data as unknown as Prisma.InputJsonObject },
@@ -161,5 +164,5 @@ export async function handleParseReply(prisma: PrismaClient, job: ClaimedJob): P
         },
       },
     });
-  });
+  }
 }

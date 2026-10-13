@@ -1,5 +1,5 @@
 import { runPositionDetection, type StatementExtraction } from "@mca/ai";
-import { enqueueJob, type ClaimedJob, type Prisma, type PrismaClient } from "@mca/db";
+import { asList, enqueueJob, type ClaimedJob, type Prisma, type PrismaClient } from "@mca/db";
 import { computeBankMetrics, gradePaper, scrubStatements, type ScrubRow } from "@mca/domain";
 import { llmClient } from "../ai";
 import { PermanentJobError } from "./errors";
@@ -64,7 +64,7 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
   });
   const positions = await runPositionDetection(llmClient(prisma), {
     months: rows as unknown as StatementExtraction["months"],
-    funderDescriptors: Object.fromEntries(funders.map((f) => [f.name, f.achDescriptors])),
+    funderDescriptors: Object.fromEntries(funders.map((f) => [f.name, asList(f.achDescriptors)])),
     tenantId: deal.tenantId,
     dealId,
   });
@@ -97,7 +97,10 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
     };
   });
 
-  await prisma.$transaction(async (tx) => {
+  // D1 has no multi-statement transactions: these writes run in order; each is idempotent
+  // enough that a retry after a crash in between ends in the same state.
+  {
+    const tx = prisma;
     const analysis = await tx.bankAnalysis.create({
       data: {
         dealId,
@@ -155,7 +158,7 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
         },
       },
     });
-  });
+  }
   // Next: the internal Risk Report built on this scrub.
   await enqueueJob(prisma, {
     tenantId: deal.tenantId,

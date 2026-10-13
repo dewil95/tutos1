@@ -15,10 +15,8 @@ export async function GET() {
   const provider = currentProvider();
   const present = (name: string) => (process.env[name] ? "ok" : "missing");
   checks.aiKey = present(apiKeyEnvVar(provider));
-  checks.supabaseAuth =
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ? "ok"
-      : "missing";
+  checks.cloudflareAccess =
+    process.env.CF_ACCESS_TEAM_DOMAIN && process.env.CF_ACCESS_AUD ? "ok" : "missing";
   checks.googleOAuth =
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "ok" : "missing";
   checks.encryptionKey = present("PII_ENCRYPTION_KEY");

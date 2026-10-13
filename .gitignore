@@ -28,3 +28,8 @@ test-results/
 packages/ai/evals/data/**/*.pdf
 packages/ai/evals/data/**/*.png
 packages/ai/evals/results/
+
+# Cloudflare build output and local state
+.open-next/
+.wrangler/
+.dev.vars

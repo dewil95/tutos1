@@ -19,7 +19,10 @@ export function setupConfig(): WhatsAppSetupConfig {
     ...(s.token ? [] : ["WHATSAPP_TOKEN"]),
     ...(s.phoneNumberId ? [] : ["WHATSAPP_PHONE_NUMBER_ID"]),
   ];
-  if (missing.length) throw new Error(`Set ${missing.join(" and ")} in Vercel, then redeploy.`);
+  if (missing.length)
+    throw new Error(
+      `Set ${missing.join(" and ")} in Cloudflare (wrangler secret put), then redeploy.`,
+    );
   return {
     token: s.token,
     phoneNumberId: s.phoneNumberId,

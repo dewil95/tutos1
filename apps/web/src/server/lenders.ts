@@ -1,5 +1,5 @@
 import { buildRecipients } from "@mca/connectors";
-import type { Funder, FunderProgram, PrismaClient, Tenant } from "@mca/db";
+import { asList, type Funder, type FunderProgram, type PrismaClient, type Tenant } from "@mca/db";
 import {
   rankFunders,
   type DealProfile,
@@ -17,17 +17,17 @@ export function programRules(funders: FunderWithPrograms[]): FunderProgramRule[]
       programId: f.id,
       funderName: f.name,
       programName: p?.name ?? "Core",
-      paperGrades: p?.paperGrades ?? [],
+      paperGrades: asList(p?.paperGrades),
       minMonthlyRevenue: p?.minMonthlyRevenue ? Number(p.minMonthlyRevenue) : null,
       minTimeInBusinessMonths: p?.minTimeInBusinessMonths ?? null,
       minFico: p?.minFico ?? null,
       maxExistingPositions: p?.maxExistingPositions ?? null,
-      positionAppetite: p?.positionAppetite ?? [],
+      positionAppetite: asList(p?.positionAppetite),
       minAdvance: p?.minAdvance ? Number(p.minAdvance) : null,
       maxAdvance: p?.maxAdvance ? Number(p.maxAdvance) : null,
-      allowedStates: p?.allowedStates ?? [],
-      excludedStates: p?.excludedStates ?? [],
-      excludedNaics: p?.excludedNaics ?? [],
+      allowedStates: asList(p?.allowedStates),
+      excludedStates: asList(p?.excludedStates),
+      excludedNaics: asList(p?.excludedNaics),
       isActive: p?.isActive ?? true,
     })),
   );
@@ -91,8 +91,8 @@ export function lenderRows(opts: {
     let problem: string | null = null;
     try {
       ({ to, cc } = buildRecipients(
-        { emails: [f.submissionTo, ...f.submissionCc].filter((e): e is string => !!e) },
-        { teamCc: opts.tenant.teamCc, from: opts.tenant.fromAddress ?? undefined },
+        { emails: [f.submissionTo, ...asList(f.submissionCc)].filter((e): e is string => !!e) },
+        { teamCc: asList(opts.tenant.teamCc), from: opts.tenant.fromAddress ?? undefined },
       ));
     } catch (err) {
       problem = err instanceof Error ? err.message : String(err);

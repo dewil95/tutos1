@@ -97,7 +97,7 @@ export async function WhatsAppSection({
       {canEdit ? (
         <div className="stack" style={{ marginBottom: 16 }}>
           <p className="small muted" style={{ margin: 0 }}>
-            One-time setup, in this order, after the Vercel variables are in place:
+            One-time setup, in this order, after the Cloudflare settings are in place:
           </p>
           <div className="row">
             <form action={whatsappSetupStep.bind(null, "check")} className="inline">

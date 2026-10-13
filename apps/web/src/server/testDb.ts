@@ -1,16 +1,10 @@
-import pg from "pg";
+import { useTestDatabase } from "@mca/db/testing";
 
-/** True when DATABASE_URL points at a migrated Postgres (local cluster or the CI service). */
+/**
+ * Starts a local Cloudflare D1 (Miniflare) with every migration applied and makes it the
+ * app's database. Always available, so database tests always run (in CI too).
+ */
 export async function databaseReady(): Promise<boolean> {
-  const url = process.env.DATABASE_URL;
-  if (!url) return false;
-  const c = new pg.Client({ connectionString: url, connectionTimeoutMillis: 1500 });
-  try {
-    await c.connect();
-    return Boolean((await c.query(`select to_regclass('public."ApiKey"') as t`)).rows[0]?.t);
-  } catch {
-    return false;
-  } finally {
-    await c.end().catch(() => undefined);
-  }
+  await useTestDatabase();
+  return true;
 }

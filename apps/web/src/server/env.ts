@@ -1,4 +1,4 @@
-/** Server-only environment access with clear errors (Vercel → Project → Settings → Environment Variables). */
+/** Server-only environment access with clear errors (Cloudflare → Workers → ascend-crm → Settings → Variables). */
 
 export function requireEnv(name: string): string {
   const v = process.env[name];
@@ -28,4 +28,18 @@ export function googleOAuthConfig(req: Request) {
     clientSecret: requireEnv("GOOGLE_CLIENT_SECRET"),
     redirectUri: process.env.GOOGLE_REDIRECT_URI ?? `${appUrl(req)}/api/google/callback`,
   };
+}
+
+/**
+ * Time for jobs run right after a click or an incoming request. On Cloudflare that work runs in
+ * `ctx.waitUntil`, which may continue about 30 s after the response, so the default is 25 s;
+ * slow AI jobs (40 s+) are left for the scheduled run.
+ */
+export function inlineBudgetMs(): number {
+  return Number(process.env.INLINE_BUDGET_MS ?? 25_000);
+}
+
+/** Time for one scheduled run (Cloudflare Cron Trigger every 2 minutes). */
+export function tickBudgetMs(): number {
+  return Number(process.env.TICK_BUDGET_MS ?? 45_000);
 }
