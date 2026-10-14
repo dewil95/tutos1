@@ -79,7 +79,10 @@ export function AscendApplicationPanel({
                 </div>
               ) : null}
               {reading?.state === "failed" ? (
-                <div className="small error">Reading failed: {reading.error?.slice(0, 160)}</div>
+                <div className="small error">
+                  Reading failed: {reading.error?.slice(0, 160)}. Type the details below, or read it
+                  again.
+                </div>
               ) : null}
               {reading?.state !== "reading" ? (
                 <form action={rereadApplication.bind(null, dealId)} className="inline">

@@ -103,6 +103,14 @@ export class AiOutputError extends Error {
   }
 }
 
+/** The AI is not usable (key missing or rejected); retrying will not help until it is fixed. */
+export class AiUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiUnavailableError";
+  }
+}
+
 export function textBlock(text: string): ContentPart {
   return { type: "text", text };
 }

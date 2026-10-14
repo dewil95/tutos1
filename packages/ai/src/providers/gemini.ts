@@ -12,6 +12,7 @@ import { z } from "zod";
 import {
   AiOutputError,
   AiRefusalError,
+  AiUnavailableError,
   ZERO_USAGE,
   hashInput,
   stripSchemaKeys,
@@ -81,6 +82,13 @@ export function isRetryableGeminiError(err: unknown): boolean {
   return err instanceof TypeError && /fetch failed|network|socket/i.test(err.message);
 }
 
+/** A missing, invalid or blocked key: no retry fixes it, so jobs stop at once. */
+export function isGeminiKeyError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  if (err.status === 401 || err.status === 403) return true;
+  return err.status === 400 && /api[ _]?key/i.test(err.message);
+}
+
 export function describeGeminiError(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 429) return `rate_limited: ${err.message}`;
@@ -117,7 +125,7 @@ export class GeminiClient implements LlmClient {
   /** Created lazily so importing the package never requires an API key. */
   private get ai(): GeminiSdk {
     if (!this.sdk) {
-      if (!this.apiKey) throw new Error("GEMINI_API_KEY is not set");
+      if (!this.apiKey) throw new AiUnavailableError("GEMINI_API_KEY is not set");
       this.sdk = new GoogleGenAI({ apiKey: this.apiKey });
     }
     return this.sdk;
@@ -176,6 +184,7 @@ export class GeminiClient implements LlmClient {
         output: null,
         error: describeGeminiError(err),
       });
+      if (isGeminiKeyError(err)) throw new AiUnavailableError(describeGeminiError(err));
       throw err;
     }
 
