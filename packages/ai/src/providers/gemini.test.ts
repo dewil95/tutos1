@@ -1,7 +1,7 @@
 import { ApiError, FileState, ThinkingLevel, type GenerateContentResponse } from "@google/genai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiOutputError, AiRefusalError, type AiRunRecord } from "../llm";
+import { AiOutputError, AiRefusalError, AiUnavailableError, type AiRunRecord } from "../llm";
 import { estimateCostUsd } from "../models";
 import { FunderReplySchema } from "../schemas/funderReply";
 import {
@@ -230,12 +230,23 @@ describe("GeminiClient.structured", () => {
     expect(records[0]!.error).toBe("bad_request: bad schema");
   });
 
+  it("turns a rejected key into AiUnavailableError, without retrying", async () => {
+    const generate = vi
+      .fn()
+      .mockRejectedValue(new ApiError({ message: "API key not valid", status: 400 }));
+    const client = new GeminiClient({ ai: sdkWith(generate), sleep: async () => undefined });
+    await expect(client.structured(call)).rejects.toBeInstanceOf(AiUnavailableError);
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
   it("fails clearly when no API key is configured", async () => {
     const saved = { g: process.env.GEMINI_API_KEY, o: process.env.GOOGLE_API_KEY };
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     try {
-      await expect(new GeminiClient().structured(call)).rejects.toThrow(/GEMINI_API_KEY/);
+      const run = new GeminiClient().structured(call);
+      await expect(run).rejects.toThrow(/GEMINI_API_KEY/);
+      await expect(run).rejects.toBeInstanceOf(AiUnavailableError);
     } finally {
       if (saved.g) process.env.GEMINI_API_KEY = saved.g;
       if (saved.o) process.env.GOOGLE_API_KEY = saved.o;

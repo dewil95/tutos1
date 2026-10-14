@@ -6,6 +6,7 @@ import {
   type JobType,
   type PrismaClient,
 } from "@mca/db";
+import { AiUnavailableError } from "@mca/ai";
 import { PermanentJobError } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
 import { handleEmailRules } from "./emailRules";
@@ -14,7 +15,7 @@ import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
 import { handleSendSubmission } from "./sendSubmission";
 import { handleRiskReport } from "./riskReport";
-import { handleStatementExtract } from "./statementExtract";
+import { handleStatementExtract, queueScrubWhenReady, STATEMENT_TYPES } from "./statementExtract";
 import { handleStatementScrub } from "./statementScrub";
 import { handleWhatsAppMessage, handleWhatsAppNudges } from "../whatsapp/chat";
 import { handleWhatsAppAppRead } from "../whatsapp/read";
@@ -100,7 +101,8 @@ async function runOne(prisma: PrismaClient, job: ClaimedJob, result: RunResult):
     result.done.push(job.id);
   } catch (err) {
     const error = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    const permanent = err instanceof PermanentJobError;
+    // A missing or rejected AI key fails at once: retrying for minutes cannot fix it.
+    const permanent = err instanceof PermanentJobError || err instanceof AiUnavailableError;
     const outcome = await failJob(
       prisma,
       permanent ? { ...job, attempts: job.maxAttempts } : job,
@@ -108,5 +110,23 @@ async function runOne(prisma: PrismaClient, job: ClaimedJob, result: RunResult):
     );
     (outcome === "failed" ? result.failed : result.retried).push({ id: job.id, error });
     console.error(`[job ${job.type} ${job.id}] attempt ${job.attempts}: ${error}`);
+    if (outcome === "failed" && job.type === "STATEMENT_EXTRACT") {
+      await scrubWithoutFailedStatement(prisma, job).catch((e: unknown) =>
+        console.error(`[job ${job.id}] queueing the scrub: ${String(e)}`),
+      );
+    }
   }
+}
+
+/** One unreadable statement must not hold back the scrub of the others on the deal. */
+async function scrubWithoutFailedStatement(prisma: PrismaClient, job: ClaimedJob): Promise<void> {
+  const { documentId } = job.payload as { documentId?: string };
+  const doc = documentId
+    ? await prisma.document.findUnique({ where: { id: documentId }, select: { dealId: true } })
+    : null;
+  if (!doc?.dealId) return;
+  const extracted = await prisma.document.count({
+    where: { dealId: doc.dealId, type: { in: [...STATEMENT_TYPES] }, extractedAt: { not: null } },
+  });
+  if (extracted > 0) await queueScrubWhenReady(prisma, job.tenantId, doc.dealId, documentId);
 }

@@ -21,7 +21,8 @@ export async function GET() {
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "ok" : "missing";
   checks.encryptionKey = present("PII_ENCRYPTION_KEY");
   checks.cronSecret = present("CRON_SECRET");
-  const healthy = Object.values(checks).every((v) => v === "ok");
+  // The AI is optional too: without it deals are filled in by hand and everything else works.
+  const healthy = Object.entries(checks).every(([k, v]) => k === "aiKey" || v === "ok");
   // WhatsApp is optional: reported for setup, never makes the CRM "degraded".
   const whatsapp = Object.fromEntries(
     [

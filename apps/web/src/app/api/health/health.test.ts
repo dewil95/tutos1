@@ -32,4 +32,27 @@ describe("/api/health", () => {
       process.env = keep;
     }
   });
+
+  it("stays healthy without an AI key and reports it as missing", async () => {
+    const keep = { ...process.env };
+    Object.assign(process.env, {
+      CF_ACCESS_TEAM_DOMAIN: "x",
+      CF_ACCESS_AUD: "x",
+      GOOGLE_CLIENT_ID: "x",
+      GOOGLE_CLIENT_SECRET: "x",
+      PII_ENCRYPTION_KEY: "x",
+      CRON_SECRET: "x",
+    });
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.MCA_AI_PROVIDER;
+    try {
+      const res = await GET();
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.checks.aiKey).toBe("missing");
+    } finally {
+      process.env = keep;
+    }
+  });
 });

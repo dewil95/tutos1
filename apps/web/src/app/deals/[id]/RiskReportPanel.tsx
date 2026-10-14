@@ -15,11 +15,14 @@ export function RiskReportPanel({
   report,
   pdfLink,
   hasScrub,
+  error = null,
 }: {
   dealId: string;
   report: unknown;
   pdfLink: string | null;
   hasScrub: boolean;
+  /** The last generation failed (e.g. the AI is unavailable). */
+  error?: string | null;
 }) {
   const r = report as StoredRiskReport | null;
   return (
@@ -27,11 +30,19 @@ export function RiskReportPanel({
       <h2>
         AI Risk Report <span className="tag">internal</span>
       </h2>
+      {error ? (
+        <p className="small error">
+          The AI could not write the report ({error.slice(0, 160)}). The deal works without it;
+          regenerate below to try again.
+        </p>
+      ) : null}
       {!r ? (
         <p className="empty">
-          {hasScrub
-            ? "Generating after the bank scrub… refresh in a minute, or regenerate below."
-            : "Created automatically after the bank scrub."}
+          {error
+            ? "No report yet."
+            : hasScrub
+              ? "Generating after the bank scrub… refresh in a minute, or regenerate below."
+              : "Created automatically after the bank scrub."}
         </p>
       ) : (
         <>
