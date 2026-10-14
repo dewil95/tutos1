@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GmailProvider, parseAddressList, parseGmailMessage } from "../email/gmail";
+import { GmailProvider, bestText, parseAddressList, parseGmailMessage } from "../email/gmail";
 import { DriveProvider, dealFolderPath, driveQuoted } from "../storage/drive";
 import { GOOGLE_HISTORY_SCOPES, GoogleApiError, GoogleAuth, googleConsentUrl } from "./auth";
 
@@ -179,6 +179,22 @@ describe("GmailProvider", () => {
     expect(m.text).toBe("Funding $15,000\nRate 1.50");
     expect(m.cc).toEqual(["isabel@instagreencapital.com", "jonas@ascendfund.co"]);
     expect(parseAddressList(null)).toEqual([]);
+  });
+
+  it("reads the HTML when the plain text only points to it (portal offers)", () => {
+    const html =
+      "<h2>PreApproved Offers</h2><p>Maximum advance $75,000</p><p>Buy rate 1.380</p><p>Daily $792.86</p>";
+    expect(
+      bestText(
+        "Review, accept, or request a change using the secure link in the HTML version.",
+        html,
+      ),
+    ).toContain("Buy rate 1.380");
+    // A real plain-text body wins.
+    const plain =
+      "APPROVAL ADVANCE $15,000 RATE 1.50 PAYBACK $22,500 DAILY $375 # OF PAYMENTS 60. ".repeat(6);
+    expect(bestText(plain, "<p>short</p>")).toBe(plain);
+    expect(bestText("", html)).toContain("Maximum advance");
   });
 });
 

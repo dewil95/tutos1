@@ -44,6 +44,37 @@ const list = (v: string | undefined, sep = /[;,]/) =>
 const num = (v: string | undefined) => (v && !Number.isNaN(Number(v)) ? Number(v) : null);
 const emails = (v: string | undefined) => list(v, /[;,\s]+/).map((e) => e.toLowerCase());
 
+/** Free mailbox providers: a lender on one of these is matched by its exact address. */
+export const FREE_MAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "aol.com",
+  "icloud.com",
+  "me.com",
+  "msn.com",
+]);
+
+/**
+ * What identifies a lender's mail: its company domains, or the full address for a lender
+ * that uses a free mailbox (never "gmail.com" itself). Entries without "@" are domains.
+ */
+export function senderKeys(entries: (string | null | undefined)[]): string[] {
+  const keys = entries
+    .filter((e): e is string => Boolean(e))
+    .map((e) => e.toLowerCase())
+    .map((e) => {
+      if (!e.includes("@")) return e;
+      const domain = e.split("@")[1]!;
+      return FREE_MAIL_DOMAINS.has(domain) ? e : domain;
+    })
+    .filter((k) => k.includes("@") || !FREE_MAIL_DOMAINS.has(k));
+  return [...new Set(keys)];
+}
+
 export interface FunderSeed {
   name: string;
   submissionTo: string | null;
@@ -86,7 +117,7 @@ export function funderSeedsFromCsv(text: string): FunderSeed[] {
     if (!name) continue;
     const to = emails(r.submission_email)[0] ?? null;
     const cc = emails(r.cc_emails).filter((e) => e !== to);
-    const domains = [...new Set([to, ...cc].filter(Boolean).map((e) => e!.split("@")[1]!))];
+    const domains = senderKeys([to, ...cc, ...emails(r.reply_addresses)]);
     // A row that routes through another funder's inbox (e.g. Fundzilla via Mazal) must not be
     // offered as a separate send target, or the same inbox would get the deal twice.
     const routedVia = /\(via ([^)]+)\)/i.exec(name)?.[1] ?? null;

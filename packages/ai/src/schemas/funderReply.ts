@@ -24,7 +24,13 @@ export const FunderReplyIntentSchema = z.enum([
 export const OfferOptionSchema = z
   .object({
     advanceAmount: z.number().min(0).describe("Funded / purchase price amount"),
-    factorRate: z.number().min(1).describe("Sell rate shown for this row, e.g. 1.49"),
+    factorRate: z
+      .number()
+      .min(1)
+      .nullable()
+      .describe(
+        "Sell rate shown for this row, e.g. 1.49; null when only amount and term are given",
+      ),
     paybackAmount: z.number().min(0).nullable(),
     paymentAmount: z.number().min(0).nullable(),
     paymentFrequency: z.enum(["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"]).nullable(),
@@ -97,6 +103,11 @@ export const FunderReplySchema = z
       .string()
       .nullable()
       .describe("e.g. Fundzilla when Mazal passes the file on"),
+    offerInImage: z
+      .boolean()
+      .describe(
+        "The lender says the offer is in an attached or embedded image (or only in a portal) and the numbers are not in the text",
+      ),
     summary: z.string().max(300).describe("One sentence for the deal timeline"),
     confidence: z.number().min(0).max(1),
   })

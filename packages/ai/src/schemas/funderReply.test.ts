@@ -50,6 +50,7 @@ describe("FunderReplySchema", () => {
         requiresConfirmationReply: false,
       },
       forwardedToAlternateFunder: null,
+      offerInImage: false,
       summary: "Approved $10,000 over 40 daily payments, buy rate 1.38.",
       confidence: 0.95,
     };

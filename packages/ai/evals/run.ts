@@ -133,6 +133,7 @@ interface A8Case {
     stipCount?: number;
     linkCount?: number;
     forwardedToAlternateFunder?: string;
+    offerInImage?: boolean;
     funded?: Partial<FunderReply["funded"]>;
   };
 }
@@ -184,6 +185,8 @@ function checkA8(got: FunderReply, exp: A8Case["expected"]): string[] {
       }
   }
   if (exp.stipCount !== undefined && got.stips.length !== exp.stipCount) miss.push("stipCount");
+  if (exp.offerInImage !== undefined && got.offerInImage !== exp.offerInImage)
+    miss.push("offerInImage");
   if (exp.linkCount !== undefined && got.links.length !== exp.linkCount) miss.push("linkCount");
   if (
     exp.forwardedToAlternateFunder !== undefined &&

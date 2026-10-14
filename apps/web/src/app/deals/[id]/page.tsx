@@ -319,6 +319,17 @@ export default async function DealPage({
                         {reply ? (
                           <>
                             <div>{reply.r.summary}</div>
+                            {reply.r.offerInImage ? (
+                              <div className="warn">
+                                The offer is in an image or a portal link: open the email to read
+                                it.
+                              </div>
+                            ) : null}
+                            {reply.r.forwardedToAlternateFunder ? (
+                              <div className="muted">
+                                Forwarded to {reply.r.forwardedToAlternateFunder} for pricing.
+                              </div>
+                            ) : null}
                             {reply.r.offers.length ? (
                               <table className="offers">
                                 <tbody>

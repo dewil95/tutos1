@@ -6,7 +6,10 @@
       "subject": "Re: New Deal Submission - Riverside Plumbing LLC",
       "body": "[image: Funder A]\n\n SUBMISSION RECEIVED\n\nFILE IN REVIEW\n\nThank you for your continued partnership. We look forward to your upcoming submissions."
     },
-    "expected": { "intent": "ACKNOWLEDGED", "isAutomated": true }
+    "expected": {
+      "intent": "ACKNOWLEDGED",
+      "isAutomated": true
+    }
   },
   {
     "id": "zlur-auto-decline-no-reason",
@@ -15,7 +18,11 @@
       "subject": "Re: New Deal Submission - Riverside Plumbing LLC",
       "body": "*Unfortunately your submission has been declined.*\n\nIf you believe this submission has been declined in error, please resend your submission containing all required attachments previously sent, plus any new supporting documents."
     },
-    "expected": { "intent": "DECLINED", "isAutomated": true, "declineCategory": "NO_REASON_GIVEN" }
+    "expected": {
+      "intent": "DECLINED",
+      "isAutomated": true,
+      "declineCategory": "NO_REASON_GIVEN"
+    }
   },
   {
     "id": "portal-reject-state",
@@ -24,7 +31,11 @@
       "subject": "New Deal Submission - Lone Star Grill LLC",
       "body": " Application Rejection Notice\n\nDear Applicant,\n\nAfter careful consideration of your application, we regret to inform you that we are unable to proceed with your request for the following reasons:\n\nRejection Details:\n\n*Lead Name:* New Deal Submission - Lone Star Grill LLC\n\n*Reason:*\nBlack list, State - texas"
     },
-    "expected": { "intent": "DECLINED", "isAutomated": true, "declineCategory": "STATE" }
+    "expected": {
+      "intent": "DECLINED",
+      "isAutomated": true,
+      "declineCategory": "STATE"
+    }
   },
   {
     "id": "decline-bad-balances",
@@ -33,7 +44,10 @@
       "subject": "Re: New Deal Submission - Harbor Events LLC",
       "body": "[image: Funder A]\nThe deal below was DECLINED\n\n*REASON *\n\nPass - bad balances in August\n\nThank you for your continued partnership."
     },
-    "expected": { "intent": "DECLINED", "declineCategory": "BAD_BALANCES" }
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "BAD_BALANCES"
+    }
   },
   {
     "id": "decline-min-true-revenue",
@@ -42,7 +56,10 @@
       "subject": "Re: New Deal Submission - Glow Cosmetic Center",
       "body": "Decline: Does not meet our minimum true revenue requirement of $30k each month\n\n*All Offers are Subject to Final Review*"
     },
-    "expected": { "intent": "DECLINED", "declineCategory": "LOW_REVENUE" }
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "LOW_REVENUE"
+    }
   },
   {
     "id": "decline-multiple-advances",
@@ -51,7 +68,10 @@
       "subject": "Re: New Deal Submission - Smokehouse Kitchen LLC and Smokehouse LLC",
       "body": "We see multiple advances in both businesses ,\nWe will pass on this one.\n\n________________________________\nFrom: Broker <funding@broker.test>\nSent: Wednesday\nSubject: Re: New Deal Submission\n\nCould you please confirm the business that got this approval team?"
     },
-    "expected": { "intent": "DECLINED", "declineCategory": "TOO_MANY_POSITIONS" }
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "TOO_MANY_POSITIONS"
+    }
   },
   {
     "id": "decline-post-signing-mtd",
@@ -73,7 +93,10 @@
       "subject": "Re: New Deal Submission - Harbor Events LLC",
       "body": "Thank you for submitting this opportunity to Funder A.\n\nAt this time, the file does not meet our underwriting criteria. Rather than decline it, we have forwarded it to AltFund for alternative pricing.\n\nWe'll be in touch as soon as we receive an update."
     },
-    "expected": { "intent": "IN_REVIEW", "forwardedToAlternateFunder": "AltFund" }
+    "expected": {
+      "intent": "IN_REVIEW",
+      "forwardedToAlternateFunder": "AltFund"
+    }
   },
   {
     "id": "approval-grid",
@@ -195,7 +218,11 @@
       "subject": "Re: New Deal Submission - Citywide Events Inc",
       "body": "Where is payments to expansion?\n\n[signature.png]\n\nFrom: Broker <funding@broker.test>\nDate: Thursday\nSubject: New Deal Submission - Citywide Events Inc\n\nHello, Please see the attached deal for submission."
     },
-    "expected": { "intent": "STIP_REQUEST", "isAutomated": false, "stipCount": 1 }
+    "expected": {
+      "intent": "STIP_REQUEST",
+      "isAutomated": false,
+      "stipCount": 1
+    }
   },
   {
     "id": "stip-portal-missing-items",
@@ -204,7 +231,12 @@
       "subject": "Missing items for Polanko Construction Corp - Bank Statement Check - Docs",
       "body": "The *Bank Statement Check - Docs* step for *Polanko Construction Corp* is on hold until we receive the items below.\n\nDocuments needed\n\n   - 1 more Bank Statement (4 months required for NY) (required 4, received 3)\n\nEnter the missing items\n<https://portal.example.test/stip/abc123>\n\nThis link expires on October 13, 2026."
     },
-    "expected": { "intent": "STIP_REQUEST", "isAutomated": true, "stipCount": 1, "linkCount": 1 }
+    "expected": {
+      "intent": "STIP_REQUEST",
+      "isAutomated": true,
+      "stipCount": 1,
+      "linkCount": 1
+    }
   },
   {
     "id": "contract-request-needs-phone",
@@ -213,7 +245,10 @@
       "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
       "body": "Please provide the best contact phone number for the merchant.\nTo avoid delays in docs going out, please always provide the phone number in the original contract request."
     },
-    "expected": { "intent": "STIP_REQUEST", "stipCount": 1 }
+    "expected": {
+      "intent": "STIP_REQUEST",
+      "stipCount": 1
+    }
   },
   {
     "id": "contract-sent-with-dl",
@@ -222,7 +257,10 @@
       "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
       "body": "*Contract Has Been Sent!*\nDecision Logic Link:\nhttps://app.decisionlogic.com/ABC123"
     },
-    "expected": { "intent": "CONTRACT_SENT", "linkCount": 1 }
+    "expected": {
+      "intent": "CONTRACT_SENT",
+      "linkCount": 1
+    }
   },
   {
     "id": "contract-signed",
@@ -231,7 +269,10 @@
       "subject": "CONTRACT SIGNED: GREEN LAWN LANDSCAPING LLC",
       "body": "The contract for *GREEN LAWN LANDSCAPING LLC* has been signed.\n\nPlease have merchant complete the Decision Logic link:\n\nhttps://app.decisionlogic.com/ABC123"
     },
-    "expected": { "intent": "CONTRACT_SIGNED", "linkCount": 1 }
+    "expected": {
+      "intent": "CONTRACT_SIGNED",
+      "linkCount": 1
+    }
   },
   {
     "id": "funding-call",
@@ -240,7 +281,9 @@
       "subject": "Re: New Deal Submission - Green Lawn Landscaping LLC",
       "body": "Hey team gtf will call for FC soon"
     },
-    "expected": { "intent": "FUNDING_CALL" }
+    "expected": {
+      "intent": "FUNDING_CALL"
+    }
   },
   {
     "id": "funded-with-clawback",
@@ -266,7 +309,10 @@
       "subject": "RE: New Deal Submission - Luxe Nails & Spa",
       "body": "Just following up on the offer.\n\nIf there's any room to improve the offer on our side to help you close the deal, we're happy to take another look.\n\nLet me know where things stand.\n\nBest,\nDmitrii"
     },
-    "expected": { "intent": "FOLLOW_UP", "isAutomated": false }
+    "expected": {
+      "intent": "FOLLOW_UP",
+      "isAutomated": false
+    }
   },
   {
     "id": "follow-up-competition",
@@ -275,7 +321,9 @@
       "subject": "Re: New Deal Submission - Big Valley Sanitation",
       "body": "Deal is in competition, first to sign docs wins!\n\nOn Wed, Sep 30, 2026 at 7:38 AM Funder A <subs@examplefunder-a.com> wrote:\n> Funding approval\n> Approval amount $12,000.00"
     },
-    "expected": { "intent": "FOLLOW_UP" }
+    "expected": {
+      "intent": "FOLLOW_UP"
+    }
   },
   {
     "id": "marketing-blast",
@@ -284,6 +332,201 @@
       "subject": "FUNDER G IS OPEN AND FUNDING",
       "body": "FUNDER G IS BACK TO FUNDING!\n\nPROGRAM GUIDELINES AT A GLANCE:\n• Positions: 2nd – 10th\n• Funding Amount: $10K – $2M\n• Min Monthly Revenue: $45,000\n• Commission: Up to 12 pts\n• Max NSFs: 5/month"
     },
-    "expected": { "intent": "MARKETING", "offerCount": 0 }
+    "expected": {
+      "intent": "MARKETING",
+      "offerCount": 0
+    }
+  },
+  {
+    "id": "zlur-commission-ladder",
+    "input": {
+      "from": "submissions@examplefunder-z.com",
+      "subject": "Re: New Deal Submission - Harbor Tacos LLC",
+      "body": "ZLUR SILVER: ***14% COMMISSION!!!***\n\nOFFER: $6,000\nFEES: $660\nNET FUNDING: $5,340\nDAILY PAYMENTS: 60\n\nFactor/Daily/Commission:\n1.69 - $169.00 per day. 14%\n1.65 - $165.00 per day. 13%\n1.60 - $160.00 per day. 11%\n1.499 - $149.90 per day. 9%\n\nRequest contracts by replying to this email with DL, VC or Screenshot, best email and phone number for the merchant."
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 4,
+      "firstOffer": {
+        "advanceAmount": 6000,
+        "factorRate": 1.69,
+        "paymentAmount": 169,
+        "numberOfPayments": 60,
+        "commissionPoints": 14,
+        "netFundingAmount": 5340
+      }
+    }
+  },
+  {
+    "id": "ack-new-thread",
+    "input": {
+      "from": "submissions@examplefunder-z.com",
+      "subject": "New Deal Submission - Harbor Tacos LLC",
+      "body": "Thank you for submitting your deal. We have received your submission and our underwriting team is reviewing it. You will receive a decision shortly."
+    },
+    "expected": {
+      "intent": "ACKNOWLEDGED",
+      "isAutomated": true
+    }
+  },
+  {
+    "id": "capnova-card-with-boilerplate",
+    "input": {
+      "from": "submit@examplefunder-c.com",
+      "subject": "Re: New Deal Submission - Pine Street Movers LLC",
+      "body": "✕ DECLINED\nMerchant: Pine Street Movers LLC\nREASON FOR DECLINE\nDECLINING REVENUE\n\nCOMMON DECLINE REASONS\n- Low revenue\n- Too many positions\n- Excessive NSFs\n- Restricted industry\n- Recent default"
+    },
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "DECLINING_DEPOSITS",
+      "declineReasonCount": 1
+    }
+  },
+  {
+    "id": "capnova-card-approved",
+    "input": {
+      "from": "submit@examplefunder-c.com",
+      "subject": "Re: New Deal Submission - Pine Street Movers LLC",
+      "body": "✓ APPROVED\nMerchant: Pine Street Movers LLC\nApproval Amount: $5,000\nPosition: N/A\nTerm: 45 DAYS\nPayment: $166.67 DAILY\nCommission: 12 Points\nUNDERWRITER NOTES / CONDITIONS\n1.49"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 5000,
+        "termDays": 45,
+        "paymentAmount": 166.67,
+        "commissionPoints": 12,
+        "factorRate": 1.49
+      }
+    }
+  },
+  {
+    "id": "shorthand-amount-days",
+    "input": {
+      "from": "deals@examplefunder-m.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "10k/65d"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 10000,
+        "termDays": 65,
+        "factorRate": null
+      }
+    }
+  },
+  {
+    "id": "shorthand-weekly-factor",
+    "input": {
+      "from": "uw@examplefunder-h.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "25k 1.499 19 weeks"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 25000,
+        "factorRate": 1.499,
+        "numberOfPayments": 19,
+        "paymentFrequency": "WEEKLY"
+      }
+    }
+  },
+  {
+    "id": "status-in-subject-decline",
+    "input": {
+      "from": "uw@examplefunder-t.com",
+      "subject": "Decline: New Deal Submission - Bluefin Auto Repair",
+      "body": "Deal Status: Declined\nDetermination: Poor Daily Ending Balances\n\nThank you for the submission."
+    },
+    "expected": {
+      "intent": "DECLINED",
+      "declineCategory": "BAD_BALANCES"
+    }
+  },
+  {
+    "id": "status-in-subject-on-hold",
+    "input": {
+      "from": "uw@examplefunder-t.com",
+      "subject": "On Hold: New Deal Submission - Bluefin Auto Repair",
+      "body": "Deal Status: On Hold\nDetermination: Need statements for the transfer account x0000"
+    },
+    "expected": {
+      "intent": "STIP_REQUEST",
+      "stipCount": 1
+    }
+  },
+  {
+    "id": "portal-preapproval-html",
+    "input": {
+      "from": "preapprovals@examplefunder-l.com",
+      "subject": "Bluefin Auto Repair - PreApproved Offers",
+      "body": "PreApproved Offers\nBluefin Auto Repair\nMaximum advance $75,000\n140-day term\nTotal payback $111,000\nDaily $792.86\nBuy rate 1.380\nUpsell 0.100\nOrigination fee $2,250\nReview & accept"
+    },
+    "expected": {
+      "intent": "APPROVED",
+      "isAutomated": true,
+      "offerCount": 1,
+      "firstOffer": {
+        "advanceAmount": 75000,
+        "termDays": 140,
+        "paybackAmount": 111000,
+        "paymentAmount": 792.86
+      }
+    }
+  },
+  {
+    "id": "offer-in-image",
+    "input": {
+      "from": "uw@examplefunder-p.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "Please see the revised offer attached. The offer was revised because one additional position was not initially taken into account.\n\n[image: OFFER.png]"
+    },
+    "expected": {
+      "intent": "OFFER_REVISED",
+      "offerCount": 0,
+      "offerInImage": true
+    }
+  },
+  {
+    "id": "retracted-offer",
+    "input": {
+      "from": "submissions@examplefunder-d.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "sorry wrong thread, ignore previous offer"
+    },
+    "expected": {
+      "intent": "OTHER",
+      "offerCount": 0
+    }
+  },
+  {
+    "id": "multi-lender-thread-quoted",
+    "input": {
+      "from": "deals@examplefunder-g.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "pass - rev, balances\n\nOn Tue, Oct 6, 2026 at 9:12 AM <misfits@examplefunder-x.com> wrote:\n> 12K 50 Days\n> 1.699 12% fee 18 pts\n> 1.499 10% fee 13 pts\n\nEl mar, 6 de oct de 2026 a las 2:01, <funding@broker.example> escribió:\n> Please see the attached deal for submission."
+    },
+    "expected": {
+      "intent": "DECLINED",
+      "offerCount": 0,
+      "declineCategory": "LOW_REVENUE"
+    }
+  },
+  {
+    "id": "forwarded-fundzilla-style",
+    "input": {
+      "from": "subs@examplefunder-a.com",
+      "subject": "RE: New Deal Submission - Bluefin Auto Repair",
+      "body": "Rather than decline it, we have forwarded it to AltFund for alternative pricing."
+    },
+    "expected": {
+      "intent": "IN_REVIEW",
+      "forwardedToAlternateFunder": "AltFund"
+    }
   }
 ]

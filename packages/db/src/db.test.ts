@@ -53,6 +53,16 @@ describe("funder CSV", () => {
     const cashable = seeds.find((s) => s.name === "Cashable Funding")!;
     expect(cashable.program.minMonthlyRevenue).toBe(30000);
     for (const s of seeds.filter((x) => x.isActive)) expect(s.submissionTo).toMatch(/@/);
+    // A lender on a free mailbox is matched by its exact address, never by gmail.com.
+    expect(seeds.find((s) => s.name === "Fund Me Fast")!.emailDomains).toEqual([
+      "fundmefastllc@gmail.com",
+    ]);
+    // Addresses a lender only replies from (portals) are recognised too.
+    expect(seeds.find((s) => s.name.startsWith("Lendini"))!.emailDomains).toContain(
+      "fundingmetrics.com",
+    );
+    expect(seeds.find((s) => s.name === "Zlur")!.emailDomains).toEqual(["zlur.com", "zlur.net"]);
+    expect(seeds.filter((s) => s.isActive).length).toBeGreaterThanOrEqual(22);
   });
 });
 
