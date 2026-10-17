@@ -19,7 +19,7 @@ describe("templates", () => {
   });
 });
 
-describe.runIf(await databaseReady())("email automation (D1, dry run)", () => {
+describe.runIf(await databaseReady())("email automation (SQLite, dry run)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let merchantId: string;

@@ -127,7 +127,7 @@ function fakes() {
   return { files, sent, media, drive, sender };
 }
 
-describe.runIf(await databaseReady())("WhatsApp application (D1)", () => {
+describe.runIf(await databaseReady())("WhatsApp application (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let f: ReturnType<typeof fakes>;
@@ -370,7 +370,11 @@ describe.runIf(await databaseReady())("WhatsApp application (D1)", () => {
     expect(sig.agreeMessageId).toMatch(/^wamid\./);
     await expect(
       prisma.applicationSignature.update({ where: { id: sig.id }, data: { signerName: "x" } }),
-    ).rejects.toThrow(/append-only/);
+    ).rejects.toThrow();
+    // Append-only: the trigger blocked the change.
+    expect(
+      (await prisma.applicationSignature.findUniqueOrThrow({ where: { id: sig.id } })).signerName,
+    ).toBe(sig.signerName);
     expect(f.drive.rename).toHaveBeenCalledWith(
       "folder-1",
       expect.stringContaining("Sample Bistro"),

@@ -2,7 +2,7 @@
   "name": "mca-crm",
   "private": true,
   "version": "0.1.0",
-  "description": "AI-native CRM for Merchant Cash Advance brokers (Next.js on Cloudflare Workers + D1, Google Workspace, Gemini API)",
+  "description": "AI-native CRM for Merchant Cash Advance brokers (Next.js + SQLite on an Oracle Cloud server, Google Workspace, Gemini API)",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=22"
@@ -16,11 +16,8 @@
     "db:generate": "pnpm --filter @mca/db generate",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yml,yaml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yml,yaml,css}\"",
-    "db:migrate:local": "pnpm --filter @mca/web db:migrate:local",
-    "db:migrate:remote": "pnpm --filter @mca/web db:migrate:remote",
     "db:schema-sql": "pnpm --silent --filter @mca/db schema:sql",
-    "cf:build": "pnpm --filter @mca/web cf:build",
-    "cf:deploy": "pnpm --filter @mca/web cf:deploy"
+    "db:migrate": "pnpm --filter @mca/db migrate"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

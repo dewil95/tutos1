@@ -30,7 +30,7 @@ vi.mock("./ai", () => ({ llmClient: () => ({ provider: "gemini", structured: vi.
 const { handleRiskReport } = await import("./jobs/riskReport");
 const { queueSubmissions } = await import("./submissions");
 
-describe.runIf(await databaseReady())("AI Risk Report (D1)", () => {
+describe.runIf(await databaseReady())("AI Risk Report (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let dealId: string;

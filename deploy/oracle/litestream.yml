@@ -1,0 +1,14 @@
+# Continuous backup of the CRM database to Oracle Object Storage (S3-compatible API).
+# The values come from /etc/ascend-crm/env (see env.example, "Backups").
+dbs:
+  - path: /var/lib/ascend-crm/crm.db
+    replicas:
+      - type: s3
+        bucket: ${BACKUP_BUCKET}
+        path: crm
+        endpoint: ${BACKUP_ENDPOINT}
+        region: ${BACKUP_REGION}
+        force-path-style: true
+        access-key-id: ${BACKUP_ACCESS_KEY_ID}
+        secret-access-key: ${BACKUP_SECRET_ACCESS_KEY}
+        retention: 720h

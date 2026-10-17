@@ -1,0 +1,12 @@
+[Unit]
+Description=Ascend CRM background jobs (inbox check, lender emails, AI reading)
+After=ascend-crm.service
+Requires=ascend-crm.service
+
+[Service]
+Type=oneshot
+User=ascend
+EnvironmentFile=/etc/ascend-crm/env
+# The secret goes to curl through stdin, never on a command line ("$$" keeps systemd from
+# expanding it; bash reads it from the environment).
+ExecStart=/bin/bash -c 'printf "Authorization: Bearer %%s\\n" "$$CRON_SECRET" | curl -fsS -m 170 -o /dev/null -X POST -H @- http://127.0.0.1:3000/api/cron/tick'

@@ -21,7 +21,7 @@ export function setupConfig(): WhatsAppSetupConfig {
   ];
   if (missing.length)
     throw new Error(
-      `Set ${missing.join(" and ")} in Cloudflare (wrangler secret put), then redeploy.`,
+      `Set ${missing.join(" and ")} in the server settings file (/etc/ascend-crm/env), then restart the CRM.`,
     );
   return {
     token: s.token,

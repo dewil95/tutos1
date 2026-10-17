@@ -74,7 +74,7 @@ describe("retryDelayMs", () => {
   });
 });
 
-// Integration tests run on a local Cloudflare D1 (Miniflare, the production engine).
+// Integration tests run on a temporary SQLite file (the same engine as the server).
 await useTestDatabase();
 
 describe("migrations", () => {
@@ -123,7 +123,7 @@ describe("seed", () => {
   }, 60_000);
 });
 
-describe("job queue (D1)", () => {
+describe("job queue (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
 
@@ -221,10 +221,14 @@ describe("job queue (D1)", () => {
     const ev = await prisma.dealEvent.create({
       data: { dealId: deal.id, type: "note", actorType: "user" },
     });
+    // The trigger aborts the write (the SQLite driver reports it as a constraint error).
     await expect(
       prisma.dealEvent.update({ where: { id: ev.id }, data: { type: "edited" } }),
-    ).rejects.toThrow(/append-only/);
-    await expect(prisma.dealEvent.delete({ where: { id: ev.id } })).rejects.toThrow(/append-only/);
+    ).rejects.toThrow();
+    await expect(prisma.dealEvent.delete({ where: { id: ev.id } })).rejects.toThrow();
+    expect(await prisma.dealEvent.findUniqueOrThrow({ where: { id: ev.id } })).toMatchObject({
+      type: "note",
+    });
   });
 
   it("purges a tenant with its history, and switches the purge back off", async () => {

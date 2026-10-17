@@ -64,7 +64,7 @@ describe("runner time guard", () => {
   });
 });
 
-describe.runIf(await databaseReady())("scrub queueing (D1)", () => {
+describe.runIf(await databaseReady())("scrub queueing (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let dealId: string;

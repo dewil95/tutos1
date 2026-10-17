@@ -21,15 +21,14 @@ jobs:
       - run: pnpm --filter @mca/db validate
       - run: pnpm --filter @mca/db generate
       - run: pnpm typecheck
-      # Database tests run on a local Cloudflare D1 (Miniflare) with packages/db/migrations applied.
+      # Database tests run on a temporary SQLite file with packages/db/migrations applied.
       - run: pnpm test
       - run: pnpm format:check
-      # The Cloudflare Worker build, and its size: Workers Paid allows 10 MiB compressed.
-      - run: pnpm --filter @mca/web cf:build
-      - name: Worker bundle size
-        working-directory: apps/web
+      # The standalone server the Oracle machine runs (apps/web/.next/standalone).
+      - run: pnpm --filter @mca/web build
+      - name: Database migrations apply to a fresh file
+        run: DATABASE_PATH="$RUNNER_TEMP/crm.db" pnpm db:migrate
+      - name: Server scripts parse
         run: |
-          npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker" | tee "$RUNNER_TEMP/size.txt"
-          kib=$(grep -oE 'gzip: [0-9.]+' "$RUNNER_TEMP/size.txt" | grep -oE '[0-9.]+')
-          echo "compressed: ${kib} KiB"
-          awk -v k="$kib" 'BEGIN { exit (k > 9500) }'
+          bash -n deploy/oracle/setup-server.sh
+          bash -n deploy/oracle/update.sh

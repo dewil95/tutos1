@@ -1,5 +1,7 @@
+import { statfsSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import { apiKeyEnvVar, currentProvider, MODELS } from "@mca/ai";
-import { getPrisma } from "@mca/db";
+import { databasePath, getPrisma } from "@mca/db";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ export async function GET() {
   return Response.json(
     {
       status: healthy ? "ok" : "degraded",
+      server: serverInfo(),
       ai: { provider, primary: MODELS.primary, fast: MODELS.fast },
       emailDryRun: process.env.MCA_EMAIL_DRY_RUN !== "false",
       checks,
@@ -43,4 +46,16 @@ export async function GET() {
     },
     { status: healthy ? 200 : 503 },
   );
+}
+
+/** Database size and free disk on the server (a full disk is the usual way a server dies). */
+function serverInfo() {
+  const mb = (bytes: number) => Math.round(bytes / 1_048_576);
+  try {
+    const path = databasePath();
+    const fs = statfsSync(dirname(path));
+    return { databaseMb: mb(statSync(path).size), diskFreeMb: mb(fs.bavail * fs.bsize) };
+  } catch {
+    return { databaseMb: null, diskFreeMb: null };
+  }
 }

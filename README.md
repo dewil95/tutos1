@@ -30,10 +30,13 @@ Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO
 - Stamps each lender's copy of the PDFs with a traceable watermark.
 - Sends routine emails on its own (missing documents, stip chases, lender follow-ups).
 - Takes applications from Ascend's website through an API key ([`docs/API.md`](docs/API.md)).
-- WhatsApp applications are built and **switched off** (section 8).
+- WhatsApp applications are built and **switched off** (see "WhatsApp applications" below).
 
-Everything runs on **Cloudflare** (the app on Workers, the database on D1, sign-in through
-Cloudflare Access) plus Google Workspace (Gmail, Drive) and Google Gemini for the AI.
+The CRM runs on **one Oracle Cloud server** (Always Free ARM machine): the app, its database
+(a SQLite file, backed up continuously to Oracle Object Storage) and the background jobs.
+Cloudflare stays only as the front door: your domain, a private tunnel to the server and the
+team sign-in (Cloudflare Access), all on Cloudflare's free plan. Gmail and Drive hold the email
+and files, and Google Gemini does the AI reading.
 Lender emails stay in **dry-run mode** (written to the deal timeline, not sent) until you turn
 it off.
 
@@ -43,11 +46,12 @@ How it fits together: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Research a
 ## Layout
 
 ```
-apps/web             Next.js app on Cloudflare Workers: pages, API routes, job handlers, wrangler.jsonc
-packages/db          Prisma schema, D1 migrations (packages/db/migrations), job queue, seed
+apps/web             Next.js app (pages, API routes, job handlers); builds to a standalone Node server
+packages/db          Prisma schema, SQLite migrations (packages/db/migrations), migration runner, job queue
 packages/domain      Offer math, qualification, bank metrics, lender matching
 packages/ai          Gemini (default) / Claude clients, prompts, schemas, evals
 packages/connectors  Gmail, Drive, To/CC rules, the house submission email, PDFs
+deploy/oracle        Server setup script, update script, systemd services, backup config
 docs/                Plan, architecture, lender matrix CSV, eval guidelines
 legacy/              The static tutorial page this repo started as
 ```
@@ -56,25 +60,24 @@ legacy/              The static tutorial page this repo started as
 
 ```bash
 pnpm install
-pnpm db:migrate:local                  # local D1 database (a file under apps/web/.wrangler)
-cp .env.example apps/web/.env.local    # then fill in the values below
-pnpm --filter @mca/web dev             # http://localhost:3000 → one-time setup page
+DATABASE_PATH=.data/crm.db pnpm db:migrate   # creates the database file
+cp .env.example apps/web/.env.local          # then fill in the values below
+pnpm --filter @mca/web dev                   # http://localhost:3000 → one-time setup page
 ```
 
-In `apps/web/.env.local` set at least `PII_ENCRYPTION_KEY` (`openssl rand -base64 32`),
-`CRON_SECRET` (`openssl rand -hex 32`) and `DEV_USER_EMAIL=you@ascendfund.co` (stands in for
-Cloudflare Access on your machine only). The first visit opens **/setup**, which creates the
-team and the lender roster.
+In `apps/web/.env.local` set `DATABASE_PATH` to the full path of `.data/crm.db`,
+`PII_ENCRYPTION_KEY` (`openssl rand -base64 32`), `CRON_SECRET` (`openssl rand -hex 32`) and
+`DEV_USER_EMAIL=you@ascendfund.co` (stands in for Cloudflare Access on your machine only). The
+first visit opens **/setup**, which creates the team and the lender roster.
 
-To run it the way Cloudflare does: `pnpm cf:build && pnpm --filter @mca/web cf:preview`
-(secrets in `apps/web/.dev.vars`).
-Checks: `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm cf:build`.
+Checks: `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm --filter @mca/web build`.
 
 ## Go live with Claude Code on your PC (easiest)
 
-Claude Code runs the setup commands for you in your computer's terminal and asks you only for
-the sign-ins and the few things Google and Cloudflare make you click. You need a Claude Pro,
-Max or Team plan.
+Claude Code runs the setup with you from your computer's terminal: it prepares every command,
+connects to the server for you, and asks you only for sign-ins, the few pages Oracle, Google and
+Cloudflare make you click, and to type secret values yourself. You need a Claude Pro, Max or
+Team plan.
 
 1. **Install the tools.** Open **PowerShell** (Start → type "PowerShell") and run:
 
@@ -103,94 +106,120 @@ Max or Team plan.
    claude
    ```
 
-   Sign in to Claude when the browser opens. Until the Cloudflare pull request is merged, use
-   `git clone -b ccr-a084c87c-zub6v3 https://github.com/dewil95/tutos1` instead, so `/go-live`
-   is there.
+   Until the Oracle version is merged, use
+   `git clone -b ccr-a084c87c-zub6v3 https://github.com/dewil95/tutos1` instead.
 
-3. **Type `/go-live`.** Claude follows the checklist in
-   [`.claude/skills/go-live/SKILL.md`](.claude/skills/go-live/SKILL.md): merge the code, deploy,
-   Google, Cloudflare sign-in, secrets, first sign-in and a dry-run test. It never shows or asks
-   you to paste keys into the chat: when a key has to be typed, it gives you a command to run in
-   a second PowerShell window, which hides what you paste.
+3. **Type `/go-live`.** Claude follows [`.claude/skills/go-live/SKILL.md`](.claude/skills/go-live/SKILL.md),
+   the same steps as below.
 
-The manual steps below do the same thing by hand.
+## Go live on Oracle Cloud (about 1–2 hours, once)
 
-## Go live on Cloudflare (about an hour, once)
+What you need: an Oracle Cloud account, your Cloudflare login (the `ascendfund.co` domain is
+there), admin access to this GitHub repo, and a Google Workspace admin. Never paste keys or
+passwords into a chat; type them on the server or the settings pages below.
 
-You need: the Cloudflare account that already has the $5 Workers plan and the `ascendfund.co`
-domain, admin access to this GitHub repo, and a Google Workspace admin. Never paste keys or
-tokens into a chat; type them straight into the settings pages below.
+### 1. Oracle account
 
-### 1. Let GitHub deploy to Cloudflare
+1. Sign up at oracle.com/cloud/free. Pick your **home region** carefully (nearest to you; it
+   can't be changed later, and the free servers only exist there).
+2. **Upgrade to Pay As You Go** (Billing → Upgrade). You still pay **$0** while you stay inside
+   the Always Free limits, and Oracle stops reclaiming "idle" free servers. A CRM is idle most of
+   the day, so on the plain free account Oracle could take the server back.
+3. Optional but wise: Billing → **Budgets** → a $1 budget with an email alert.
 
-1. Cloudflare dashboard → **My Profile → API Tokens → Create Token** → template **Edit
-   Cloudflare Workers**. Add the permission **Account → D1 → Edit**. Limit it to your account
-   and the `ascendfund.co` zone. Create it and copy it once. (If the first deploy says it
-   cannot add the `crm.ascendfund.co` domain, edit the token and add **Zone → DNS → Edit**.)
-2. Cloudflare dashboard home → your account → copy the **Account ID** (right side, or in the
-   URL).
-3. GitHub → this repo → **Settings → Secrets and variables → Actions → New repository secret**:
-   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+### 2. The server
 
-Then merge the pull request with these changes into `main`. From then on, every merge to `main`
-runs **Deploy to Cloudflare**
-(`.github/workflows/deploy.yml`): it creates the D1 database `ascend-crm` the first time,
-applies the database migrations, builds and deploys the Worker `ascend-crm` on
-`crm.ascendfund.co`. You can also start it by hand under **Actions → Deploy to Cloudflare →
-Run workflow**. Until steps 3 and 4 are done, the site lets nobody in.
+1. Compute → Instances → **Create instance**:
+   - Image: **Canonical Ubuntu 24.04** (the aarch64 / ARM build).
+   - Shape: **Ampere → VM.Standard.A1.Flex**, **2 OCPUs, 12 GB** (inside the free limit). If
+     Oracle says "out of capacity", try another availability domain, try again later, or use
+     **1 OCPU / 6 GB** (enough for the CRM).
+   - Boot volume: 50 GB is plenty (free up to 200 GB in total).
+   - SSH keys: **Generate a key pair** and download both files (keep the private key safe), or
+     upload your own public key.
+   - Networking: the default VCN with a public IP is fine. **Don't open any ports**: the site
+     reaches the server through the Cloudflare Tunnel, so only SSH (22) stays open.
+2. Note the **public IP address**.
+3. Connect: `ssh -i <private key file> ubuntu@<public IP>`.
 
-### 2. Google Cloud (owned by the ascendfund.co Workspace)
+### 3. Set up the server
+
+On the server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dewil95/tutos1/main/deploy/oracle/setup-server.sh -o setup-server.sh
+sudo bash setup-server.sh
+```
+
+It installs Node, the tunnel and the backup tool, creates the `ascend` user, the database folder
+(`/var/lib/ascend-crm`) and the services, builds the CRM and starts it on the server only
+(127.0.0.1:3000). It turns on automatic security updates. Safe to run again. (Before the Oracle
+version is merged, add `BRANCH=ccr-a084c87c-zub6v3` in front of `bash`, and use that branch in
+the URL.)
+
+### 4. Google Cloud (Gmail, Drive, Gemini)
 
 1. console.cloud.google.com → new project "Ascend CRM" → enable the **Gmail API** and the
    **Google Drive API**.
 2. **OAuth consent screen**: user type **Internal** (no Google review needed).
 3. **Credentials → Create credentials → OAuth client ID → Web application**, authorized redirect
-   URI `https://crm.ascendfund.co/api/google/callback`. Keep the client ID and secret for step 4.
+   URI `https://crm.ascendfund.co/api/google/callback`. Keep the client ID and secret for step 7.
 4. **Gemini**: aistudio.google.com → Get API key, in a Google Cloud project **with billing
    enabled** (so statements are never used to train Google's models).
 
-### 3. Sign-in: Cloudflare Access
+### 5. Cloudflare: tunnel and sign-in (free)
 
 1. Cloudflare dashboard → **Zero Trust** (free for up to 50 users). Pick a team name, e.g.
    `ascendfund` → your team domain is `ascendfund.cloudflareaccess.com`.
-2. **Access → Applications → Add an application → Self-hosted**: name "Ascend CRM", domain
+2. **Networks → Tunnels → Create a tunnel** (Cloudflared) named `ascend-crm`. Copy the install
+   token it shows, and on the server run `sudo cloudflared service install <TOKEN>`.
+3. In the tunnel's **Public hostname** tab: subdomain `crm`, domain `ascendfund.co`, service
+   **HTTP** `127.0.0.1:3000`. Cloudflare creates the DNS record.
+4. **Access → Applications → Add an application → Self-hosted**: name "Ascend CRM", domain
    `crm.ascendfund.co`. Policy "Team": **Allow**, include **Emails ending in** `@ascendfund.co`.
-   Login method: **One-time PIN** works with no setup (a code by email); add Google later if you
-   prefer.
-3. Add a second application (or policies) that **bypass** Access for the paths that have their
-   own protection: `crm.ascendfund.co/api/v1/*` (website API key),
-   `crm.ascendfund.co/api/health`, `crm.ascendfund.co/apply/*` (one-time SSN links) and
-   `crm.ascendfund.co/api/whatsapp/*` (Meta signature), plus `crm.ascendfund.co/_next/*` (the
-   app's public scripts and styles, which the SSN page needs). Policy action **Bypass**,
-   include **Everyone**.
-4. Open the "Ascend CRM" application → **Overview** → copy the **Application Audience (AUD)
+   Login method: **One-time PIN** works with no setup (a code by email).
+5. Add a second application that **bypasses** Access for paths with their own protection:
+   `crm.ascendfund.co/api/v1/*` (website API key), `crm.ascendfund.co/api/health`,
+   `crm.ascendfund.co/apply/*` (one-time SSN links), `crm.ascendfund.co/api/whatsapp/*` (Meta
+   signature) and `crm.ascendfund.co/_next/*` (the app's public scripts and styles). Policy
+   action **Bypass**, include **Everyone**.
+6. Open the "Ascend CRM" application → **Overview** → copy the **Application Audience (AUD)
    Tag**.
 
-The CRM checks Cloudflare's signed sign-in token on every request and only lets in
-`@ascendfund.co` emails that are on the team.
+### 6. Backups (Oracle Object Storage, free up to 20 GB)
 
-### 4. Secrets
+1. Storage → **Buckets → Create bucket** `ascend-crm-backups` (private, Standard tier).
+2. Your profile (top right) → **Customer secret keys → Generate secret key** named "litestream".
+   Copy the secret now (shown once) and the **Access key** next to it.
+3. Note the **Object storage namespace** (Tenancy details) and your **region** id (e.g.
+   `us-ashburn-1`). The endpoint is `https://<namespace>.compat.objectstorage.<region>.oraclecloud.com`.
 
-Cloudflare dashboard → **Workers & Pages → ascend-crm → Settings → Variables and Secrets → Add**
-(type **Secret**), then **Deploy**. (The Worker appears after the first deploy in step 1; run it
-by hand if needed.)
+### 7. Settings on the server
 
-| Name                    | Value                                                                                                                         |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `CF_ACCESS_TEAM_DOMAIN` | e.g. `ascendfund.cloudflareaccess.com` (step 3)                                                                               |
-| `CF_ACCESS_AUD`         | the Application Audience Tag (step 3)                                                                                         |
-| `GOOGLE_CLIENT_ID`      | step 2                                                                                                                        |
-| `GOOGLE_CLIENT_SECRET`  | step 2                                                                                                                        |
-| `GEMINI_API_KEY`        | step 2                                                                                                                        |
-| `PII_ENCRYPTION_KEY`    | `openssl rand -base64 32` (keep a copy in a password manager: without it the saved SSNs and Google connections can't be read) |
-| `CRON_SECRET`           | `openssl rand -hex 32`                                                                                                        |
+On the server: `sudo nano /etc/ascend-crm/env` and fill in every empty line
+([`deploy/oracle/env.example`](deploy/oracle/env.example) explains each one):
+`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GEMINI_API_KEY`, `PII_ENCRYPTION_KEY` (`openssl rand -base64 32`; **keep a copy in a password
+manager**: without it the saved SSNs and Google connections can't be read), `CRON_SECRET`
+(`openssl rand -hex 32`) and the five `BACKUP_*` values. Then:
 
-Plain settings (`APP_URL`, `ALLOWED_EMAIL_DOMAIN`, `MCA_EMAIL_DRY_RUN`, `WHATSAPP_ENABLED`, time
-budgets) are in `apps/web/wrangler.jsonc` and change with a merge.
+```bash
+sudo systemctl restart ascend-crm
+sudo systemctl enable --now litestream
+curl -s http://127.0.0.1:3000/api/health      # every check "ok"
+```
 
-Check: `https://crm.ascendfund.co/api/health` → every check `ok`.
+`https://crm.ascendfund.co/api/health` should show the same from anywhere.
 
-### 5. First sign-in
+### 8. Updates from GitHub
+
+Each merge to `main` updates the server automatically (**Deploy to Oracle**,
+`.github/workflows/deploy.yml`) once these GitHub repository secrets exist (**Settings → Secrets
+and variables → Actions**): `ORACLE_HOST` (the public IP), `ORACLE_USER` (`ubuntu`) and
+`ORACLE_SSH_KEY` (the private key file's contents). You can also update by hand on the server:
+`sudo bash /opt/ascend-crm/deploy/oracle/update.sh`.
+
+### 9. First sign-in
 
 1. Open `https://crm.ascendfund.co`, sign in with your @ascendfund.co email.
 2. The first visit shows **one-time setup**: it creates the team (jonas@, savvy@, david@) and the
@@ -198,26 +227,37 @@ Check: `https://crm.ascendfund.co/api/health` → every check `ok`.
 3. **Settings → Connect funding@ascendfund.co**: sign in as funding@ and allow Gmail and Drive.
    The inbox is checked every 2 minutes from then on.
 4. **Settings → Learn from past email → Connect a mailbox to learn from**: sign in as
-   **jonas@** and allow read-only Gmail access. It reads past submissions and lender replies in
-   the background (a few minutes for a few hundred emails); progress shows in Settings and the
-   results on the **Lenders** page.
+   **jonas@** and allow read-only Gmail access.
 5. **Settings → Ascend application**: paste the authorization wording from Ascend's current
-   application (printed above the merchant's signature).
+   application.
 
-### 6. Test in dry-run mode
+### 10. Test in dry-run mode, then turn on sending
 
-1. **New deal → upload a made-up application PDF** (fake names and numbers) and a made-up
-   statement.
-2. On the deal: check the filled fields, download Ascend's application, upload a "signed" copy,
-   tick two lenders and **Send**. Each email appears on the timeline with its exact To and CC,
-   marked as dry run.
+1. **New deal → upload a made-up application PDF** and a made-up statement; check the fields,
+   download Ascend's application, upload a "signed" copy, tick two lenders and **Send**. Each
+   email appears on the timeline with its exact To and CC, marked as dry run.
+2. When it looks right: set `MCA_EMAIL_DRY_RUN=false` in `/etc/ascend-crm/env` and
+   `sudo systemctl restart ascend-crm`.
 
-### 7. Turn on real sending
+### Looking after the server
 
-When the test deals look right, set `MCA_EMAIL_DRY_RUN` to `"false"` in
-`apps/web/wrangler.jsonc` and merge. Lender emails then really go out from funding@.
+- **Status:** `systemctl status ascend-crm litestream cloudflared`; logs with
+  `sudo journalctl -u ascend-crm -n 100`.
+- **Backups:** `sudo -u ascend litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db`
+  lists them. To restore (for example on a new server):
 
-### 8. WhatsApp applications (built, switched off)
+  ```bash
+  sudo systemctl stop ascend-crm litestream
+  sudo -u ascend litestream restore -config /etc/litestream.yml -o /var/lib/ascend-crm/restored.db /var/lib/ascend-crm/crm.db
+  sudo -u ascend mv /var/lib/ascend-crm/restored.db /var/lib/ascend-crm/crm.db
+  sudo systemctl start litestream ascend-crm
+  ```
+
+- **Disk:** `/api/health` shows `diskFreeMb`; keep it above 2,000.
+- Security updates install automatically; reboot now and then with `sudo reboot` (the CRM and
+  tunnel start on their own).
+
+### WhatsApp applications (built, switched off)
 
 How it works for the merchant: they message Ascend's WhatsApp number (or tap a
 `wa.me/<number>?text=Apply` link on the website), pick English or Spanish and send the signed
@@ -253,13 +293,12 @@ the bot saves the merchant's files to Drive):
 4. **Permanent token.** Meta Business Settings → System users → add one, give it the app and the
    WhatsApp account, generate a token with `whatsapp_business_messaging` and
    `whatsapp_business_management`.
-5. **Cloudflare variables** (Workers → ascend-crm → Settings → Variables and Secrets, or
-   `npx wrangler secret put NAME` in `apps/web`):
+5. **Server settings** (`sudo nano /etc/ascend-crm/env`, then `sudo systemctl restart ascend-crm`):
    - `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_BUSINESS_ACCOUNT_ID` (both on the API Setup page)
    - `WHATSAPP_TOKEN` (step 4)
    - `WHATSAPP_APP_SECRET` (App settings → Basic)
    - `WHATSAPP_VERIFY_TOKEN` (any random string, `openssl rand -hex 16`)
-   - keep `WHATSAPP_ENABLED` at `"false"` (in `apps/web/wrangler.jsonc`) for now.
+   - keep `WHATSAPP_ENABLED=false` for now.
 
    Check: `https://<your-app>/api/health` lists each of them as `ok` under `whatsapp`.
 
@@ -279,7 +318,7 @@ the bot saves the merchant's files to Drive):
 8. **Test in test mode.** Message the number from your own phone with a made-up application PDF.
    With `WHATSAPP_ENABLED=false` the bot's replies only appear on the deal page (marked "not
    sent"), and the file appears in the deal's Drive folder.
-9. **Turn on.** Set `WHATSAPP_ENABLED` to `"true"` in `wrangler.jsonc` and merge; run the whole flow from your phone to the
+9. **Turn on.** Set `WHATSAPP_ENABLED=true` in the settings file and restart the CRM; run the whole flow from your phone to the
    signature, check the signed PDF in Drive, then again in Spanish. Then add the `wa.me` button
    (shown in Settings) to the website.
 
@@ -288,14 +327,14 @@ all the bot sends (two reminders included). Reading one application with Gemini 
 
 ### Costs and limits
 
-- **Cloudflare Workers Paid** ($5/month, the plan you already have, shared with your other
-  app). The CRM needs the paid plan: its code is about 5 MB compressed (free plan limit 3 MB)
-  and the background runs use more than the free CPU time. D1 and Access stay within the
-  included amounts at Ascend's volume.
+- **Oracle Cloud**: $0 inside the Always Free limits (the ARM server, 200 GB of disk, 20 GB of
+  Object Storage, 10 TB of traffic a month). The account is Pay As You Go so the server isn't
+  reclaimed; a budget alert warns you if anything ever costs money.
+- **Cloudflare**: $0 (DNS, the tunnel, and Access for up to 50 users are free).
 - **Gemini**: a few cents per application or statement set; well under $50/month at about 100
   deals a month.
 - **Google Workspace**: what you already pay. Gmail sends up to 2,000 messages a day per user.
 - Uploads through the CRM are up to 10 MB per click; bigger files can be emailed to funding@ and
   are filed automatically.
-- **Backups**: D1 keeps 30 days of point-in-time history (Time Travel), and every file lives in
-  Google Drive.
+- **Backups**: the database streams to Object Storage within seconds of each change (30 days
+  kept), and every file lives in Google Drive.

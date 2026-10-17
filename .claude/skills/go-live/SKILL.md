@@ -1,191 +1,176 @@
 ---
 name: go-live
-description: Put the Ascend CRM online on Cloudflare from the user's own computer (Windows or Mac), step by step with them - merge to main, deploy, database, Google, Cloudflare Access, secrets, first sign-in. Use when the user types /go-live or asks to set up, launch or deploy the CRM.
+description: Put the Ascend CRM online on an Oracle Cloud server from the user's own computer (Windows or Mac), step by step with them - Oracle account and server, server setup over SSH, Google, Cloudflare tunnel and sign-in, backups, settings, GitHub deploys, first sign-in. Use when the user types /go-live or asks to set up, launch or deploy the CRM.
 disable-model-invocation: true
 ---
 
-# Go live: Ascend CRM on Cloudflare
+# Go live: Ascend CRM on Oracle Cloud
 
 You are running in Claude Code on the user's own computer, in their copy of this repo. Walk them
-through putting the CRM online at `https://crm.ascendfund.co`. The user is not technical: one
-step at a time, plain words, say what you are about to do and why, and check each step worked
-before the next. Keep a short checklist of the 11 steps and show it when you start and after
-each step.
+through putting the CRM online at `https://crm.ascendfund.co` on one Oracle Cloud server. The
+user is not technical: one step at a time, plain words, say what you are about to do and why, and
+check each step worked before the next. Keep a checklist of the 12 steps below and show it when
+you start and after each step.
 
-Background: the app is a Cloudflare Worker named `ascend-crm` (config `apps/web/wrangler.jsonc`)
-with a D1 database `ascend-crm`. It is built and deployed by GitHub Actions
-(`.github/workflows/deploy.yml`) on every push to `main`, never built on this computer.
-README "Go live on Cloudflare" has the same steps for clicking by hand.
+How it fits together: the app, its SQLite database (`/var/lib/ascend-crm/crm.db`) and the
+background-job timer run on the Oracle server under systemd (`deploy/oracle/`). Litestream
+streams the database to Oracle Object Storage. Cloudflare is only the front door: a Cloudflare
+Tunnel connects `crm.ascendfund.co` to the server (no open ports) and Cloudflare Access is the
+team sign-in. README "Go live on Oracle Cloud" has the same steps for doing them by hand.
 
 ## Safety rules (always)
 
-- **Never print, echo, log, or ask the user to paste into this chat any secret**: API tokens,
-  keys, client secrets, the encryption key. Two ways only:
-  1. A value the computer generates and nobody needs to see is piped straight into storage,
-     e.g. `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" | npx wrangler secret put CRON_SECRET`.
-  2. A value the user copies from a web page, or must keep, is typed by the user in **their own
-     separate terminal window** (open a new PowerShell or Terminal window and `cd` to the repo).
-     Give them the exact command to run there; it asks for the value and hides it. Wait for them
-     to say "done", then verify (e.g. `npx wrangler secret list` shows the name).
-- Do not run commands that display secret values (no `cat .dev.vars`, no `gcloud ... get-key-string`
-  without piping it into `wrangler secret put`, no `gh secret list` tricks).
-- **Ask before**: merging a pull request, anything that costs money (Google billing), deleting
-  anything, or changing DNS. Never touch `ascendfund.co` or `www.ascendfund.co` (the public
-  website); only `crm.ascendfund.co`.
-- Keep `MCA_EMAIL_DRY_RUN` as `"true"` in `apps/web/wrangler.jsonc`. Turning on real lender
-  emails is a separate decision for later (README step 7).
-- Never commit secrets, `.dev.vars`, `.env*` files or real merchant files.
+- **Never print, echo, log, or ask the user to paste into this chat any secret**: API keys,
+  client secrets, the encryption key, Oracle secret keys, the tunnel token, SSH private keys.
+  Secrets go into the server's settings file by the user typing them over SSH in **their own
+  terminal window**, or are generated on the server and written straight into the file without
+  being shown. Never `cat` the env file or the private key; check settings only through
+  `/api/health`, which reports presence, not values.
+- **Ask before**: merging a pull request, upgrading the Oracle account or anything else that
+  could cost money, deleting anything, or changing DNS. Never touch `ascendfund.co` or
+  `www.ascendfund.co` (the public website); only `crm.ascendfund.co`.
+- Keep `MCA_EMAIL_DRY_RUN=true`. Turning on real lender emails is a separate decision for later.
+- Never commit secrets, `.env*` files, SSH keys or real merchant files.
 - If a command fails, read the error, explain it in one plain sentence, and fix what you can.
   Never disable checks or skip a step silently.
-- Run all `wrangler` commands from `apps/web` (where `wrangler.jsonc` is).
 
-On Windows, commands run in Git Bash, so `|` pipes and `$(...)` work as written. If `npx`,
-`gh` or `gcloud` is "not found", ask the user to close and reopen Claude Code after installing.
+You can run SSH commands on the server yourself once the user has the key file on this computer:
+`ssh -i <key file> ubuntu@<IP> '<command>'`. On Windows, Claude Code's shell is Git Bash, so
+`ssh` and `scp` work as written; use the key path the user gives (e.g.
+`~/Downloads/ssh-key-2026-10-17.key`) and run `chmod 600` on it first. For anything that asks for
+a secret, give the user the exact command to run in their own window instead.
 
 ## Steps
 
 ### 1. Tools and repo
 
-Required: `node -v` (22 or newer), `git --version`, `gh --version`. Optional:
-`gcloud --version` (Google Cloud CLI, about 1 GB; step 7 works without it in the browser).
-If a required one is missing, tell the user the install line for Windows PowerShell:
-`winget install Git.Git OpenJS.NodeJS.LTS GitHub.cli` (Mac: `brew install node git gh`), then
-reopen the terminal. If winget fails to download, `winget source reset --force` first, or use the
-installer from nodejs.org. If space is short, check it with `Get-PSDrive C` (keep 2 GB free).
-The repo should be in the user's folder (e.g. `C:\Users\<name>\tutos1`), never under
-`C:\WINDOWS\system32`. Then `git fetch origin` and `git status`.
+Required here: `git --version`, `gh --version`, `ssh -V`. If one is missing, Windows PowerShell:
+`winget install Git.Git GitHub.cli` (Git includes ssh), then reopen. `git fetch origin` and
+`git status`. The repo should be in the user's folder, never under `C:\WINDOWS\system32`.
 
-### 2. GitHub sign-in
+### 2. GitHub sign-in and the code in `main`
 
-`gh auth status`; if not signed in, ask the user to run `gh auth login` in their own terminal
-window (GitHub.com, HTTPS, log in with a web browser). Confirm with `gh auth status`.
-
-### 3. The CRM code into `main`
-
-The Cloudflare version lives on branch `ccr-a084c87c-zub6v3` until it is merged.
-
-1. `gh pr list --head ccr-a084c87c-zub6v3 --state all`. If an open PR exists, use it. If none
-   is open (or only merged ones), and `git log origin/main..origin/ccr-a084c87c-zub6v3 --oneline`
-   shows commits, create it:
-   `gh pr create --base main --head ccr-a084c87c-zub6v3 --title "Ascend CRM on Cloudflare" --body "Cloudflare (Workers, D1, Access), upload application → Ascend PDF → ship, learn from past email. See README."`
-2. `gh pr checks <number> --watch`. All must pass.
-3. Ask: "Merge it now? This puts the Cloudflare version on main." Only on yes:
+1. `gh auth status`; if needed the user runs `gh auth login` in their own window (GitHub.com,
+   HTTPS, browser).
+2. The Oracle version lives on branch `ccr-a084c87c-zub6v3` until merged. `gh pr list --head
+ccr-a084c87c-zub6v3 --state all`. If no open PR and `git log
+origin/main..origin/ccr-a084c87c-zub6v3 --oneline` shows commits, create one:
+   `gh pr create --base main --head ccr-a084c87c-zub6v3 --title "Ascend CRM on Oracle Cloud" --body "App, SQLite database, backups and jobs on an Oracle server; Cloudflare tunnel + Access in front. See README."`
+3. `gh pr checks <number> --watch` until all pass. Ask "Merge it now?"; only on yes:
    `gh pr merge <number> --merge`. Then `git checkout main && git pull`.
 
-### 4. Cloudflare sign-in
+### 3. Oracle account
 
-From `apps/web`: `npx wrangler login` (opens the browser; the user approves). Then
-`npx wrangler whoami` shows the account name and **Account ID** (not a secret). Store it for
-GitHub: `gh secret set CLOUDFLARE_ACCOUNT_ID --body <account id>`.
+Guide the user at https://cloud.oracle.com (they sign up or sign in themselves):
 
-### 5. Deploy token for GitHub
+1. If new: pick the **home region** nearest to them (cannot be changed later).
+2. **Upgrade to Pay As You Go** (Billing & Cost Management → Upgrade and Manage Payment). Explain
+   first: it stays $0 inside the Always Free limits, and it stops Oracle from reclaiming idle free
+   servers (a CRM is idle most of the day). Ask before they confirm.
+3. Billing → **Budgets → Create budget**: $1 monthly, alert email to them.
 
-GitHub needs its own Cloudflare token (the browser login above stays on this computer).
+### 4. The server
 
-1. Ask the user to open https://dash.cloudflare.com/profile/api-tokens → **Create Token** →
-   template **Edit Cloudflare Workers** → **Use template**. Add permissions:
-   **Account · D1 · Edit** and **Zone · DNS · Edit**. Account resources: their account.
-   Zone resources: Specific zone → `ascendfund.co`. Continue → Create Token → **Copy**.
-2. In their own terminal window: `gh secret set CLOUDFLARE_API_TOKEN --repo dewil95/tutos1`
-   and paste when asked.
-3. Verify: `gh secret list --repo dewil95/tutos1` shows both names (values are never shown).
+Guide the clicks in Compute → Instances → **Create instance**:
 
-### 6. First deploy
+- Name `ascend-crm`. Image: **Canonical Ubuntu 24.04** (aarch64). Shape: **Ampere
+  VM.Standard.A1.Flex**, 2 OCPUs / 12 GB. On "out of capacity": another availability domain,
+  later, or 1 OCPU / 6 GB.
+- SSH keys: **Generate a key pair for me** → **Save private key** (and public key). Ask where
+  the private key file is saved on this computer.
+- Networking: default VCN, **assign a public IPv4 address**. Do not add ingress rules (only SSH
+  22 stays open; the site comes through the tunnel).
+- Create, wait for **Running**, note the **public IP**.
+  Then: `chmod 600 <key>` and test `ssh -i <key> -o StrictHostKeyChecking=accept-new ubuntu@<IP> 'uname -m && df -h /'`.
 
-`gh workflow run deploy.yml --ref main`, then find the run with
-`gh run list --workflow deploy.yml --limit 1` and `gh run watch <run id> --exit-status`.
-On failure: `gh run view <run id> --log-failed`, explain, fix (a token permission is the usual
-cause: go back to step 5 and edit the token).
-Verify from `apps/web`: `npx wrangler d1 list` shows `ascend-crm`; `npx wrangler deployments list`
-shows a deployment. Until steps 8–9 are done the site lets nobody in; that is expected.
+### 5. Set up the server
 
-### 7. Google: Gmail, Drive and Gemini
+Run over SSH (the branch is `main` once merged in step 2):
+`ssh -i <key> ubuntu@<IP> 'curl -fsSL https://raw.githubusercontent.com/dewil95/tutos1/main/deploy/oracle/setup-server.sh -o setup-server.sh && sudo bash setup-server.sh'`
+It takes several minutes (installs Node, cloudflared, Litestream, builds the CRM). It ends with
+"Done". Check: `ssh ... 'systemctl is-active ascend-crm && curl -s http://127.0.0.1:3000/api/health | head -c 300'`
+(status "degraded" is expected until step 9).
 
-If `gcloud` is not installed, do this step in the browser instead (use the user's project id
-throughout):
+### 6. Google: Gmail, Drive and Gemini
 
-- Create the project at https://console.cloud.google.com/projectcreate (name "Ascend CRM").
-- Billing: https://console.cloud.google.com/billing/linkedaccount?project=<id> (ask first, as
-  below).
-- Enable each API: https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=<id>,
-  https://console.cloud.google.com/apis/library/drive.googleapis.com?project=<id> and
-  https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com?project=<id>
-  → **Enable**.
-- Gemini key: https://aistudio.google.com/apikey → **Create API key** → pick the "Ascend CRM"
-  project → copy. In their own window, from `apps/web`: `npx wrangler secret put GEMINI_API_KEY`.
-- Then item 6 below (the sign-in client) as written.
+1. Project at https://console.cloud.google.com/projectcreate ("Ascend CRM").
+2. Enable https://console.cloud.google.com/apis/library/gmail.googleapis.com and
+   https://console.cloud.google.com/apis/library/drive.googleapis.com (project selected).
+3. https://console.cloud.google.com/auth/overview → **Get started**: app "Ascend CRM", support
+   email funding@ascendfund.co, audience **Internal**. Then **Clients → Create client**: **Web
+   application**, redirect URI `https://crm.ascendfund.co/api/google/callback`. The user keeps the
+   Client ID and secret for step 9 (in a note on their side, not in the chat).
+4. Gemini key: https://aistudio.google.com/apikey → Create API key in the "Ascend CRM" project.
+   Billing must be on for that project (ask before they add billing).
 
-With `gcloud`:
+### 7. Cloudflare: tunnel and sign-in
 
-1. `gcloud auth login` (browser; the user signs in as a Google Workspace admin of ascendfund.co).
-2. Project: `gcloud projects create ascend-crm-<4 random digits> --name="Ascend CRM"`, then
-   `gcloud config set project <id>`. (If the org requires a folder or the name is taken, try
-   another id.)
-3. Billing: `gcloud billing projects describe <id>`. If `billingEnabled` is not true, explain
-   Gemini needs billing for privacy (a few cents per deal) and ask the user to link a billing
-   account at https://console.cloud.google.com/billing/linkedaccount?project=<id>. Do not
-   continue with Gemini until it is enabled.
-4. `gcloud services enable gmail.googleapis.com drive.googleapis.com generativelanguage.googleapis.com apikeys.googleapis.com`
-5. Gemini key, straight into the Worker without showing it (from `apps/web`):
-   `gcloud services api-keys create --display-name="Ascend CRM Gemini" --key-id=ascend-crm-gemini --api-target=service=generativelanguage.googleapis.com`
-   then
-   `gcloud services api-keys get-key-string ascend-crm-gemini --location=global --format="value(keyString)" | npx wrangler secret put GEMINI_API_KEY`
-6. Gmail/Drive sign-in client (Google has no command for this one). Ask the user to open
-   https://console.cloud.google.com/auth/overview?project=<id>:
-   - **Get started**: app name "Ascend CRM", support email funding@ascendfund.co, audience
-     **Internal**, contact email theirs, agree, Create.
-   - **Clients → Create client**: type **Web application**, name "Ascend CRM", authorized
-     redirect URI `https://crm.ascendfund.co/api/google/callback`, Create.
-   - In their own terminal window, from `apps/web`: `npx wrangler secret put GOOGLE_CLIENT_ID`
-     (paste the Client ID), then `npx wrangler secret put GOOGLE_CLIENT_SECRET` (paste the
-     secret).
+At https://one.dash.cloudflare.com:
 
-### 8. Sign-in for the team: Cloudflare Access
+1. If asked, Free plan and team name (e.g. `ascendfund` → `ascendfund.cloudflareaccess.com`).
+2. **Networks → Tunnels → Create a tunnel → Cloudflared**, name `ascend-crm`. It shows an install
+   command with a token. The user runs on the server, in their own window:
+   `ssh -i <key> ubuntu@<IP>` then `sudo cloudflared service install <TOKEN>`.
+   Check: `ssh ... 'systemctl is-active cloudflared'`, and the tunnel shows **Healthy**.
+3. Tunnel → **Public hostname → Add**: subdomain `crm`, domain `ascendfund.co`, type **HTTP**, URL
+   `127.0.0.1:3000`.
+4. **Access → Applications → Add → Self-hosted** "Ascend CRM", domain `crm.ascendfund.co`;
+   policy "Team": **Allow**, **Emails ending in** `@ascendfund.co`; login **One-time PIN**.
+5. Another **Self-hosted** app "Ascend CRM public paths": `crm.ascendfund.co/api/v1/*`,
+   `crm.ascendfund.co/api/health`, `crm.ascendfund.co/apply/*`,
+   `crm.ascendfund.co/api/whatsapp/*`, `crm.ascendfund.co/_next/*`; policy **Bypass**, **Everyone**.
+6. "Ascend CRM" app → Overview → **Application Audience (AUD) Tag**: the user keeps it for step 9.
+   Check: `curl -s https://crm.ascendfund.co/api/health | head -c 200` answers through the tunnel.
 
-Wrangler cannot create Access apps, so guide the clicks at https://one.dash.cloudflare.com:
+### 8. Backups (Object Storage)
 
-1. If asked, pick the **Free** plan and a team name (e.g. `ascendfund`); the team domain is
-   `<team>.cloudflareaccess.com`.
-2. Access → Applications → **Add an application → Self-hosted**: name "Ascend CRM", domain
-   `crm.ascendfund.co`; policy "Team": action **Allow**, include **Emails ending in**
-   `@ascendfund.co`; login method **One-time PIN**. Save.
-3. Add another **Self-hosted** application "Ascend CRM public paths" with destinations
-   `crm.ascendfund.co/api/v1/*`, `crm.ascendfund.co/api/health`, `crm.ascendfund.co/apply/*`,
-   `crm.ascendfund.co/api/whatsapp/*`, `crm.ascendfund.co/_next/*`; policy action **Bypass**,
-   include **Everyone**. Save.
-4. Team domain (not secret), from `apps/web`:
-   `printf '%s' '<team>.cloudflareaccess.com' | npx wrangler secret put CF_ACCESS_TEAM_DOMAIN`
-5. The "Ascend CRM" app → Overview → **Application Audience (AUD) Tag**: the user copies it and
-   runs in their own window, from `apps/web`: `npx wrangler secret put CF_ACCESS_AUD`.
+Guide: Storage → Buckets → **Create bucket** `ascend-crm-backups` (private). Profile → **Customer
+secret keys → Generate** (secret shown once; the user keeps it for step 9) and the Access key.
+Tenancy details → **Object storage namespace**; region id from the region menu (e.g.
+`us-ashburn-1`). Endpoint: `https://<namespace>.compat.objectstorage.<region>.oraclecloud.com`
+(namespace and region are not secret; you may help assemble it).
 
-### 9. Encryption key and cron secret
+### 9. Settings on the server
 
-1. The encryption key protects saved SSNs and Google connections; the user must keep a copy.
-   In their own window: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-   → they save the printed value in their password manager, then from `apps/web`:
-   `npx wrangler secret put PII_ENCRYPTION_KEY` and paste it.
-2. Cron secret (nobody needs to see it), you run from `apps/web`:
-   `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" | npx wrangler secret put CRON_SECRET`
-3. Verify: `npx wrangler secret list` shows `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`,
-   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`, `PII_ENCRYPTION_KEY`,
-   `CRON_SECRET`.
+1. Generate the two server secrets on the server, written straight into the file:
+   `ssh ... 'sudo sed -i "s|^CRON_SECRET=.*|CRON_SECRET=$(openssl rand -hex 32)|" /etc/ascend-crm/env'`
+   For the encryption key the user must keep a copy, so in **their own window**:
+   `ssh -i <key> ubuntu@<IP>` then `openssl rand -base64 32` → they save it in their password
+   manager → then they paste it in the next step.
+2. The user, in their own window on the server: `sudo nano /etc/ascend-crm/env` and fills
+   `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   `GEMINI_API_KEY`, `PII_ENCRYPTION_KEY`, `BACKUP_ENDPOINT`, `BACKUP_REGION`,
+   `BACKUP_ACCESS_KEY_ID`, `BACKUP_SECRET_ACCESS_KEY` (Ctrl+O, Enter, Ctrl+X to save).
+3. Apply: `ssh ... 'sudo systemctl restart ascend-crm && sudo systemctl enable --now litestream'`.
+4. Check: `curl -s https://crm.ascendfund.co/api/health`: every check `ok` (WhatsApp ones may say
+   missing; it is switched off). Backups: `ssh ... 'sleep 20; sudo -u ascend litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db'`
+   lists a snapshot. If a check is missing, return to its step.
 
-### 10. Check
+### 10. Automatic updates from GitHub
 
-`curl -s https://crm.ascendfund.co/api/health`: every check should be `ok` (WhatsApp ones may
-say missing; that is fine, it is switched off). If a check is missing, go back to its step.
-New secrets take effect right away; if in doubt, re-run `gh workflow run deploy.yml --ref main`.
+GitHub needs its own key to reach the server:
+
+1. Make a deploy key on this computer: `ssh-keygen -t ed25519 -N "" -C "github-deploy" -f ~/.ssh/ascend_deploy`.
+2. Add its public half on the server: `ssh -i <key> ubuntu@<IP> 'cat >> ~/.ssh/authorized_keys' < ~/.ssh/ascend_deploy.pub`.
+3. Secrets: `gh secret set ORACLE_HOST --body <IP> --repo dewil95/tutos1`,
+   `gh secret set ORACLE_USER --body ubuntu --repo dewil95/tutos1`, and
+   `gh secret set ORACLE_SSH_KEY --repo dewil95/tutos1 < ~/.ssh/ascend_deploy` (read from the
+   file, never shown).
+4. `gh workflow run deploy.yml --ref main`, then `gh run watch <id> --exit-status`.
 
 ### 11. First sign-in (in the browser, with the user)
 
-1. Open https://crm.ascendfund.co, sign in with the emailed code → **one-time setup** button.
-2. Settings → **Connect funding@ascendfund.co** (sign in as funding@, allow Gmail and Drive).
+1. https://crm.ascendfund.co → sign in with the emailed code → **one-time setup** button.
+2. Settings → **Connect funding@ascendfund.co** (funding@, allow Gmail and Drive).
 3. Settings → Learn from past email → **Connect a mailbox to learn from** → jonas@ (read-only).
-4. Settings → **Ascend application**: paste the authorization wording from Ascend's current
-   application.
-5. Test in dry-run: New deal → upload a made-up application PDF and statement; check the
-   fields, download Ascend's application, upload a "signed" copy, tick two lenders, Send. Each
-   email appears on the deal timeline with its To and CC, marked dry run.
+4. Settings → **Ascend application**: paste the authorization wording.
 
-Finish with the checklist, what is still pending, and a reminder: real lender emails stay off
-until they decide to set `MCA_EMAIL_DRY_RUN` to `"false"` (README step 7).
+### 12. Dry-run test
+
+New deal → upload a made-up application PDF and statement; check the fields, download Ascend's
+application, upload a "signed" copy, tick two lenders, Send. Each email appears on the deal
+timeline with its To and CC, marked dry run.
+
+Finish with the checklist, anything pending, and reminders: real lender emails stay off until
+they set `MCA_EMAIL_DRY_RUN=false` in `/etc/ascend-crm/env` and restart; "Looking after the
+server" in the README has status, backup-restore and disk commands.

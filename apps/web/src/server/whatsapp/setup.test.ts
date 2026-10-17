@@ -18,7 +18,7 @@ const fakeFetch = (routes: Record<string, unknown>) =>
 describe("WhatsApp setup steps", () => {
   it("names the missing settings", () => {
     expect(() => setupConfig()).toThrow(
-      "Set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in Cloudflare",
+      "Set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in the server settings file",
     );
   });
 
