@@ -122,18 +122,19 @@ passwords into a chat; type them on the server or the settings pages below.
 
 1. Sign up at oracle.com/cloud/free. Pick your **home region** carefully (nearest to you; it
    can't be changed later, and the free servers only exist there).
-2. **Upgrade to Pay As You Go** (Billing → Upgrade). You still pay **$0** while you stay inside
-   the Always Free limits, and Oracle stops reclaiming "idle" free servers. A CRM is idle most of
-   the day, so on the plain free account Oracle could take the server back.
-3. Optional but wise: Billing → **Budgets** → a $1 budget with an email alert.
+2. Stay on the free account. Oracle may take back a free server it considers idle; the next
+   steps size the server and add a usage meter so that doesn't happen (see "Staying clear of
+   Oracle's idle rule" below). If you ever want zero risk, upgrade to Pay As You Go: still $0
+   inside the free limits, and idle servers are never reclaimed.
 
 ### 2. The server
 
 1. Compute → Instances → **Create instance**:
    - Image: **Canonical Ubuntu 24.04** (the aarch64 / ARM build).
-   - Shape: **Ampere → VM.Standard.A1.Flex**, **2 OCPUs, 12 GB** (inside the free limit). If
-     Oracle says "out of capacity", try another availability domain, try again later, or use
-     **1 OCPU / 6 GB** (enough for the CRM).
+   - Shape: **Ampere → VM.Standard.A1.Flex**, **1 OCPU, 3 GB memory**. Small on purpose: the
+     CRM's normal memory use then stays above Oracle's 20% "idle" line, without any fake load
+     (a 12 GB server would look idle). If Oracle says "out of capacity", try another
+     availability domain or try again later.
    - Boot volume: 50 GB is plenty (free up to 200 GB in total).
    - SSH keys: **Generate a key pair** and download both files (keep the private key safe), or
      upload your own public key.
@@ -205,7 +206,7 @@ manager**: without it the saved SSNs and Google connections can't be read), `CRO
 
 ```bash
 sudo systemctl restart ascend-crm
-sudo systemctl enable --now litestream
+sudo systemctl enable --now litestream ascend-crm-nightly.timer
 curl -s http://127.0.0.1:3000/api/health      # every check "ok"
 ```
 
@@ -239,16 +240,69 @@ and variables → Actions**): `ORACLE_HOST` (the public IP), `ORACLE_USER` (`ubu
 2. When it looks right: set `MCA_EMAIL_DRY_RUN=false` in `/etc/ascend-crm/env` and
    `sudo systemctl restart ascend-crm`.
 
+### Staying clear of Oracle's idle rule
+
+Oracle may reclaim (stop) a free server when, over 7 days, its CPU (95th percentile), network
+and memory all stay under 20%. The CRM handles it this way:
+
+- **Right size**: 1 OCPU / 3 GB, so the system, the CRM, the tunnel and the backup tool keep
+  memory above 20% in normal use. A 2 GB swap file (made by the setup script) gives builds room.
+- **Usage meter**: every minute the server records CPU and memory the way Oracle judges them.
+  **Settings → Server** (and `/api/health`) shows the idle risk: _low_, _watch_ or _high_, with
+  the numbers. Check it after the first week. If it says _watch_ or _high_, lower the memory
+  (Compute → Instance → Edit → shape, 2 GB) so the same use counts for more, or upgrade the
+  account to Pay As You Go.
+- **Useful nightly work**: at 3:30 every night the server restores the latest backup into a
+  temporary file and checks it is intact (shown under Settings → Server), and tidies the
+  database statistics. It proves your backups work.
+- **An outside alarm**: create a free monitor at uptimerobot.com for
+  `https://crm.ascendfund.co/api/health` (HTTP, every 5 minutes, email alert). If the server
+  stops for any reason, you get an email within minutes.
+
+No program runs just to burn CPU or hold memory; that wastes the free resources and could break
+if Oracle changes its rules.
+
+### If the server is stopped or lost
+
+- **Stopped (reclaimed or crashed)**: Oracle stops the server, it doesn't delete it. Compute →
+  Instances → `ascend-crm` → **Start**. Everything starts on its own (CRM, tunnel, backups,
+  timers); check `https://crm.ascendfund.co/api/health`.
+- **Lost (new server needed, about 30 minutes)**:
+  1. Create a server as in step 2 and run the setup script as in step 3.
+  2. Put your settings back in `/etc/ascend-crm/env` (keep a copy of that file's values in your
+     password manager, especially `PII_ENCRYPTION_KEY`).
+  3. Bring the database back from Object Storage before starting the CRM:
+
+     ```bash
+     sudo systemctl stop ascend-crm
+     # Only on a brand-new server: remove the empty database the setup script made.
+     sudo rm -f /var/lib/ascend-crm/crm.db /var/lib/ascend-crm/crm.db-wal /var/lib/ascend-crm/crm.db-shm
+     sudo -u ascend bash -c 'set -a; . /etc/ascend-crm/env; set +a; litestream restore -config /etc/litestream.yml -o /var/lib/ascend-crm/crm.db /var/lib/ascend-crm/crm.db'
+     sudo systemctl start ascend-crm
+     sudo systemctl enable --now litestream ascend-crm-nightly.timer
+     ```
+
+  4. Reconnect the tunnel: Zero Trust → Networks → Tunnels → `ascend-crm` → install command,
+     then `sudo cloudflared service install <TOKEN>` on the new server. Update the
+     `ORACLE_HOST` GitHub secret to the new IP.
+  5. Files are in Google Drive and email in Gmail, so nothing else needs restoring.
+
 ### Looking after the server
 
 - **Status:** `systemctl status ascend-crm litestream cloudflared`; logs with
   `sudo journalctl -u ascend-crm -n 100`.
-- **Backups:** `sudo -u ascend litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db`
-  lists them. To restore (for example on a new server):
+- **Backups:** list them with
+
+  ```bash
+  sudo -u ascend bash -c 'set -a; . /etc/ascend-crm/env; set +a; litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db'
+  ```
+
+  To roll back to the latest backup on the same server:
 
   ```bash
   sudo systemctl stop ascend-crm litestream
-  sudo -u ascend litestream restore -config /etc/litestream.yml -o /var/lib/ascend-crm/restored.db /var/lib/ascend-crm/crm.db
+  sudo -u ascend bash -c 'set -a; . /etc/ascend-crm/env; set +a; litestream restore -config /etc/litestream.yml -o /var/lib/ascend-crm/restored.db /var/lib/ascend-crm/crm.db'
+  sudo rm -f /var/lib/ascend-crm/crm.db-wal /var/lib/ascend-crm/crm.db-shm
   sudo -u ascend mv /var/lib/ascend-crm/restored.db /var/lib/ascend-crm/crm.db
   sudo systemctl start litestream ascend-crm
   ```
@@ -327,9 +381,8 @@ all the bot sends (two reminders included). Reading one application with Gemini 
 
 ### Costs and limits
 
-- **Oracle Cloud**: $0 inside the Always Free limits (the ARM server, 200 GB of disk, 20 GB of
-  Object Storage, 10 TB of traffic a month). The account is Pay As You Go so the server isn't
-  reclaimed; a budget alert warns you if anything ever costs money.
+- **Oracle Cloud**: $0 on the Always Free account (the ARM server, 200 GB of disk, 20 GB of
+  Object Storage, 10 TB of traffic a month). See "Staying clear of Oracle's idle rule".
 - **Cloudflare**: $0 (DNS, the tunnel, and Access for up to 50 users are free).
 - **Gemini**: a few cents per application or statement set; well under $50/month at about 100
   deals a month.

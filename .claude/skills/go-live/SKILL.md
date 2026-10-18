@@ -9,7 +9,7 @@ disable-model-invocation: true
 You are running in Claude Code on the user's own computer, in their copy of this repo. Walk them
 through putting the CRM online at `https://crm.ascendfund.co` on one Oracle Cloud server. The
 user is not technical: one step at a time, plain words, say what you are about to do and why, and
-check each step worked before the next. Keep a checklist of the 12 steps below and show it when
+check each step worked before the next. Keep a checklist of the 13 steps below and show it when
 you start and after each step.
 
 How it fits together: the app, its SQLite database (`/var/lib/ascend-crm/crm.db`) and the
@@ -64,18 +64,17 @@ origin/main..origin/ccr-a084c87c-zub6v3 --oneline` shows commits, create one:
 Guide the user at https://cloud.oracle.com (they sign up or sign in themselves):
 
 1. If new: pick the **home region** nearest to them (cannot be changed later).
-2. **Upgrade to Pay As You Go** (Billing & Cost Management → Upgrade and Manage Payment). Explain
-   first: it stays $0 inside the Always Free limits, and it stops Oracle from reclaiming idle free
-   servers (a CRM is idle most of the day). Ask before they confirm.
-3. Billing → **Budgets → Create budget**: $1 monthly, alert email to them.
+2. The user chose to **stay on the free account** (no Pay As You Go). Don't push an upgrade;
+   the server size, usage meter and alarm in the next steps handle Oracle's idle rule. Mention
+   once that upgrading later is the zero-risk option.
 
 ### 4. The server
 
 Guide the clicks in Compute → Instances → **Create instance**:
 
 - Name `ascend-crm`. Image: **Canonical Ubuntu 24.04** (aarch64). Shape: **Ampere
-  VM.Standard.A1.Flex**, 2 OCPUs / 12 GB. On "out of capacity": another availability domain,
-  later, or 1 OCPU / 6 GB.
+  VM.Standard.A1.Flex**, **1 OCPU / 3 GB** (small on purpose: normal use then stays above
+  Oracle's 20% memory "idle" line). On "out of capacity": another availability domain or later.
 - SSH keys: **Generate a key pair for me** → **Save private key** (and public key). Ask where
   the private key file is saved on this computer.
 - Networking: default VCN, **assign a public IPv4 address**. Do not add ingress rules (only SSH
@@ -141,9 +140,9 @@ Tenancy details → **Object storage namespace**; region id from the region menu
    `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
    `GEMINI_API_KEY`, `PII_ENCRYPTION_KEY`, `BACKUP_ENDPOINT`, `BACKUP_REGION`,
    `BACKUP_ACCESS_KEY_ID`, `BACKUP_SECRET_ACCESS_KEY` (Ctrl+O, Enter, Ctrl+X to save).
-3. Apply: `ssh ... 'sudo systemctl restart ascend-crm && sudo systemctl enable --now litestream'`.
+3. Apply: `ssh ... 'sudo systemctl restart ascend-crm && sudo systemctl enable --now litestream ascend-crm-nightly.timer'`.
 4. Check: `curl -s https://crm.ascendfund.co/api/health`: every check `ok` (WhatsApp ones may say
-   missing; it is switched off). Backups: `ssh ... 'sleep 20; sudo -u ascend litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db'`
+   missing; it is switched off). Backups: `ssh ... 'sleep 20; sudo -u ascend bash -c "set -a; . /etc/ascend-crm/env; set +a; litestream snapshots -config /etc/litestream.yml /var/lib/ascend-crm/crm.db"'`
    lists a snapshot. If a check is missing, return to its step.
 
 ### 10. Automatic updates from GitHub
@@ -165,7 +164,16 @@ GitHub needs its own key to reach the server:
 3. Settings → Learn from past email → **Connect a mailbox to learn from** → jonas@ (read-only).
 4. Settings → **Ascend application**: paste the authorization wording.
 
-### 12. Dry-run test
+### 12. Idle-rule safety net
+
+1. Outside alarm: the user creates a free monitor at https://uptimerobot.com for
+   `https://crm.ascendfund.co/api/health` (HTTP(s), every 5 minutes, email alert).
+2. Usage meter: `ssh ... 'tail -n 3 /var/lib/ascend-crm/usage.log'` shows samples; Settings →
+   Server shows the idle risk. Tell the user to check it after the first week; if it says
+   _watch_ or _high_, the README section "Staying clear of Oracle's idle rule" says what to do.
+3. Point them to "If the server is stopped or lost" in the README.
+
+### 13. Dry-run test
 
 New deal → upload a made-up application PDF and statement; check the fields, download Ascend's
 application, upload a "signed" copy, tick two lenders, Send. Each email appears on the deal

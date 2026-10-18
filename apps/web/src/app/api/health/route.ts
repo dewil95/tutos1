@@ -2,6 +2,7 @@ import { statfsSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { apiKeyEnvVar, currentProvider, MODELS } from "@mca/ai";
 import { databasePath, getPrisma } from "@mca/db";
+import { serverStatus } from "@/server/serverUsage";
 
 export const dynamic = "force-dynamic";
 
@@ -48,14 +49,21 @@ export async function GET() {
   );
 }
 
-/** Database size and free disk on the server (a full disk is the usual way a server dies). */
+/**
+ * Database size and free disk (a full disk is the usual way a server dies), the idle-reclaim
+ * risk from the usage meter, and the last nightly backup restore check.
+ */
 function serverInfo() {
   const mb = (bytes: number) => Math.round(bytes / 1_048_576);
   try {
     const path = databasePath();
     const fs = statfsSync(dirname(path));
-    return { databaseMb: mb(statSync(path).size), diskFreeMb: mb(fs.bavail * fs.bsize) };
+    return {
+      databaseMb: mb(statSync(path).size),
+      diskFreeMb: mb(fs.bavail * fs.bsize),
+      ...serverStatus(),
+    };
   } catch {
-    return { databaseMb: null, diskFreeMb: null };
+    return { databaseMb: null, diskFreeMb: null, ...serverStatus() };
   }
 }

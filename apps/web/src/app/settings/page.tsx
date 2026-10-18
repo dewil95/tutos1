@@ -9,6 +9,7 @@ import { EmailRulesSection } from "./EmailRulesSection";
 import { WhatsAppSection } from "./WhatsAppSection";
 import { ApplicationSection } from "./ApplicationSection";
 import { HistorySection } from "./HistorySection";
+import { serverStatus } from "@/server/serverUsage";
 import { revokeApiKey } from "./apiKeyActions";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +89,8 @@ export default async function SettingsPage({
       {flash.checking ? (
         <p className="notice ok">Checking the inbox now. Refresh in a minute.</p>
       ) : null}
+
+      <ServerStatus />
 
       <section className="panel">
         <h2>Funding mailbox (Gmail + Google Drive)</h2>
@@ -225,5 +228,48 @@ export default async function SettingsPage({
         </section>
       ) : null}
     </>
+  );
+}
+
+const RISK_TEXT = {
+  low: "low",
+  watch: "watch: close to Oracle's 20% line",
+  high: "high: Oracle could treat the server as idle",
+  unknown: "not measured yet",
+} as const;
+
+/** Oracle idle-reclaim risk and the last nightly backup check (from the server's timers). */
+function ServerStatus() {
+  const { usage, backupCheck } = serverStatus();
+  return (
+    <section className="panel">
+      <h2>Server</h2>
+      <p className="small">
+        Idle risk:{" "}
+        <strong
+          className={usage.idleRisk === "high" ? "error" : usage.idleRisk === "watch" ? "warn" : ""}
+        >
+          {RISK_TEXT[usage.idleRisk]}
+        </strong>
+        {usage.samples ? (
+          <span className="muted">
+            {" "}
+            · memory {usage.memAvg}% (lowest {usage.memMin}%), CPU {usage.cpuP95}% (95th
+            percentile), over {usage.days} days
+          </span>
+        ) : null}
+      </p>
+      <p className="small">
+        Last backup check:{" "}
+        {backupCheck ? (
+          <span className={backupCheck.ok ? "ok" : "error"}>
+            {backupCheck.ok ? "restored and intact" : "failed"} ·{" "}
+            {new Date(backupCheck.at).toLocaleString("en-US")} · {backupCheck.detail}
+          </span>
+        ) : (
+          <span className="muted">none yet (runs every night)</span>
+        )}
+      </p>
+    </section>
   );
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Ascend CRM backup check every night
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

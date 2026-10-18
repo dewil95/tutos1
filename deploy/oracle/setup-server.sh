@@ -29,6 +29,15 @@ APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 CONF
 
+echo "== Swap (2 GB): lets the CRM build on a small server"
+if ! swapon --show | grep -q .; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 echo "== Node.js 22 and pnpm"
 if ! node -v 2>/dev/null | grep -q '^v22\.'; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -72,11 +81,15 @@ echo "== Services"
 install -m 644 "$APP_DIR/deploy/oracle/ascend-crm.service" /etc/systemd/system/
 install -m 644 "$APP_DIR/deploy/oracle/ascend-crm-tick.service" /etc/systemd/system/
 install -m 644 "$APP_DIR/deploy/oracle/ascend-crm-tick.timer" /etc/systemd/system/
+for unit in ascend-crm-usage.service ascend-crm-usage.timer ascend-crm-nightly.service ascend-crm-nightly.timer; do
+  install -m 644 "$APP_DIR/deploy/oracle/$unit" /etc/systemd/system/
+done
 install -m 644 "$APP_DIR/deploy/oracle/litestream.yml" /etc/litestream.yml
 install -d /etc/systemd/system/litestream.service.d
 install -m 644 "$APP_DIR/deploy/oracle/litestream-env.conf" /etc/systemd/system/litestream.service.d/env.conf
 systemctl daemon-reload
-systemctl enable ascend-crm.service ascend-crm-tick.timer
+systemctl enable ascend-crm.service ascend-crm-tick.timer ascend-crm-usage.timer
+systemctl start ascend-crm-usage.timer
 
 echo "== First build and start"
 BRANCH="$BRANCH" bash "$APP_DIR/deploy/oracle/update.sh"
@@ -88,7 +101,7 @@ Done. Next:
   1. Fill in the settings:          sudo nano /etc/ascend-crm/env
   2. Apply them:                    sudo systemctl restart ascend-crm
   3. Connect the Cloudflare Tunnel: sudo cloudflared service install <TUNNEL TOKEN>
-  4. Turn on backups (after the backup settings are in the env file):
-                                    sudo systemctl enable --now litestream
+  4. Turn on backups and the nightly restore check (after the backup settings are in the env file):
+                                    sudo systemctl enable --now litestream ascend-crm-nightly.timer
   5. Check:                         curl -s http://127.0.0.1:3000/api/health
 DONE

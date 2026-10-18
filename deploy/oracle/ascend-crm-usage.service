@@ -1,0 +1,7 @@
+[Unit]
+Description=Ascend CRM usage meter (CPU and memory, for Oracle's idle rule)
+
+[Service]
+Type=oneshot
+User=ascend
+ExecStart=/bin/bash /opt/ascend-crm/deploy/oracle/usage-sample.sh
