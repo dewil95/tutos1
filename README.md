@@ -112,6 +112,14 @@ Team plan.
 3. **Type `/go-live`.** Claude follows [`.claude/skills/go-live/SKILL.md`](.claude/skills/go-live/SKILL.md),
    the same steps as below.
 
+**Optional: let Claude do the clicks.** At the start, `/go-live` offers a browser helper
+(Playwright, using the Edge already on your PC). A separate Edge window opens; you sign in to
+Oracle, Cloudflare and Google yourself, and Claude fills in the setup pages and stops before
+every "Create" to ask you. On screens that show a secret (tunnel token, secret keys, client
+secret, Gemini key) you click and copy yourself; Claude doesn't look at those screens. The
+helper keeps its sign-ins in `%USERPROFILE%\.ascend-browser`; delete that folder when you're
+done to sign it out.
+
 ## Go live on Oracle Cloud (about 1–2 hours, once)
 
 What you need: an Oracle Cloud account, your Cloudflare login (the `ascendfund.co` domain is
@@ -136,12 +144,14 @@ passwords into a chat; type them on the server or the settings pages below.
      (a 12 GB server would look idle). If Oracle says "out of capacity", try another
      availability domain or try again later.
    - Boot volume: 50 GB is plenty (free up to 200 GB in total).
-   - SSH keys: **Generate a key pair** and download both files (keep the private key safe), or
-     upload your own public key.
+   - SSH keys: make one on your computer first (Git Bash or Terminal:
+     `ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/ascend_oracle`), then choose **Paste public
+     keys** and paste the contents of `~/.ssh/ascend_oracle.pub`. (Oracle's **Generate a key
+     pair** also works; keep the downloaded private key safe.)
    - Networking: the default VCN with a public IP is fine. **Don't open any ports**: the site
      reaches the server through the Cloudflare Tunnel, so only SSH (22) stays open.
 2. Note the **public IP address**.
-3. Connect: `ssh -i <private key file> ubuntu@<public IP>`.
+3. Connect: `ssh -i ~/.ssh/ascend_oracle ubuntu@<public IP>`.
 
 ### 3. Set up the server
 
