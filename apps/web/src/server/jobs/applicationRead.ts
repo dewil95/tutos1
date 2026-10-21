@@ -2,6 +2,7 @@ import { maskApplication, runApplicationReading } from "@mca/ai";
 import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
 import { llmClient } from "../ai";
 import { applyApplication } from "../applicationData";
+import { READING_PLACEHOLDER } from "../ascendApplication";
 import { findMerchantMatch } from "../websiteApi";
 import { tenantMailbox } from "../google";
 import { PermanentJobError } from "./errors";
@@ -59,7 +60,13 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
 
   let merchantId = doc.deal.merchantId;
   let mode: "fill" | "overwrite" = "fill";
-  if (newDeal) {
+  // The details were typed by hand while the AI was reading (or retrying): keep that work and
+  // only fill what is still empty.
+  const typedByHand =
+    newDeal &&
+    (await prisma.merchant.findUnique({ where: { id: merchantId }, select: { legalName: true } }))
+      ?.legalName !== READING_PLACEHOLDER;
+  if (newDeal && !typedByHand) {
     mode = "overwrite";
     const legalName = reading.business.legalName?.trim();
     const match = legalName

@@ -32,15 +32,39 @@ export function BankScrubPanel({
   dealId,
   analysis,
   pending,
+  unreadable = [],
+  error = null,
 }: {
   dealId: string;
   analysis: BankAnalysis | null;
   pending: number;
+  /** Statements the AI could not read (failed for good); the rest are scrubbed without them. */
+  unreadable?: string[];
+  /** The last scrub failed; an older analysis, if any, is still shown. */
+  error?: string | null;
 }) {
+  const problems = (
+    <>
+      {unreadable.length ? (
+        <p className="small error">
+          The AI could not read {unreadable.join(", ")}. Review{" "}
+          {unreadable.length > 1 ? "them" : "it"} by hand, or tick it above and use “Re-run bank
+          scrub” to try again.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="small error">
+          The bank scrub did not finish ({error.slice(0, 160)}). Use “Re-run bank scrub” to try
+          again.
+        </p>
+      ) : null}
+    </>
+  );
   if (!analysis?.scrub) {
     return (
       <section className="panel" id="scrub">
         <h2>Bank scrub</h2>
+        {problems}
         <p className="empty">
           {pending
             ? `Reading ${pending} statement(s)… refresh in a minute.`
@@ -68,6 +92,7 @@ export function BankScrubPanel({
   return (
     <section className="panel" id="scrub">
       <h2>Bank scrub</h2>
+      {problems}
       <div className="stats">
         <div>
           <span className="k">Grade</span>

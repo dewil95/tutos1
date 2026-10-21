@@ -120,6 +120,11 @@ export default async function DealPage({
         in: [
           ...submissions.map((s) => `send:${s.id}`),
           ...(sourceApp ? [`appread:${sourceApp.id}`] : []),
+          ...allDocuments
+            .filter((d) => d.type === "BANK_STATEMENT" && !d.extractedAt)
+            .map((d) => `extract:${d.id}`),
+          `scrub:${id}`,
+          `risk:${id}`,
         ],
       },
     },
@@ -156,9 +161,16 @@ export default async function DealPage({
   const positions = (deal.submissionPositions ?? []) as unknown as PositionLine[];
 
   const metrics = analysis?.metrics as unknown as BankMetrics | undefined;
-  const pendingStatements = documents.filter(
-    (d) => d.type === "BANK_STATEMENT" && !d.extractedAt,
-  ).length;
+  // A statement the AI could not read is reported as such, never left "reading" forever.
+  const failedJob = (key: string) =>
+    jobs.find((j) => j.dedupeKey === key && j.status === "FAILED") ?? null;
+  const unreadStatements = documents.filter((d) => d.type === "BANK_STATEMENT" && !d.extractedAt);
+  const unreadable = unreadStatements
+    .filter((d) => failedJob(`extract:${d.id}`))
+    .map((d) => d.fileName);
+  const pendingStatements = unreadStatements.length - unreadable.length;
+  const scrubError = failedJob(`scrub:${id}`)?.lastError ?? null;
+  const riskError = failedJob(`risk:${id}`)?.lastError ?? null;
   const history = await lenderHistory(prisma, user.tenantId, deal.paperGrade);
   const activePositions = await prisma.position.count({ where: { dealId: id, isActive: true } });
   const rows = lenderRows({
@@ -565,13 +577,20 @@ export default async function DealPage({
         ) : null}
       </section>
 
-      <BankScrubPanel dealId={id} analysis={analysis} pending={pendingStatements} />
+      <BankScrubPanel
+        dealId={id}
+        analysis={analysis}
+        pending={pendingStatements}
+        unreadable={unreadable}
+        error={scrubError}
+      />
 
       <RiskReportPanel
         dealId={id}
         report={deal.riskReport}
         pdfLink={riskPdf?.driveWebViewLink ?? null}
         hasScrub={Boolean(analysis?.scrub)}
+        error={riskError}
       />
 
       <section className="panel" id="timeline">

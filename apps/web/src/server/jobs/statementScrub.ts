@@ -62,12 +62,17 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
   const funders = await prisma.funder.findMany({
     where: { tenantId: deal.tenantId, isActive: true },
   });
+  // A2 only adds positions; the scrub, metrics and grade stand without it.
   const positions = await runPositionDetection(llmClient(prisma), {
     months: rows as unknown as StatementExtraction["months"],
     funderDescriptors: Object.fromEntries(funders.map((f) => [f.name, asList(f.achDescriptors)])),
     tenantId: deal.tenantId,
     dealId,
+  }).catch((err: unknown) => {
+    console.warn(`[A2] ${dealId}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
   });
+  const typedPositions = ((deal.submissionPositions ?? []) as unknown[]).length;
   const tib = deal.merchant.startDate
     ? Math.floor((Date.now() - deal.merchant.startDate.getTime()) / (30.44 * 86_400_000))
     : null;
@@ -76,7 +81,7 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
     metrics,
     ficoEstimate: owner?.ficoEstimate ?? null,
     timeInBusinessMonths: tib,
-    existingPositions: positions.data.activePositionCount,
+    existingPositions: positions?.data.activePositionCount ?? typedPositions,
   });
 
   const files = docs.map((d) => {
@@ -112,9 +117,10 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
         scrub: { report, files, sourceByMonth, ruleGrade } as unknown as Prisma.InputJsonObject,
       },
     });
-    await tx.position.deleteMany({ where: { dealId, confirmedById: null } });
+    // Without A2 the positions found earlier are kept rather than wiped.
+    if (positions) await tx.position.deleteMany({ where: { dealId, confirmedById: null } });
     await tx.position.createMany({
-      data: positions.data.positions.map((p) => ({
+      data: (positions?.data.positions ?? []).map((p) => ({
         dealId,
         descriptor: p.descriptor,
         funderGuess: p.funderGuess,
@@ -128,7 +134,7 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
       })),
     });
     const current = (deal.submissionPositions ?? []) as unknown[];
-    const lines = positions.data.positions
+    const lines = (positions?.data.positions ?? [])
       .filter((p) => p.isActive)
       .map((p) => ({
         funder: p.funderGuess ?? p.descriptor,
@@ -154,7 +160,8 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
           grade: ruleGrade.grade,
           critical: report.flags.filter((f) => f.severity === "critical").length,
           warnings: report.flags.filter((f) => f.severity === "warning").length,
-          activePositions: positions.data.activePositionCount,
+          activePositions: positions?.data.activePositionCount ?? null,
+          positionsUnavailable: positions === null,
         },
       },
     });
