@@ -63,6 +63,21 @@ function htmlToText(html: string): string {
     .trim();
 }
 
+const STUB_TEXT =
+  /html version|view (this|the) (e-?mail|message) in (a|your) browser|enable html|secure link in the html/i;
+
+/**
+ * The readable body: the plain-text part, unless it is only a stub pointing at the HTML
+ * (portal emails put the offer only in the HTML), or the HTML holds far more.
+ */
+export function bestText(plain: string, html: string): string {
+  if (!html) return plain;
+  const fromHtml = htmlToText(html);
+  if (!plain) return fromHtml;
+  const stub = STUB_TEXT.test(plain) || (plain.length < 400 && fromHtml.length > plain.length * 3);
+  return stub ? fromHtml : plain;
+}
+
 /** Walks the MIME tree: prefers text/plain, falls back to HTML; collects real attachments. */
 export function parseGmailMessage(m: GmailMessage): InboundEmail {
   let plain = "";
@@ -91,7 +106,7 @@ export function parseGmailMessage(m: GmailMessage): InboundEmail {
     to: parseAddressList(header(m.payload, "To")),
     cc: parseAddressList(header(m.payload, "Cc")),
     subject: header(m.payload, "Subject") ?? "",
-    text: plain || htmlToText(html),
+    text: bestText(plain, html),
     receivedAt: new Date(Number(m.internalDate ?? Date.now())),
     attachments,
   };

@@ -1,4 +1,4 @@
-import { PrismaD1 } from "@prisma/adapter-d1";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "./generated/client";
 
 export * from "./generated/client";
@@ -8,43 +8,37 @@ export * from "./crypto";
 export * from "./funderCsv";
 export * from "./lookup";
 
-/** The Cloudflare D1 binding (`env.DB`), typed loosely so this package needs no Workers types. */
-export type D1Binding = ConstructorParameters<typeof PrismaD1>[0];
+/** Where the database file lives on the server unless DATABASE_PATH says otherwise. */
+export const DEFAULT_DATABASE_PATH = "/var/lib/ascend-crm/crm.db";
 
-let resolveD1: (() => D1Binding) | null = null;
-const clients = new WeakMap<object, PrismaClient>();
+let resolvePath: (() => string) | null = null;
+const clients = new Map<string, PrismaClient>();
 
-/**
- * Tells the package where the D1 database comes from: on Cloudflare the web app registers
- * `() => getCloudflareContext().env.DB`; tests register a local Miniflare D1.
- */
-export function setD1Resolver(fn: () => D1Binding): void {
-  resolveD1 = fn;
+/** Points the app at another database file (tests use a temporary one). */
+export function setDatabasePath(fn: () => string): void {
+  resolvePath = fn;
 }
 
-/** Prisma client for a given D1 binding (one per binding object, reused across calls). */
-export function prismaFor(db: D1Binding): PrismaClient {
-  let client = clients.get(db as object);
-  if (!client) {
-    client = new PrismaClient({ adapter: new PrismaD1(db) });
-    clients.set(db as object, client);
-  }
-  return client;
+export function databasePath(): string {
+  return resolvePath?.() ?? process.env.DATABASE_PATH ?? DEFAULT_DATABASE_PATH;
 }
 
 /**
- * Prisma client on Cloudflare D1. D1 has no interactive transactions: code writes in order, and
- * every rule that must not break (one claim per job, append-only history) is enforced by a
- * single conditional statement or a database trigger.
+ * Prisma client on the server's SQLite file (one per file, reused by every request). The file
+ * is in WAL mode (set by the migration runner), so readers never wait for the writer. Code
+ * still writes in order rather than in interactive transactions, and every rule that must not
+ * break (one claim per job, append-only history) is a single conditional statement or a
+ * database trigger.
  */
 export function getPrisma(): PrismaClient {
-  if (resolveD1) return prismaFor(resolveD1());
-  // On Cloudflare, @opennextjs/cloudflare keeps the request's bindings under this symbol
-  // (what getCloudflareContext() reads); the D1 binding is named DB in wrangler.jsonc.
-  const ctx = (globalThis as Record<symbol, { env?: { DB?: D1Binding } } | undefined>)[
-    Symbol.for("__cloudflare-context__")
-  ];
-  if (ctx?.env?.DB) return prismaFor(ctx.env.DB);
-  throw new Error("No D1 database: the DB binding is missing (see wrangler.jsonc)");
+  const path = databasePath();
+  let client = clients.get(path);
+  if (!client) {
+    client = new PrismaClient({
+      adapter: new PrismaBetterSqlite3({ url: `file:${path}`, timeout: 10_000 }),
+    });
+    clients.set(path, client);
+  }
+  return client;
 }
 export * from "./seed";

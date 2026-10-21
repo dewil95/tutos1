@@ -1,7 +1,7 @@
 import type { PrismaClient } from "./generated/client";
 
 /**
- * Merchants whose legal name (or DBA) equals `name` ignoring letter case. SQLite/D1 has no
+ * Merchants whose legal name (or DBA) equals `name` ignoring letter case. SQLite has no
  * case-insensitive `equals`, so this compares lower() in SQL; names are ASCII in practice.
  */
 export async function merchantIdsByName(

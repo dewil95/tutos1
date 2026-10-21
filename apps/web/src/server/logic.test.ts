@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classifyFileName, defaultPackage } from "./documents";
 import {
   fundersAddressed,
+  isLenderAddress,
   merchantFromSubject,
   routeMessage,
   subjectMentions,
@@ -22,6 +23,37 @@ describe("inbox routing", () => {
       "Real Drip NYC",
     );
     expect(merchantFromSubject("Deal funded")).toBeNull();
+    // Lenders that put their decision in the subject (TMR).
+    expect(merchantFromSubject("Decline: New Deal Submission - Acme Bistro")).toBe("Acme Bistro");
+  });
+
+  it("imports a forwarded re-shop as a submission, but not the team's replies", () => {
+    const fwd = {
+      from: "jonas@ascendfund.co",
+      labelIds: ["SENT"],
+      subject: "Fwd: New Deal Submission - Acme",
+    };
+    expect(routeMessage(fwd, ctx)).toEqual({ kind: "outbound_submission", merchantName: "Acme" });
+    expect(routeMessage({ ...fwd, subject: "FW: RE: New Deal Submission - Acme" }, ctx)).toEqual({
+      kind: "ignore",
+    });
+  });
+
+  it("matches a lender on a free mailbox by its exact address only", () => {
+    const keys = ["fundmefastllc@gmail.com"];
+    expect(isLenderAddress("FundMeFastLLC@gmail.com", keys)).toBe(true);
+    expect(isLenderAddress("someone.else@gmail.com", keys)).toBe(false);
+    expect(isLenderAddress("uw@tmrnow.com", ["tmrnow.com"])).toBe(true);
+    const gmailLender = [{ id: "f9", name: "Fund Me Fast", emailDomains: keys }];
+    expect(
+      routeMessage(
+        { from: "owner@gmail.com", labelIds: ["INBOX"], subject: "x" },
+        {
+          ownDomain: "ascendfund.co",
+          funders: gmailLender,
+        },
+      ),
+    ).toEqual({ kind: "external" });
   });
 
   it("imports hand-sent submissions, ignores our replies, routes lender and outside mail", () => {

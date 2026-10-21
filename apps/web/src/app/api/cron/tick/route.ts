@@ -16,7 +16,7 @@ function authorized(req: Request): boolean {
 }
 
 /**
- * Heartbeat run by the Worker's Cron Trigger every 2 minutes (worker.ts calls it in-process with
+ * Heartbeat run by the server's timer every 2 minutes (ascend-crm-tick.timer calls it with
  * CRON_SECRET): queues an inbox check per funding mailbox (and the next batch of any history
  * import) and the automation jobs, then works
  * through due jobs for TICK_BUDGET_MS.

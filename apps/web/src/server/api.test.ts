@@ -64,7 +64,7 @@ describe("website payload", () => {
   });
 });
 
-describe.runIf(await databaseReady())("website API (D1)", () => {
+describe.runIf(await databaseReady())("website API (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
   let key: string;

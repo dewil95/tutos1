@@ -19,16 +19,21 @@ export function parsePositions(text: string): PositionLine[] {
 }
 
 const SIGN_OFF =
-  /^(thanks?\b|thank you|best\b|regards|sincerely|confidentiality notice|--\s*$|sent from|on .+ wrote:|from:\s)/i;
-const POSITION_LINE =
-  /^[-•*]?\s*([A-Za-z0-9][^$:\n]{0,60}?)\s*(?::\s*\$?|[-–]?\s*\$)\s?([\d,]+(?:\.\d+)?)\s*([kK])?\.?\s*$/;
+  /^\**\s*(thanks?\b|thank you|best\b|regards|sincerely|confidentiality|important notice|--\s*$|sent from|on .+ wrote:|el .+ escribió:|from:\s)/i;
+/** "Lender: $12,500", "lender-8,000", "Lender $4900", "Kash 35427" — several may share a line. */
+const POSITION =
+  /([A-Za-z][A-Za-z0-9&.'/ ]{0,50}?)\s*(?:[:\-–]\s*)?\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*([kK])?(?=[\s;,.]|$)/g;
+/** Words that make a line a note, not a positions line. */
+const NOTE_LINE =
+  /^(note\b|industry\b)|\b(competing|competition|looking|close|closing|offer|signed|revenue|deposits?|because|the merchant|team|please|weeks? ago|ein|ssn|tax id|phone|fax|cell)\b/i;
 const NOT_A_LENDER =
-  /\b(phone|tel|fax|cell|mobile|office|ext|revenue|deposits?|amount|request(ed)?|monthly|average|avg|total|funding|need(s|ed)?)\b/i;
+  /\b(phone|tel|fax|cell|mobile|office|ext|revenue|deposits?|amount|request(ed)?|monthly|average|avg|total|funding need|need(s|ed)?)\b/i;
 
 /**
- * The positions block of a "New Deal Submission" email ("Mazal: $12,500" lines between the
- * greeting and the sign-off). Lines without a dollar balance or a "Lender: amount" shape are
- * left out, so notes, phone numbers and signatures never become positions.
+ * The positions block of a "New Deal Submission" email, in any of the ways the team writes it:
+ * "Mazal: $12,500", "dream advances-8,000", "Kash 35427 Biz Capital 20264" (several on a line),
+ * "Kapitus: $161,216; KIF: $55,180". Paid-off lines ("BITTY PIF", "CFG payoff") have no balance
+ * and are left out, as are notes, industry tags, competing offers and the signature.
  */
 export function positionsFromSubmissionBody(text: string): PositionLine[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim());
@@ -36,10 +41,16 @@ export function positionsFromSubmissionBody(text: string): PositionLine[] {
   const out: PositionLine[] = [];
   for (const line of lines.slice(start + 1)) {
     if (SIGN_OFF.test(line) || line.startsWith(">")) break;
-    const m = POSITION_LINE.exec(line);
-    if (!m || NOT_A_LENDER.test(m[1]!)) continue;
-    const n = Number(m[2]!.replace(/,/g, "")) * (m[3] ? 1000 : 1);
-    if (Number.isFinite(n) && n > 0) out.push({ funder: m[1]!.trim(), balance: n });
+    if (!line || NOTE_LINE.test(line) || /\b(pif|paid in full|pay ?off|paid off)\b/i.test(line))
+      continue;
+    // Prose ("The revenue drop in AUG is because…") is long; position lines are short.
+    if (line.split(/\s+/).length > 12 && !line.includes(";")) continue;
+    for (const m of line.matchAll(POSITION)) {
+      const name = m[1]!.trim().replace(/[\s.]+$/, "");
+      if (!/[A-Za-z]{2}/.test(name) || NOT_A_LENDER.test(name)) continue;
+      const n = Number(m[2]!.replace(/,/g, "")) * (m[3] ? 1000 : 1);
+      if (Number.isFinite(n) && n >= 500) out.push({ funder: name, balance: n });
+    }
   }
   return out;
 }

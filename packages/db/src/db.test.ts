@@ -53,6 +53,16 @@ describe("funder CSV", () => {
     const cashable = seeds.find((s) => s.name === "Cashable Funding")!;
     expect(cashable.program.minMonthlyRevenue).toBe(30000);
     for (const s of seeds.filter((x) => x.isActive)) expect(s.submissionTo).toMatch(/@/);
+    // A lender on a free mailbox is matched by its exact address, never by gmail.com.
+    expect(seeds.find((s) => s.name === "Fund Me Fast")!.emailDomains).toEqual([
+      "fundmefastllc@gmail.com",
+    ]);
+    // Addresses a lender only replies from (portals) are recognised too.
+    expect(seeds.find((s) => s.name.startsWith("Lendini"))!.emailDomains).toContain(
+      "fundingmetrics.com",
+    );
+    expect(seeds.find((s) => s.name === "Zlur")!.emailDomains).toEqual(["zlur.com", "zlur.net"]);
+    expect(seeds.filter((s) => s.isActive).length).toBeGreaterThanOrEqual(22);
   });
 });
 
@@ -64,7 +74,7 @@ describe("retryDelayMs", () => {
   });
 });
 
-// Integration tests run on a local Cloudflare D1 (Miniflare, the production engine).
+// Integration tests run on a temporary SQLite file (the same engine as the server).
 await useTestDatabase();
 
 describe("migrations", () => {
@@ -113,7 +123,7 @@ describe("seed", () => {
   }, 60_000);
 });
 
-describe("job queue (D1)", () => {
+describe("job queue (SQLite)", () => {
   let prisma: PrismaClient;
   let tenantId: string;
 
@@ -211,10 +221,14 @@ describe("job queue (D1)", () => {
     const ev = await prisma.dealEvent.create({
       data: { dealId: deal.id, type: "note", actorType: "user" },
     });
+    // The trigger aborts the write (the SQLite driver reports it as a constraint error).
     await expect(
       prisma.dealEvent.update({ where: { id: ev.id }, data: { type: "edited" } }),
-    ).rejects.toThrow(/append-only/);
-    await expect(prisma.dealEvent.delete({ where: { id: ev.id } })).rejects.toThrow(/append-only/);
+    ).rejects.toThrow();
+    await expect(prisma.dealEvent.delete({ where: { id: ev.id } })).rejects.toThrow();
+    expect(await prisma.dealEvent.findUniqueOrThrow({ where: { id: ev.id } })).toMatchObject({
+      type: "note",
+    });
   });
 
   it("purges a tenant with its history, and switches the purge back off", async () => {

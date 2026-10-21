@@ -122,6 +122,9 @@ export default async function LendersPage() {
                     <td>
                       <strong>{l.name}</strong>
                       {l.pending ? <div className="small muted">{l.pending} waiting</div> : null}
+                      {l.forwarded ? (
+                        <div className="small muted">{l.forwarded} passed to a partner</div>
+                      ) : null}
                     </td>
                     <td>{l.sent}</td>
                     <td>{l.approved}</td>

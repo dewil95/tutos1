@@ -1,10 +1,12 @@
 # How the Ascend CRM works
 
-The CRM runs on **Cloudflare**: the app on **Workers**, the database on **D1**, sign-in through
-**Cloudflare Access**, and a **Cron Trigger** every 2 minutes for background work. Files live in
-**Google Drive**, email goes through the Gmail account `funding@ascendfund.co`, and AI runs on
-the **Google Gemini API**. WhatsApp applications are built and switched off. There are no calls
-or SMS.
+The CRM runs on **one Oracle Cloud server** (Always Free ARM machine): the Next.js app as a
+Node service, its **SQLite** database, and a **timer** that runs the background jobs every 2
+minutes. **Litestream** streams every database change to **Oracle Object Storage**. Cloudflare
+is only the front door: a **Cloudflare Tunnel** connects `crm.ascendfund.co` to the server (no
+open ports) and **Cloudflare Access** is the team sign-in. Files live in **Google Drive**, email
+goes through the Gmail account `funding@ascendfund.co`, and AI runs on the **Google Gemini API**.
+WhatsApp applications are built and switched off. There are no calls or SMS.
 
 ## 1. The pieces
 
@@ -12,13 +14,19 @@ or SMS.
 flowchart TB
   team["Ascend team<br/>(browser)"]
 
-  subgraph cf["Cloudflare (Workers Paid)"]
+  subgraph cf["Cloudflare (free)"]
     access["Access<br/>@ascendfund.co only"]
-    app["Worker crm (Next.js)<br/>deal board · deal page · lenders · settings"]
-    cron["Cron Trigger<br/>every 2 minutes"]
-    tick["/api/cron/tick<br/>job runner"]
-    db[("D1<br/>deals · lenders · submissions · jobs")]
+    tunnel["Tunnel<br/>crm.ascendfund.co"]
   end
+
+  subgraph oci["Oracle Cloud server (Ubuntu, ARM)"]
+    app["ascend-crm service<br/>Next.js on 127.0.0.1:3000<br/>deal board · deal page · lenders · settings"]
+    timer["ascend-crm-tick timer<br/>every 2 minutes → /api/cron/tick"]
+    db[("SQLite<br/>/var/lib/ascend-crm/crm.db")]
+    ls["Litestream"]
+  end
+
+  bucket[("Object Storage<br/>backups, 30 days")]
 
   subgraph google["Google Workspace"]
     gmail["Gmail<br/>funding@ (read + send)"]
@@ -30,14 +38,14 @@ flowchart TB
   lenders["Lenders"]
   merchant["Merchant"]
 
-  team --> access --> app
+  team --> access --> tunnel --> app
+  timer --> app
   app --> db
-  cron -- "scheduled() → in-process call with CRON_SECRET" --> tick
-  tick --> db
-  app & tick --> gmail
-  tick --> hist
-  app & tick --> drive
-  app & tick --> gemini
+  db --> ls --> bucket
+  app --> gmail
+  app --> hist
+  app --> drive
+  app --> gemini
   gmail <--> lenders
   merchant -- "statements, MTD, DL/VC" --> gmail
 ```
@@ -137,20 +145,19 @@ sequenceDiagram
 
 ## 4. Background work
 
-A Cloudflare Cron Trigger runs the Worker's `scheduled()` handler every 2 minutes; it calls the
-job runner in-process. Work is kept in a `Job` table and each job is a small unit. Clicking
-**Send** (or uploading an application) also runs the new jobs right away, in the background of
-that request.
+A systemd timer on the server calls the job runner every 2 minutes with the cron secret. Work
+is kept in a `Job` table and each job is a small unit. Clicking **Send** (or uploading an
+application) also runs the new jobs right away, in the background of that request.
 
 ```mermaid
 sequenceDiagram
-  participant C as Cron Trigger
+  participant C as ascend-crm-tick.timer
   participant T as /api/cron/tick
-  participant DB as D1 Job table
+  participant DB as SQLite Job table
   participant H as Job handlers
-  C->>T: scheduled() → POST with Authorization: Bearer CRON_SECRET
+  C->>T: POST with Authorization: Bearer CRON_SECRET
   T->>DB: queue INBOX_SYNC (funding@), HISTORY_IMPORT (until done), EMAIL_RULES
-  loop until ~4 minutes used
+  loop until ~100 s used
     T->>DB: claim due jobs (conditional update: only one runner wins each job)
     T->>H: SEND_SUBMISSION, INBOX_SYNC, PARSE_REPLY, EMAIL_RULES
     T->>H: APPLICATION_READ, STATEMENT_*, RISK_REPORT, HISTORY_IMPORT (only with 40 s left)
@@ -159,8 +166,8 @@ sequenceDiagram
 ```
 
 A send that crashes after Gmail accepted it is never sent twice: the job marks the submission
-"sending" first, and a retry looks in Sent before trying again. D1 has no multi-step
-transactions, so every job is written to end in the same state if it is run again.
+"sending" first, and a retry looks in Sent before trying again. Jobs write in order rather than
+in long transactions, so every job ends in the same state if it is run again.
 
 ## 5. From application to Risk Report
 
@@ -264,23 +271,23 @@ sequenceDiagram
 
 ## Where things live in the code
 
-| Concern                                      | Path                                                                 |
-| -------------------------------------------- | -------------------------------------------------------------------- |
-| To/CC rules                                  | `packages/connectors/src/recipients.ts`                              |
-| House email (subject, body, positions block) | `packages/connectors/src/funder/email.ts`                            |
-| Gmail and Drive clients                      | `packages/connectors/src/email/gmail.ts`, `storage/drive.ts`         |
-| Job queue                                    | `packages/db/src/jobs.ts`                                            |
-| Background jobs (send, inbox, scrub, report) | `apps/web/src/server/jobs/`                                          |
-| Website API                                  | `apps/web/src/app/api/v1/`, `docs/API.md`                            |
-| Bank scrub checks, risk score, lender rank   | `packages/domain/src/scrub.ts`, `riskScore.ts`, `funderMatch.ts`     |
-| Watermark, PDF checks, report PDF            | `packages/connectors/src/pdf/`                                       |
-| Email automation                             | `apps/web/src/server/email/`, `server/jobs/emailRules.ts`            |
-| WhatsApp bot, questions, signature           | `apps/web/src/server/whatsapp/`, `app/api/whatsapp/webhook/`         |
-| WhatsApp Cloud API client, application PDF   | `packages/connectors/src/whatsapp/`, `pdf/application.ts`            |
-| Deal page                                    | `apps/web/src/app/deals/[id]/`                                       |
-| Ascend application (fill, PDF, signed copy)  | `apps/web/src/server/ascendApplication.ts`, `app/deals/new/`         |
-| History import, lender playbook              | `server/jobs/historyImport.ts`, `server/playbook.ts`, `app/lenders/` |
-| Sign-in (Cloudflare Access)                  | `apps/web/src/server/auth.ts`                                        |
-| Worker entry, cron, bindings                 | `apps/web/worker.ts`, `apps/web/wrangler.jsonc`                      |
-| Gemini client                                | `packages/ai/src/providers/gemini.ts`                                |
-| Database schema and D1 migrations            | `packages/db/prisma/`, `packages/db/migrations/`                     |
+| Concern                                      | Path                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| To/CC rules                                  | `packages/connectors/src/recipients.ts`                                        |
+| House email (subject, body, positions block) | `packages/connectors/src/funder/email.ts`                                      |
+| Gmail and Drive clients                      | `packages/connectors/src/email/gmail.ts`, `storage/drive.ts`                   |
+| Job queue                                    | `packages/db/src/jobs.ts`                                                      |
+| Background jobs (send, inbox, scrub, report) | `apps/web/src/server/jobs/`                                                    |
+| Website API                                  | `apps/web/src/app/api/v1/`, `docs/API.md`                                      |
+| Bank scrub checks, risk score, lender rank   | `packages/domain/src/scrub.ts`, `riskScore.ts`, `funderMatch.ts`               |
+| Watermark, PDF checks, report PDF            | `packages/connectors/src/pdf/`                                                 |
+| Email automation                             | `apps/web/src/server/email/`, `server/jobs/emailRules.ts`                      |
+| WhatsApp bot, questions, signature           | `apps/web/src/server/whatsapp/`, `app/api/whatsapp/webhook/`                   |
+| WhatsApp Cloud API client, application PDF   | `packages/connectors/src/whatsapp/`, `pdf/application.ts`                      |
+| Deal page                                    | `apps/web/src/app/deals/[id]/`                                                 |
+| Ascend application (fill, PDF, signed copy)  | `apps/web/src/server/ascendApplication.ts`, `app/deals/new/`                   |
+| History import, lender playbook              | `server/jobs/historyImport.ts`, `server/playbook.ts`, `app/lenders/`           |
+| Sign-in (Cloudflare Access)                  | `apps/web/src/server/auth.ts`                                                  |
+| Server setup, services, backups, updates     | `deploy/oracle/`                                                               |
+| Gemini client                                | `packages/ai/src/providers/gemini.ts`                                          |
+| Database schema, migrations, runner          | `packages/db/prisma/`, `packages/db/migrations/`, `packages/db/src/migrate.ts` |

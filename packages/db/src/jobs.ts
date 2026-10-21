@@ -71,7 +71,7 @@ export async function enqueueJob(prisma: PrismaClient, input: EnqueueInput): Pro
 /**
  * Claims up to `limit` due jobs. Each claim is a conditional update (still QUEUED, or still the
  * same stale RUNNING lock), so two overlapping cron runs, or a cron run plus an inline run after
- * a click, never take the same job: D1 applies writes one at a time and only one update matches.
+ * a click, never take the same job: SQLite applies writes one at a time and only one update matches.
  * Jobs stuck in RUNNING longer than `staleAfterMs` (the request was cut off) are reclaimed.
  */
 export async function claimJobs(

@@ -27,6 +27,8 @@ export interface LenderPlaybook {
   declined: number;
   pending: number;
   funded: number;
+  /** Files the lender passed to a partner for pricing (e.g. Mazal → Fundzilla). */
+  forwarded: number;
   /** approved / (approved + declined), null until a lender has answered. */
   approvalRate: number | null;
   declineReasons: { reason: string; count: number }[];
@@ -127,6 +129,9 @@ export function lenderPlaybook(
       declined: declined.length,
       pending: rows.filter((r) => PENDING.has(r.status)).length,
       funded: rows.filter((r) => r.log.some((e) => e.intent === "FUNDED")).length,
+      forwarded: rows.filter((r) =>
+        r.log.some((e) => e.activityId && replies.get(e.activityId)?.forwardedToAlternateFunder),
+      ).length,
       approvalRate: answered ? approved.length / answered : null,
       declineReasons: top(reasons, 3).map((x) => ({
         reason: firstCasing.get(x.value)!,

@@ -15,6 +15,8 @@ import { mailboxFor, type Mailbox } from "../google";
 import {
   domainOf,
   fundersAddressed,
+  isLenderAddress,
+  merchantFromSubject,
   routeMessage,
   subjectMentions,
   type FunderDomains,
@@ -211,7 +213,7 @@ async function importOutbound(ctx: Ctx, m: InboundEmail, merchantName: string) {
       where: { dealId: deal.id, funderId: f.id },
     });
     if (exists) continue;
-    const lenderAddrs = [...m.to, ...m.cc].filter((a) => f.emailDomains.includes(domainOf(a)));
+    const lenderAddrs = [...m.to, ...m.cc].filter((a) => isLenderAddress(a, f.emailDomains));
     await prisma.submission.create({
       data: {
         dealId: deal.id,
@@ -266,6 +268,9 @@ async function ingestFunderMail(ctx: Ctx, m: InboundEmail, funderId: string) {
         subjectMentions(m.subject, [s.deal.merchant.legalName, s.deal.merchant.dba]),
       ) ?? null;
   }
+  // A lender the team reached by BCC or a forwarded re-shop has no row yet: its reply is the
+  // proof it got the file, so add the row now.
+  if (!sub) sub = await submissionFromReply(ctx, m, funderId);
 
   const activity = await logActivity(ctx, m, sub?.dealId ?? null, "INBOUND");
   if (!sub) return; // lender blast or unknown deal: kept in the inbox list, not parsed
@@ -286,6 +291,83 @@ async function ingestFunderMail(ctx: Ctx, m: InboundEmail, funderId: string) {
     dedupeKey: `reply:${m.rfcMessageId ?? m.messageId}`,
   });
   ctx.stats.replies++;
+}
+
+/**
+ * The deal a lender's reply is about when no submission row exists: the submission email in
+ * the same thread (BCC blast), the merchant in a "New Deal Submission - X" subject, or an open
+ * deal whose merchant the subject names. Creates that lender's submission row (status SENT).
+ */
+async function submissionFromReply(ctx: Ctx, m: InboundEmail, funderId: string) {
+  const { prisma, tenantId } = ctx;
+  const openStage = { notIn: [...CLOSED_STAGES] };
+  let dealId: string | null = null;
+
+  const sameThread = await prisma.activity.findFirst({
+    where: { tenantId, threadId: m.threadId, direction: "OUTBOUND", dealId: { not: null } },
+    orderBy: { occurredAt: "asc" },
+  });
+  dealId = sameThread?.dealId ?? null;
+
+  const name = dealId ? null : merchantFromSubject(m.subject);
+  if (name) {
+    const ids = await merchantIdsByName(prisma, tenantId, name, { includeDba: true });
+    const deal = ids.length
+      ? await prisma.deal.findFirst({
+          where: { tenantId, merchantId: { in: ids }, stage: openStage },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
+    dealId = deal?.id ?? null;
+  }
+  if (!dealId) {
+    const open = await prisma.deal.findMany({
+      where: { tenantId, stage: openStage },
+      include: { merchant: { select: { legalName: true, dba: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 300,
+    });
+    dealId =
+      open.find((d) => subjectMentions(m.subject, [d.merchant.legalName, d.merchant.dba]))?.id ??
+      null;
+  }
+  if (!dealId) return null;
+
+  const existing = await prisma.submission.findFirst({
+    where: { dealId, funderId },
+    include: { deal: { include: { merchant: true } } },
+  });
+  if (existing) return existing;
+  const firstSent = await prisma.activity.findFirst({
+    where: { tenantId, dealId, direction: "OUTBOUND" },
+    orderBy: { occurredAt: "asc" },
+  });
+  const sentAt = sameThread?.occurredAt ?? firstSent?.occurredAt ?? m.receivedAt;
+  const sub = await prisma.submission.create({
+    data: {
+      dealId,
+      funderId,
+      channel: "EMAIL",
+      status: "SENT",
+      sentAt,
+      // Only the funding mailbox's own thread can be answered later.
+      gmailThreadId: ctx.history ? null : m.threadId,
+      toAddresses: [m.from.toLowerCase()],
+      ccAddresses: [],
+      packageDocumentIds: [],
+      rawStatusLog: [
+        {
+          at: sentAt.toISOString(),
+          status: "SENT",
+          inferredFromReply: true,
+          importedFromGmail: true,
+        },
+      ],
+    },
+    include: { deal: { include: { merchant: true } } },
+  });
+  ctx.stats.submissions++;
+  return sub;
 }
 
 /** Merchant sending statements/MTD/stips: file them on the merchant's open deal. */

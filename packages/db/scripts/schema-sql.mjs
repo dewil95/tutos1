@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prints the SQL that creates the current Prisma schema on SQLite/D1 (used to write
+ * Prints the SQL that creates the current Prisma schema on SQLite (used to write
  * migrations/0001_init.sql, and by a test that checks the migrations still match the schema).
  * Prisma emits JSON defaults unquoted (`DEFAULT []`), which SQLite rejects; this quotes them.
  */

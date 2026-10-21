@@ -11,10 +11,6 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
-    },
-    "./vitest-wasm": {
-      "types": "./vitest-wasm.ts",
-      "default": "./vitest-wasm.ts"
     }
   },
   "scripts": {
@@ -23,16 +19,18 @@
     "typecheck": "tsc --noEmit",
     "build": "echo 'db: nothing to build'",
     "test": "vitest run",
-    "schema:sql": "node scripts/schema-sql.mjs"
+    "schema:sql": "node scripts/schema-sql.mjs",
+    "migrate": "tsx src/migrate.ts"
   },
   "dependencies": {
-    "@prisma/adapter-d1": "7.10.0",
+    "@prisma/adapter-better-sqlite3": "7.10.0",
     "@prisma/client": "7.10.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.2.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.19.0",
-    "miniflare": "^4.20260730.0",
     "prisma": "7.10.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",

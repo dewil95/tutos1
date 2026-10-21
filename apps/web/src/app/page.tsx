@@ -116,8 +116,8 @@ export default async function DealBoardPage() {
       </header>
       {error ? (
         <p className="notice error">
-          Database not reachable ({error}). Check the D1 binding in wrangler.jsonc and run{" "}
-          <code>pnpm db:migrate:remote</code> (see README).
+          Database not reachable ({error}). On the server, run{" "}
+          <code>sudo bash /opt/ascend-crm/deploy/oracle/update.sh</code> (see README).
         </p>
       ) : null}
       <div className="board">

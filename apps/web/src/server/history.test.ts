@@ -77,6 +77,59 @@ describe("positions from a submission email", () => {
   });
 });
 
+describe("positions in every style the team writes them", () => {
+  const body = (block: string) =>
+    `Hello,\n\nPlease see the attached deal for submission. RESTAURANT\n\n${block}\n\nThank you.\n\nConfidentiality Notice\nThis message …`;
+
+  it.each([
+    [
+      "dream advances-8,000\nriver capital-45,660",
+      [
+        ["dream advances", 8000],
+        ["river capital", 45660],
+      ],
+    ],
+    ["cfg merchant solutions-$4,200", [["cfg merchant solutions", 4200]]],
+    [
+      "Kash 35427 Biz Capital 20264 iLEND 116000 Newbury 4300",
+      [
+        ["Kash", 35427],
+        ["Biz Capital", 20264],
+        ["iLEND", 116000],
+        ["Newbury", 4300],
+      ],
+    ],
+    [
+      "Kapitus: $161,216; KIF Funding: $55,180;",
+      [
+        ["Kapitus", 161216],
+        ["KIF Funding", 55180],
+      ],
+    ],
+    ["QM Advance $4900 24weeks", [["QM Advance", 4900]]],
+    ["Giggle Finance: $6,000", [["Giggle Finance", 6000]]],
+    ["BITTY PIF FUNZILLA PIF\nexpansion capital-$20,200", [["expansion capital", 20200]]],
+  ] as [string, [string, number][]][])("%s", (block, expected) => {
+    expect(positionsFromSubmissionBody(body(block))).toEqual(
+      expected.map(([funder, balance]) => ({ funder, balance })),
+    );
+  });
+
+  it("leaves notes, competing offers and paid-off lines out", () => {
+    const text = body(
+      [
+        "We are competing 50k 1.5 44 weeks",
+        "dip funding-45,733",
+        "NOTE: Seamless and Steddy will be paid off this week.",
+        "Bitty Pay off, CFG Payoff",
+        "The revenue drop in AUG is because the merchant is changing the CCP system because the fee was really high.",
+        "Looking for 5k or 7k to close tomorrow team!",
+      ].join("\n"),
+    );
+    expect(positionsFromSubmissionBody(text)).toEqual([{ funder: "dip funding", balance: 45733 }]);
+  });
+});
+
 describe("playbook math", () => {
   const row = (over: Partial<Parameters<typeof lenderPlaybook>[0][number]>) => ({
     funderId: "f1",
@@ -341,5 +394,147 @@ describe.runIf(await databaseReady())("learn from a past mailbox", () => {
       approved: 1,
       maxPositionsApproved: 2,
     });
+  });
+});
+
+describe.runIf(await databaseReady())("BCC blasts and forwarded re-shops", () => {
+  let prisma: PrismaClient;
+  let tenantId: string;
+  let historyId: string;
+  const at = (d: string) => new Date(`2026-10-${d}Z`);
+  const mail = (over: Partial<InboundEmail> & Pick<InboundEmail, "messageId">): InboundEmail => ({
+    threadId: `t-${over.messageId}`,
+    rfcMessageId: `<${over.messageId}@bcc.test>`,
+    labelIds: ["INBOX"],
+    from: "funding@ascendfund.test",
+    to: [],
+    cc: [],
+    subject: "",
+    text: "",
+    receivedAt: at("01T12:00:00"),
+    attachments: [],
+    ...over,
+  });
+
+  beforeAll(async () => {
+    prisma = getPrisma();
+    tenantId = (
+      await prisma.tenant.create({ data: { name: "BCC Test", slug: `bcc-${Date.now()}` } })
+    ).id;
+    for (const [name, keys] of [
+      ["Blast Lender", ["blastlender.test"]],
+      ["Gmail Lender", ["quickfunds@gmail.com"]],
+      ["Forward Lender", ["forwardlender.test"]],
+      ["Status Lender", ["statuslender.test"]],
+    ] as const) {
+      await prisma.funder.create({
+        data: { tenantId, name, emailDomains: [...keys], submissionTo: `uw@${name}.test` },
+      });
+    }
+    historyId = (
+      await prisma.mailboxConnection.create({
+        data: {
+          tenantId,
+          email: "jonas@ascendfund.test",
+          encryptedRefreshToken: "x",
+          purpose: "history",
+        },
+      })
+    ).id;
+    inbox.searched = [];
+    inbox.messages = [
+      // BCC blast: only the team is visible.
+      mail({
+        messageId: "blast",
+        threadId: "t-blast",
+        to: ["david@ascendfund.test", "jonas@ascendfund.test"],
+        subject: "New Deal Submission - Sample Tacos LLC",
+        text: "Hello,\n\nPlease see the attached deal for submission.\n\nThank you.",
+      }),
+      // Two BCC'd lenders answer in the same thread.
+      mail({
+        messageId: "blast-r1",
+        threadId: "t-blast",
+        from: "deals@blastlender.test",
+        subject: "RE: New Deal Submission - Sample Tacos LLC",
+        receivedAt: at("01T15:00:00"),
+      }),
+      mail({
+        messageId: "blast-r2",
+        threadId: "t-blast",
+        from: "quickfunds@gmail.com",
+        subject: "RE: New Deal Submission - Sample Tacos LLC",
+        receivedAt: at("01T16:00:00"),
+      }),
+      // A stranger on gmail.com is not a lender.
+      mail({
+        messageId: "stranger",
+        threadId: "t-blast",
+        from: "someone@gmail.com",
+        subject: "RE: New Deal Submission - Sample Tacos LLC",
+        receivedAt: at("01T16:30:00"),
+      }),
+      // Re-shop: the original forwarded to one more lender a day later.
+      mail({
+        messageId: "fwd",
+        from: "jonas@ascendfund.test",
+        to: ["uw@forwardlender.test"],
+        subject: "Fwd: New Deal Submission - Sample Tacos LLC",
+        receivedAt: at("02T10:00:00"),
+      }),
+      // A lender that answers in a new thread with its status in the subject.
+      mail({
+        messageId: "status",
+        from: "uw@statuslender.test",
+        subject: "Decline: New Deal Submission - Sample Tacos LLC",
+        receivedAt: at("02T12:00:00"),
+      }),
+    ];
+    for (const m of inbox.messages.filter((x) => x.from !== "funding@ascendfund.test")) {
+      replies.set(`${m.from}|${m.subject}`, {
+        intent: "ACKNOWLEDGED",
+        offers: [],
+        declineReasons: [],
+        declineCategory: null,
+        stips: [],
+        funded: {
+          amount: null,
+          commissionAmount: null,
+          clawbackDays: null,
+          requiresConfirmationReply: false,
+        },
+        summary: "ok",
+      });
+    }
+  });
+
+  afterAll(async () => {
+    await purgeTenant(prisma, tenantId);
+  });
+
+  it("gives every lender that got the file its own row, including BCC'd ones", async () => {
+    await handleHistoryImport(prisma, {
+      id: "j",
+      tenantId,
+      type: "HISTORY_IMPORT",
+      payload: { mailboxId: historyId },
+      attempts: 1,
+      maxAttempts: 5,
+    });
+    const deal = await prisma.deal.findFirstOrThrow({
+      where: { tenantId },
+      include: { submissions: { include: { funder: true } } },
+    });
+    const rows = new Map(deal.submissions.map((s) => [s.funder.name, s]));
+    expect([...rows.keys()].sort()).toEqual([
+      "Blast Lender",
+      "Forward Lender",
+      "Gmail Lender",
+      "Status Lender",
+    ]);
+    // A BCC'd lender's row dates from the blast, not from its reply.
+    expect(rows.get("Blast Lender")!.sentAt!.toISOString()).toBe("2026-10-01T12:00:00.000Z");
+    expect(rows.get("Forward Lender")!.sentAt!.toISOString()).toBe("2026-10-02T10:00:00.000Z");
+    expect(await prisma.deal.count({ where: { tenantId } })).toBe(1);
   });
 });

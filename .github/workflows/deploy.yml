@@ -1,7 +1,11 @@
-name: Deploy to Cloudflare
+name: Deploy to Oracle
 
-# Deploys main to Cloudflare Workers (crm.dewilarieldiazbonilla.workers.dev) with its D1 database.
-# Needs two repository secrets: CLOUDFLARE_API_TOKEN (Workers + D1 edit) and CLOUDFLARE_ACCOUNT_ID.
+# After each merge to main, updates the CRM on the Oracle server over SSH (it pulls main,
+# builds, migrates the database and restarts). Needs three repository secrets:
+#   ORACLE_HOST     the server's public IP address
+#   ORACLE_USER     the SSH user (ubuntu on Oracle's Ubuntu images)
+#   ORACLE_SSH_KEY  the private key of an SSH key pair whose public key is on the server
+# Without them it skips, so nothing breaks before the server exists.
 on:
   push:
     branches: ["main"]
@@ -12,47 +16,27 @@ concurrency: deploy
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_USER: ${{ secrets.ORACLE_USER }}
+      ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
     steps:
-      - name: Cloudflare secrets present?
+      - name: Server secrets present?
         id: ready
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in GitHub → Settings → Secrets → Actions to deploy."
+          if [ -z "$ORACLE_HOST" ] || [ -z "$ORACLE_USER" ] || [ -z "$ORACLE_SSH_KEY" ]; then
+            echo "Add ORACLE_HOST, ORACLE_USER and ORACLE_SSH_KEY in GitHub → Settings → Secrets → Actions to deploy."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.ready.outputs.go == 'true'
-        uses: actions/checkout@v4
-      - if: steps.ready.outputs.go == 'true'
-        uses: pnpm/action-setup@v4
-      - if: steps.ready.outputs.go == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - if: steps.ready.outputs.go == 'true'
-        run: pnpm install --frozen-lockfile
-      - name: Find (or create) the D1 database and put its id in wrangler.jsonc
+      - name: Update the server
         if: steps.ready.outputs.go == 'true'
-        working-directory: apps/web
         run: |
-          id=$(npx wrangler d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const db=JSON.parse(s).find(d=>d.name==="ascend-crm");process.stdout.write(db?db.uuid:"")})')
-          if [ -z "$id" ]; then
-            npx wrangler d1 create ascend-crm
-            id=$(npx wrangler d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).find(d=>d.name==="ascend-crm").uuid))')
-          fi
-          sed -i "s/00000000-0000-0000-0000-000000000000/$id/" wrangler.jsonc
-          echo "D1 database: $id"
-      - name: Apply database migrations
-        if: steps.ready.outputs.go == 'true'
-        working-directory: apps/web
-        run: npx wrangler d1 migrations apply ascend-crm --remote
-      - name: Build and deploy
-        if: steps.ready.outputs.go == 'true'
-        working-directory: apps/web
-        run: pnpm cf:build && npx opennextjs-cloudflare deploy
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -T 20 "$ORACLE_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$ORACLE_USER@$ORACLE_HOST" \
+            'sudo BRANCH=main bash /opt/ascend-crm/deploy/oracle/update.sh'

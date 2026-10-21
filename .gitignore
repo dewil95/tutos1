@@ -33,3 +33,6 @@ packages/ai/evals/results/
 .open-next/
 .wrangler/
 .dev.vars
+
+# local SQLite database
+.data/

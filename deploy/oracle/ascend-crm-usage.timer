@@ -1,0 +1,10 @@
+[Unit]
+Description=Record Ascend CRM server usage every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

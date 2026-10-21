@@ -1,14 +1,13 @@
 // MCA broker CRM — core data model (see docs/PLAN.md §5)
-// Hosted on Cloudflare D1 (SQLite). The app reaches it only through the Worker's D1 binding, so
-// nothing is reachable from the browser. Every query is scoped by tenantId in code; history
-// tables are append-only through triggers (migrations/0001_init.sql).
+// SQLite file on the CRM server (DATABASE_PATH), backed up continuously by Litestream. Only the
+// app process opens it, so nothing is reachable from the browser. Every query is scoped by
+// tenantId in code; history tables are append-only through triggers (migrations/0002_rules.sql).
 
 generator client {
   provider            = "prisma-client"
   output              = "../src/generated"
   moduleFormat        = "esm"
   importFileExtension = ""
-  runtime             = "cloudflare"
 }
 
 datasource db {

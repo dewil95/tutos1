@@ -1,4 +1,4 @@
-/** Server-only environment access with clear errors (Cloudflare → Workers → crm → Settings → Variables). */
+/** Server-only environment access with clear errors (Cloudflare → Workers → ascend-crm → Settings → Variables). */
 
 export function requireEnv(name: string): string {
   const v = process.env[name];
@@ -31,15 +31,14 @@ export function googleOAuthConfig(req: Request) {
 }
 
 /**
- * Time for jobs run right after a click or an incoming request. On Cloudflare that work runs in
- * `ctx.waitUntil`, which may continue about 30 s after the response, so the default is 25 s;
- * slow AI jobs (40 s+) are left for the scheduled run.
+ * Time for jobs run right after a click or an incoming request (in the background of that
+ * request on the server); anything unfinished is picked up by the next scheduled run.
  */
 export function inlineBudgetMs(): number {
-  return Number(process.env.INLINE_BUDGET_MS ?? 25_000);
+  return Number(process.env.INLINE_BUDGET_MS ?? 60_000);
 }
 
-/** Time for one scheduled run (Cloudflare Cron Trigger every 2 minutes). */
+/** Time for one scheduled run (the server's timer calls the tick every 2 minutes). */
 export function tickBudgetMs(): number {
-  return Number(process.env.TICK_BUDGET_MS ?? 45_000);
+  return Number(process.env.TICK_BUDGET_MS ?? 100_000);
 }
