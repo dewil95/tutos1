@@ -403,6 +403,9 @@ model Document {
   gmailMessageId   String?
   /// Internal files (AI Risk Report) can never be put in a lender package.
   internalOnly     Boolean      @default(false)
+  /// A watermark was found on the PDF (stamped copy, not the original): never sent to lenders.
+  watermarked      Boolean      @default(false)
+  watermarkReason  String?
   /// When A1 extraction finished for this file (bank scrub, one job per document).
   extractedAt      DateTime?
   createdAt        DateTime     @default(now())

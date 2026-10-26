@@ -4,18 +4,21 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * The merchant draws their signature with a finger or the mouse. The drawing goes into a hidden
- * field as a PNG data URL; the form will not submit without one.
+ * field as a PNG data URL; unless optional, the form will not submit without one.
  */
 export function SignaturePad({
   name,
   label,
   clearLabel,
   requiredMessage,
+  optional = false,
 }: {
   name: string;
   label: string;
   clearLabel: string;
   requiredMessage: string;
+  /** Without a drawing the form still submits (the typed name is the signature). */
+  optional?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -32,7 +35,7 @@ export function SignaturePad({
     ctx.strokeStyle = "#13223f";
     const form = c.closest("form");
     const onSubmit = (e: SubmitEvent) => {
-      if (!field.current?.value) {
+      if (!optional && !field.current?.value) {
         e.preventDefault();
         setWarn(true);
         c.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -40,7 +43,7 @@ export function SignaturePad({
     };
     form?.addEventListener("submit", onSubmit);
     return () => form?.removeEventListener("submit", onSubmit);
-  }, []);
+  }, [optional]);
 
   const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const c = canvas.current!;

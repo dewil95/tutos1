@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { READING_PLACEHOLDER, applicationUploadToPdf } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
-import { storeDealFile } from "@/server/documents";
+import { assertNoWatermark, storeDealFile } from "@/server/documents";
 import { inlineBudgetMs } from "@/server/env";
 import { MailboxNotConnectedError, tenantMailbox } from "@/server/google";
 import { runDueJobs } from "@/server/jobs/runner";
@@ -30,6 +30,7 @@ export async function createDealFromApplication(form: FormData) {
   let target: string;
   try {
     if (appFiles.length === 0) throw new Error("Choose the merchant's application file.");
+    await assertNoWatermark([...appFiles, ...statements]);
     const app = await applicationUploadToPdf(appFiles);
     let mailbox;
     try {
