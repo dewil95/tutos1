@@ -6,7 +6,6 @@ import { ENTITY_LABELS, copyFor } from "../copy";
 
 export interface FormValues {
   business: Record<string, string>;
-  advances: string;
   owners: {
     id: string;
     values: Record<string, string>;
@@ -109,11 +108,6 @@ export function DetailsForm({
             <input name="postalCode" size={6} defaultValue={b.postalCode ?? ""} />
           </label>
         </div>
-        <div className="row">
-          {text("phone", t.bizPhone, { type: "tel" })}
-          {text("email", t.bizEmail, { type: "email" })}
-          {text("website", t.website)}
-        </div>
       </fieldset>
 
       <fieldset>
@@ -131,13 +125,7 @@ export function DetailsForm({
               defaultValue={b.monthlyRevenue ?? ""}
             />
           </label>
-          {text("useOfFunds", t.useOfFunds)}
         </div>
-        <label className="field">
-          {t.advances}
-          <textarea name="advances" rows={3} defaultValue={values.advances} />
-          <span className="small muted">{t.advancesHint}</span>
-        </label>
       </fieldset>
 
       {values.owners.map((o, i) => (
@@ -179,15 +167,6 @@ export function DetailsForm({
               <input name={`dob-${i}`} type="date" autoComplete="off" />
               {o.dobOnFile ? <span className="small muted">{t.dobOnFile}</span> : null}
             </label>
-            <label className="field narrow">
-              {t.score}
-              <input
-                name={`score-${i}`}
-                inputMode="numeric"
-                size={4}
-                defaultValue={o.values.score ?? ""}
-              />
-            </label>
           </div>
           <div className="row">
             <label className="field">
@@ -210,16 +189,6 @@ export function DetailsForm({
             <label className="field narrow">
               {t.zip}
               <input name={`postalCode-${i}`} size={6} defaultValue={o.values.postalCode ?? ""} />
-            </label>
-          </div>
-          <div className="row">
-            <label className="field">
-              {t.ownerEmail}
-              <input name={`email-${i}`} type="email" defaultValue={o.values.email ?? ""} />
-            </label>
-            <label className="field">
-              {t.ownerPhone}
-              <input name={`phone-${i}`} type="tel" defaultValue={o.values.phone ?? ""} />
             </label>
           </div>
         </fieldset>

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { applicationUploadToPdf } from "@/server/ascendApplication";
+import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { inlineBudgetMs } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
@@ -99,7 +100,8 @@ export async function saveDetails(token: string, form: FormData): Promise<SaveRe
       const id = String(form.get(`ownerId-${i}`) ?? "");
       if (id && !deal.merchant.owners.some((o) => o.id === id)) form.set(`ownerId-${i}`, "");
     }
-    await writeApplicationForm(prisma, deal, form, { advances: true });
+    await writeApplicationForm(prisma, deal, form);
+    await fileAscendApplication(prisma, row.tenantId, row.dealId);
     await prisma.dealEvent.create({
       data: {
         dealId: row.dealId,

@@ -11,6 +11,7 @@ import {
   missingFields,
   signatureConsent,
 } from "./ascendApplication";
+import { retireGeneratedApplications } from "./applicationFile";
 import { storeDealFile } from "./documents";
 import { tenantMailbox } from "./google";
 import { nameMatches } from "./whatsapp/questions";
@@ -58,7 +59,7 @@ export function parseDrawing(dataUrl: string | null | undefined): Buffer | null 
 
 /** Spanish reading of the default authorization; the English text is the one on the PDF. */
 const CONSENT_ES =
-  "Al firmar, certifico que soy dueño del negocio nombrado en esta solicitud y que la información en ella y en los documentos entregados es verdadera, correcta y completa. Autorizo a Ascend Fund, sus agentes y los socios de financiamiento con quienes comparta esta solicitud a obtener reportes de crédito comerciales y personales, referencias bancarias y comerciales y otra información sobre el negocio y sus dueños, y a compartir esta solicitud y sus documentos con esos socios. Acepto que una firma electrónica en esta solicitud tiene el mismo efecto que una firma a mano.";
+  "Al enviar esta solicitud, el negocio y el dueño o directivo nombrados arriba autorizan a Ascend Fund LLC dba Ascend Fund Business Capital y a cada uno de sus representantes, sucesores, cesionarios y designados a obtener reportes de consumidor o personales, comerciales y de investigación y otra información sobre usted, incluidos estados de cuenta del procesador de tarjetas y estados de cuenta bancarios, de una o más agencias de reportes de crédito. También autoriza a Ascend Fund a transmitir este formulario de solicitud, junto con cualquier información obtenida en relación con esta solicitud, a cualquiera o todos los Destinatarios para esos fines. Usted consiente que cualquier acreedor o institución financiera divulgue cualquier información relacionada con usted. Puede revocar su consentimiento para recibir comunicaciones nuestras en cualquier momento contactándonos en funding@ascendfund.co o al 786-565-0570.";
 
 /** The first address in X-Forwarded-For (set by Caddy, the only way in), else nothing. */
 export function clientIp(h: Headers): string | null {
@@ -442,6 +443,7 @@ async function recordSignature(
       } as Prisma.InputJsonObject,
     },
   });
+  await retireGeneratedApplications(prisma, row.dealId);
   await prisma.dealEvent.create({
     data: {
       dealId: row.dealId,

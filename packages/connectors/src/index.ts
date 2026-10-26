@@ -11,3 +11,4 @@ export * from "./pdf/report";
 export * from "./whatsapp/cloudApi";
 export * from "./pdf/images";
 export * from "./pdf/application";
+export * from "./pdf/text";

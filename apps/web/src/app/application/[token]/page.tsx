@@ -92,58 +92,57 @@ export default async function ApplicationPage({
     where: { dealId: row.dealId, type: "BANK_STATEMENT" },
   });
 
-  if (q.step === "review") {
-    const snap = await reviewSnapshot(prisma, row);
-    if (snap && !snap.missing.length) {
-      return (
-        <ApplyShell lang={lang} corner={languageSwitch} wide>
-          <h1>{t.reviewTitle}</h1>
-          <p className="muted">{t.reviewIntro}</p>
-          {errorText ? (
-            <p className="notice error" role="alert">
-              {errorText}
-            </p>
-          ) : null}
-          <div className="review">
-            {snap.masked.map((s) => (
-              <section key={s.heading}>
-                <h2>{s.heading}</h2>
-                <dl>
-                  {s.fields
-                    .filter(([, v]) => v)
-                    .map(([k, v]) => (
-                      <div key={k}>
-                        <dt>{k}</dt>
-                        <dd>{v}</dd>
-                      </div>
-                    ))}
-                </dl>
-              </section>
-            ))}
-          </div>
-          <p>
-            <a href={`/application/${encodeURIComponent(token)}?step=details`}>{t.edit}</a>
+  // Everything was read from the upload: straight to review and sign, nothing to type.
+  const snap = q.step === "details" ? null : await reviewSnapshot(prisma, row);
+  if (snap && !snap.missing.length) {
+    return (
+      <ApplyShell lang={lang} corner={languageSwitch} wide>
+        <h1>{t.reviewTitle}</h1>
+        <p className="muted">{t.reviewIntro}</p>
+        {errorText ? (
+          <p className="notice error" role="alert">
+            {errorText}
           </p>
-          <SignForm token={token} t={t} snap={snap} />
-        </ApplyShell>
-      );
-    }
-    if (snap) {
-      return (
-        <ApplyShell lang={lang} corner={languageSwitch}>
-          <h1>{t.reviewTitle}</h1>
-          <p className="notice warn">
-            {t.missing} {snap.missing.join(", ")}
-          </p>
-          <a
-            className="button primary"
-            href={`/application/${encodeURIComponent(token)}?step=details`}
-          >
-            {t.edit}
-          </a>
-        </ApplyShell>
-      );
-    }
+        ) : null}
+        <div className="review">
+          {snap.masked.map((s) => (
+            <section key={s.heading}>
+              <h2>{s.heading}</h2>
+              <dl>
+                {s.fields
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k}>
+                      <dt>{k}</dt>
+                      <dd>{v}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+        <p>
+          <a href={`/application/${encodeURIComponent(token)}?step=details`}>{t.edit}</a>
+        </p>
+        <SignForm token={token} t={t} snap={snap} />
+      </ApplyShell>
+    );
+  }
+  if (snap && q.step === "review") {
+    return (
+      <ApplyShell lang={lang} corner={languageSwitch}>
+        <h1>{t.reviewTitle}</h1>
+        <p className="notice warn">
+          {t.missing} {snap.missing.join(", ")}
+        </p>
+        <a
+          className="button primary"
+          href={`/application/${encodeURIComponent(token)}?step=details`}
+        >
+          {t.edit}
+        </a>
+      </ApplyShell>
+    );
   }
 
   const values = await formValues(prisma, row);
@@ -266,12 +265,6 @@ async function formValues(
       monthlyRevenue: s(r.monthlyRevenue),
       useOfFunds: s(r.useOfFunds),
     },
-    advances: (r.existingAdvances ?? [])
-      .map(
-        (a) =>
-          `${a.lender}${a.balance !== undefined ? ` $${a.balance.toLocaleString("en-US")}` : ""}`,
-      )
-      .join("\n"),
     owners,
     einLast4: b.ein ? b.ein.slice(-4) : null,
   };

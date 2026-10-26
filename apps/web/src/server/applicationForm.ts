@@ -18,31 +18,36 @@ export const ENTITY_TYPES = [
 /** A problem with what was typed; the message is shown as is. */
 export class InputError extends Error {}
 
+/**
+ * Reads the form. A field the form does not have reads as undefined, so it is left as it is
+ * (the merchant's page has fewer fields than the deal page); an empty field reads as null.
+ */
 function reader(form: FormData) {
-  const text = (k: string) => String(form.get(k) ?? "").trim() || null;
+  const text = (k: string): string | null | undefined =>
+    form.has(k) ? String(form.get(k) ?? "").trim() || null : undefined;
   const money = (k: string) => {
     const v = text(k);
-    if (v === null) return null;
+    if (v === null || v === undefined) return v;
     const n = Number(v.replace(/[$,\s]/g, ""));
     if (!Number.isFinite(n) || n < 0) throw new InputError(`Check the number in "${k}".`);
     return n;
   };
   const date = (k: string, what: string) => {
     const v = text(k);
-    if (v === null) return null;
+    if (v === null || v === undefined) return v;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)))
       throw new InputError(`${what}: use a full date.`);
     return v;
   };
   const state = (k: string) => {
     const v = text(k);
-    if (v === null) return null;
+    if (v === null || v === undefined) return v;
     if (!/^[A-Za-z]{2}$/.test(v)) throw new InputError("State: use the 2-letter code (e.g. FL).");
     return v.toUpperCase();
   };
   const digits = (k: string, n: number, what: string) => {
     const v = text(k);
-    if (v === null) return null;
+    if (v === null || v === undefined) return v;
     const d = v.replace(/\D/g, "");
     if (d.length !== n) throw new InputError(`${what}: ${n} digits.`);
     return d;
@@ -50,8 +55,12 @@ function reader(form: FormData) {
   return { text, money, date, state, digits };
 }
 
+const lower = (v: string | null | undefined) => (v ? v.toLowerCase() : v);
+
 /** "ABC Funding $8,000" per line → existing advances (balance optional). */
-export function parseAdvanceLines(v: string | null): { funder: string; balance?: number }[] {
+export function parseAdvanceLines(
+  v: string | null | undefined,
+): { funder: string; balance?: number }[] {
   return (v ?? "")
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -89,7 +98,7 @@ export async function writeApplicationForm(
   if (entity && !ENTITY_TYPES.includes(entity)) throw new InputError("Pick an entity type.");
   const ein = r.digits("ein", 9, "EIN");
   const startDate = r.date("startDate", "Business start date");
-  const email = r.text("email")?.toLowerCase() ?? null;
+  const email = lower(r.text("email"));
 
   await prisma.merchant.update({
     where: { id: deal.merchantId },
@@ -137,19 +146,19 @@ export async function writeApplicationForm(
     const ssn = r.digits(`ssn-${i}`, 9, `Owner ${i + 1} SSN`);
     const dob = r.date(`dob-${i}`, `Owner ${i + 1} date of birth`);
     const pct = r.money(`pct-${i}`);
-    if (pct !== null && pct > 100) throw new InputError(`Owner ${i + 1}: ownership over 100%.`);
+    if (pct != null && pct > 100) throw new InputError(`Owner ${i + 1}: ownership over 100%.`);
     const score = r.money(`score-${i}`);
     const data = {
       firstName,
       lastName,
       ownershipPct: pct,
-      email: r.text(`email-${i}`)?.toLowerCase() ?? null,
+      email: lower(r.text(`email-${i}`)),
       phone: r.text(`phone-${i}`),
       addressLine1: r.text(`line1-${i}`),
       city: r.text(`city-${i}`),
       state: r.state(`state-${i}`),
       postalCode: r.text(`postalCode-${i}`),
-      ficoEstimate: score === null ? null : Math.round(score),
+      ficoEstimate: score === null || score === undefined ? score : Math.round(score),
       ...(ssn
         ? {
             ssnEncrypted: encryptSecret(
