@@ -345,7 +345,7 @@ export function AscendApplicationPanel({
           <form action={createSigningLink.bind(null, dealId)} className="row">
             <label className="check small">
               <input type="checkbox" name="email" value="yes" defaultChecked />
-              Email it to the owner from funding@
+              Email it to the owner from the team mailbox
             </label>
             <button type="submit">Create signing link</button>
           </form>

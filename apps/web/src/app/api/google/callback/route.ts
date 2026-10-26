@@ -46,7 +46,9 @@ export async function GET(req: Request) {
   const existing = await prisma.mailboxConnection.findUnique({
     where: { tenantId_email: { tenantId: user.tenantId, email } },
   });
-  if (existing && existing.purpose !== purpose) return fail("already_connected");
+  // A read-only history mailbox can become the team mailbox (it then also sends and stores
+  // files); the team mailbox never goes back to read-only.
+  if (existing?.purpose === "send" && purpose === "history") return fail("already_connected");
   const data = {
     encryptedRefreshToken: encryptSecret(token.refresh_token, requireEnv("PII_ENCRYPTION_KEY")),
     scopes: granted,
@@ -54,7 +56,7 @@ export async function GET(req: Request) {
   };
   const connection = await prisma.mailboxConnection.upsert({
     where: { tenantId_email: { tenantId: user.tenantId, email } },
-    update: data,
+    update: { ...data, purpose },
     create: { ...data, tenantId: user.tenantId, email, purpose },
   });
   if (purpose === "history") {
@@ -66,6 +68,8 @@ export async function GET(req: Request) {
     });
     return Response.redirect(`${base}/settings?history=1&connected=${encodeURIComponent(email)}`);
   }
+  // The CRM sends from the mailbox it was connected with.
+  await prisma.tenant.update({ where: { id: user.tenantId }, data: { fromAddress: email } });
   const rootId = await mailboxFor(connection).drive.ensureFolderPath(["Ascend CRM", "Deals"]);
   await prisma.mailboxConnection.update({
     where: { id: connection.id },

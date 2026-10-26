@@ -249,7 +249,7 @@ export default async function DealPage({
       ) : null}
       {!mailbox ? (
         <p className="notice warn">
-          Gmail/Drive not connected yet — an admin can connect funding@ in{" "}
+          Gmail/Drive not connected yet — an admin can connect the team mailbox in{" "}
           <a href="/settings">Settings</a>.
         </p>
       ) : null}
