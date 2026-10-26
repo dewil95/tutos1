@@ -1,6 +1,6 @@
 import { getPrisma } from "@mca/db";
 import { redirect } from "next/navigation";
-import { SIGN_OUT_URL } from "@/server/auth";
+import { signOutUrl } from "@/server/auth";
 import { allowedEmailDomain } from "@/server/env";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function NoAccessPage() {
           Your Google account is signed in but isn&apos;t on the Ascend team list. Use your @
           {allowedEmailDomain()} account, or ask an admin to add you in Settings.
         </p>
-        <a className="button primary" href={SIGN_OUT_URL}>
+        <a className="button primary" href={signOutUrl()}>
           Sign in with another account
         </a>
       </section>

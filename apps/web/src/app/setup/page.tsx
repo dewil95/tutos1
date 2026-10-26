@@ -1,6 +1,7 @@
 import { getPrisma, seedTenant } from "@mca/db";
 import { redirect } from "next/navigation";
 import { currentIdentity, isAllowedEmail } from "@/server/auth";
+import { googleSignInEnabled } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,10 @@ export default async function SetupPage() {
               Set up as {id.email}
             </button>
           </form>
+        ) : googleSignInEnabled() ? (
+          <a className="button primary" href="/api/auth/login?next=/setup">
+            Sign in with Google to run setup
+          </a>
         ) : (
           <p className="notice error">Sign in with your company Google account to run setup.</p>
         )}

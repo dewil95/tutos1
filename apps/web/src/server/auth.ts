@@ -1,11 +1,15 @@
 import { getPrisma, type User } from "@mca/db";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { allowedEmailDomain } from "./env";
+import { googleSignInEnabled, SESSION_COOKIE, sessionKey, verifySessionToken } from "./session";
 
 /**
- * Sign-in is Cloudflare Access: Cloudflare shows the Google login before any request reaches
+ * Two ways to sign in, whichever is set up:
+ * - "Sign in with Google" on /login (SESSION_SECRET set): the CRM's own session cookie, see
+ *   session.ts. Used when the CRM has its own address instead of a domain on Cloudflare.
+ * - Cloudflare Access: Cloudflare shows the Google login before any request reaches
  * the CRM and allows only @ascendfund.co accounts. Every request then carries a signed JWT in
  * `Cf-Access-Jwt-Assertion`; we verify it (team keys, issuer, audience) instead of trusting the
  * email header, so a request that bypassed Access gets nothing.
@@ -59,10 +63,14 @@ function devIdentity(): AccessIdentity | null {
   return process.env.NODE_ENV === "development" && email ? { email, sub: `dev:${email}` } : null;
 }
 
-/** The verified Google identity Cloudflare Access let through (any email), or null. */
+/** The verified Google identity (any email) from Cloudflare Access or the CRM session, or null. */
 export async function currentIdentity(): Promise<AccessIdentity | null> {
   const h = await headers();
-  return (await verifyAccessJwt(h.get("cf-access-jwt-assertion"))) ?? devIdentity();
+  return (
+    (await verifyAccessJwt(h.get("cf-access-jwt-assertion"))) ??
+    (await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value, sessionKey())) ??
+    devIdentity()
+  );
 }
 
 /** The signed-in CRM user (an active User row with an allowed email), or null. */
@@ -80,7 +88,11 @@ export async function currentUser(): Promise<User | null> {
 
 export async function requireUser(): Promise<User> {
   const user = await currentUser();
-  if (!user) redirect("/no-access");
+  if (!user) {
+    // Not signed in at all: the login page; signed in but not on the team list: say so.
+    if (googleSignInEnabled() && !(await currentIdentity())) redirect("/login");
+    redirect("/no-access");
+  }
   return user;
 }
 
@@ -94,5 +106,7 @@ export async function userOrResponse(opts: { admin?: boolean } = {}): Promise<Us
   return user;
 }
 
-/** Cloudflare Access ends the session here. */
-export const SIGN_OUT_URL = "/cdn-cgi/access/logout";
+/** The CRM's own sign-out, or Cloudflare Access's when that is the sign-in. */
+export function signOutUrl(): string {
+  return googleSignInEnabled() ? "/api/auth/logout" : "/cdn-cgi/access/logout";
+}

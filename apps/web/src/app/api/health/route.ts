@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { apiKeyEnvVar, currentProvider, MODELS } from "@mca/ai";
 import { databasePath, getPrisma } from "@mca/db";
 import { serverStatus } from "@/server/serverUsage";
+import { googleSignInEnabled } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,11 @@ export async function GET() {
   const provider = currentProvider();
   const present = (name: string) => (process.env[name] ? "ok" : "missing");
   checks.aiKey = present(apiKeyEnvVar(provider));
-  checks.cloudflareAccess =
-    process.env.CF_ACCESS_TEAM_DOMAIN && process.env.CF_ACCESS_AUD ? "ok" : "missing";
+  // Either sign-in will do: Cloudflare Access, or the CRM's own Google sign-in.
+  checks.signIn =
+    (process.env.CF_ACCESS_TEAM_DOMAIN && process.env.CF_ACCESS_AUD) || googleSignInEnabled()
+      ? "ok"
+      : "missing";
   checks.googleOAuth =
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "ok" : "missing";
   checks.encryptionKey = present("PII_ENCRYPTION_KEY");
