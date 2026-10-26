@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFString, type PDFDict } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { inspectPdf } from "./metadata";
 
@@ -35,6 +35,19 @@ describe("inspectPdf", () => {
     );
     expect(r.flags.map((f) => f.code)).toEqual(["EDITOR_SOFTWARE", "MODIFIED_AFTER_CREATION"]);
     expect(r.flags[1]!.message).toContain("81 day(s)");
+  });
+
+  it("reads a statement whose dates are not in the PDF date format", async () => {
+    const doc = await PDFDocument.create({ updateMetadata: false });
+    doc.addPage();
+    doc.setProducer("Sample Bank Statement Engine 4.2");
+    // As some banks write it; pdf-lib refuses to parse it.
+    (doc as unknown as { getInfoDict(): PDFDict })
+      .getInfoDict()
+      .set(PDFName.of("CreationDate"), PDFString.of("9/1/2026 04:10:24"));
+    const r = await inspectPdf(Buffer.from(await doc.save()));
+    expect(r.createdAt).toBeNull();
+    expect(r.flags).toEqual([]);
   });
 
   it("reports files it cannot open instead of throwing", async () => {

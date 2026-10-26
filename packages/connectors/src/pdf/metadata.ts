@@ -36,8 +36,16 @@ export async function inspectPdf(data: Buffer): Promise<PdfInspection> {
   }
   const producer = doc.getProducer() ?? null;
   const creator = doc.getCreator() ?? null;
-  const created = doc.getCreationDate() ?? null;
-  const modified = doc.getModificationDate() ?? null;
+  // Some banks write dates like "9/1/2026 04:10:24", which pdf-lib refuses: treat as unknown.
+  const date = (get: () => Date | undefined) => {
+    try {
+      return get() ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const created = date(() => doc.getCreationDate());
+  const modified = date(() => doc.getModificationDate());
   const flags: PdfInspection["flags"] = [];
 
   const editor = [producer, creator].find((v) => v && EDITORS.test(v));
