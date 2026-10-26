@@ -265,6 +265,12 @@ export default async function DealPage({
         source={sourceApp}
         signed={signedApp}
         reading={reading}
+        signLink={
+          flash.signlink
+            ? `${process.env.APP_URL ?? ""}/application/${encodeURIComponent(flash.signlink)}`
+            : null
+        }
+        signLinkEmailed={flash.emailed ?? null}
       />
 
       {whatsapp ? (

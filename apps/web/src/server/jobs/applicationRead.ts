@@ -15,6 +15,11 @@ export interface ApplicationReadPayload {
    * merchant is matched by name and EIN so they keep one record.
    */
   newDeal?: boolean;
+  /**
+   * Uploaded by the merchant on the public application page: never moved onto an existing
+   * merchant, whose details the merchant's page would then show to whoever uploaded the file.
+   */
+  noMerchantMatch?: boolean;
 }
 
 /**
@@ -22,7 +27,7 @@ export interface ApplicationReadPayload {
  * deal fields. Differences from what is already saved become conflicts on the deal page.
  */
 export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJob): Promise<void> {
-  const { documentId, newDeal } = job.payload as unknown as ApplicationReadPayload;
+  const { documentId, newDeal, noMerchantMatch } = job.payload as unknown as ApplicationReadPayload;
   const doc = await prisma.document.findUnique({
     where: { id: documentId },
     include: { deal: { select: { id: true, merchantId: true } } },
@@ -69,15 +74,16 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
   if (newDeal && !typedByHand) {
     mode = "overwrite";
     const legalName = reading.business.legalName?.trim();
-    const match = legalName
-      ? await findMerchantMatch(
-          prisma,
-          doc.tenantId,
-          legalName,
-          reading.business.ein ?? undefined,
-          merchantId,
-        )
-      : null;
+    const match =
+      legalName && !noMerchantMatch
+        ? await findMerchantMatch(
+            prisma,
+            doc.tenantId,
+            legalName,
+            reading.business.ein ?? undefined,
+            merchantId,
+          )
+        : null;
     if (match) {
       // A returning merchant: move the deal onto their record; what they already have wins
       // and differences show as conflicts.

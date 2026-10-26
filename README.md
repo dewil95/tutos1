@@ -18,6 +18,23 @@ Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO
 5. Lender replies are read by AI and kept as a status row per lender (received, declined with
    reason, offer, stips, contract, funded).
 
+**Or let the merchant do it online** (`/application`)
+
+- **Public page** `https://<CRM address>/application` (Spanish: `?lang=es`): the merchant uploads
+  their application (any company's form, PDF or photos) and bank statements. A new deal appears
+  on the board and AI fills Ascend's application. Link it from ascendfund.co with an
+  **"Apply with documents"** button.
+- **Or from a deal**: **Ascend application → Create signing link** emails the owner a private link
+  (or copy it yourself).
+- On their private page the merchant fixes the details, adds SSN, date of birth and more
+  statements, reviews the application (SSN and EIN masked) and **signs by ticking the agreement
+  and typing their name**. The signed PDF is filed on the deal and ticked for lenders; the proof
+  (name, time, IP, browser, the exact text agreed to, the PDF's SHA-256) is kept append-only.
+- Changing anything after review means reviewing again; a signed application is locked. Links
+  expire after 14 days and only their hash is stored. The public page allows 5 new applications
+  per IP per hour and 100 a day. Deals started there are never joined to an existing merchant
+  automatically (a stranger must not see another business's details); merge them by hand.
+
 **What else it does**
 
 - Reads the `funding@ascendfund.co` inbox and files every attachment into a Google Drive

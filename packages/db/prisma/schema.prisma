@@ -51,6 +51,7 @@ model Tenant {
   whatsappMessages      WhatsAppMessage[]
   secureFormTokens      SecureFormToken[]
   applicationSignatures ApplicationSignature[]
+  webApplications       WebApplication[]
 }
 
 enum UserRole {
@@ -325,6 +326,7 @@ model Deal {
   aiRuns               AiRun[]
   whatsapp             WhatsAppConversation?
   signatures           ApplicationSignature[]
+  webApplications      WebApplication[]
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
@@ -1122,8 +1124,40 @@ model ApplicationSignature {
   pdfSha256      String
   signedAt       DateTime
   createdAt      DateTime @default(now())
+  /// Signed on the web page: the signer's IP address and browser
+  ipAddress      String?
+  userAgent      String?
 
   @@index([tenantId, dealId])
+}
+
+/// The merchant's private application page (/application/<token>): started by the merchant on
+/// the public page, or sent by the team for a deal already in the CRM.
+model WebApplication {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dealId      String
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the token in the link
+  hashedToken String    @unique
+  /// public (merchant started it) | team (sent from the deal page)
+  origin      String
+  /// en | es
+  lang        String    @default("en")
+  /// Contact the merchant gave on the start page (filled into the application if empty)
+  email       String?
+  phone       String?
+  /// IP that started it (public pages are rate-limited per IP)
+  createdByIp String?
+  expiresAt   DateTime
+  signedAt    DateTime?
+  signatureId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, dealId])
+  @@index([createdByIp, createdAt])
 }
 
 /// Single row (id = 1). While `on` is 1, the append-only triggers allow deletes (tenant purge).

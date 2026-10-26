@@ -85,14 +85,27 @@ describe("migrations", () => {
     expect(stmts.every((x) => !x.startsWith("--"))).toBe(true);
   });
 
-  it("match the Prisma schema", async () => {
+  it("together build exactly the Prisma schema", async () => {
     const { execFileSync } = await import("node:child_process");
-    const expected = execFileSync("node", [join(here, "../scripts/schema-sql.mjs")], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    const init = migrationFiles().find((m) => m.name.startsWith("0001"))!.sql;
-    expect(init.trim()).toBe(expected.trim());
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { default: Database } = await import("better-sqlite3");
+    const dir = mkdtempSync(join(tmpdir(), "mca-migrations-"));
+    try {
+      const file = join(dir, "migrated.db");
+      const db = new Database(file);
+      for (const m of migrationFiles()) for (const stmt of splitSql(m.sql)) db.exec(stmt);
+      db.close();
+      const left = execFileSync(
+        "node",
+        [join(here, "../scripts/schema-sql.mjs"), "--from-db", file],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      );
+      // Only comments ("-- This is an empty migration.") may remain.
+      expect(left.split("\n").filter((l) => l.trim() && !l.trim().startsWith("--"))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 60_000);
 });
 

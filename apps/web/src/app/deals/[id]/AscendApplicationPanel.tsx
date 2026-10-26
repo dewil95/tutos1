@@ -1,6 +1,7 @@
 import type { OwnerPii } from "@/server/ascendApplication";
 import type { Draft } from "@/server/whatsapp/questions";
 import {
+  createSigningLink,
   rereadApplication,
   saveApplicationDetails,
   uploadSignedApplication,
@@ -36,6 +37,8 @@ export function AscendApplicationPanel({
   source,
   signed,
   reading,
+  signLink,
+  signLinkEmailed,
 }: {
   dealId: string;
   draft: Draft;
@@ -45,6 +48,10 @@ export function AscendApplicationPanel({
   source: FileRef | null;
   signed: FileRef | null;
   reading: { state: "reading" | "failed" | "done" | "not_application"; error?: string } | null;
+  /** A signing link just created (shown once; only its hash is stored). */
+  signLink: string | null;
+  /** Where it was emailed ("dry-run:…" in test mode). */
+  signLinkEmailed: string | null;
 }) {
   const b = draft.business;
   const r = draft.request;
@@ -320,7 +327,32 @@ export function AscendApplicationPanel({
         </li>
 
         <li>
-          <strong>Download Ascend&apos;s application</strong>{" "}
+          <strong>Send the merchant a link to sign online</strong>{" "}
+          <span className="small muted">
+            They check the details, add what&apos;s missing (SSN, date of birth, statements) and
+            sign by typing their name. The signed PDF lands here by itself.
+          </span>
+          {signLink ? (
+            <div className="notice ok">
+              {signLinkEmailed?.startsWith("dry-run:")
+                ? `Test mode: the email to ${signLinkEmailed.slice(8)} was written to the timeline, not sent. Send the link yourself:`
+                : signLinkEmailed
+                  ? `Emailed to ${signLinkEmailed}. The link (works 14 days, shown only now):`
+                  : "Send this link to the merchant (works 14 days, shown only now):"}
+              <input readOnly value={signLink} className="mono" />
+            </div>
+          ) : null}
+          <form action={createSigningLink.bind(null, dealId)} className="row">
+            <label className="check small">
+              <input type="checkbox" name="email" value="yes" defaultChecked />
+              Email it to the owner from funding@
+            </label>
+            <button type="submit">Create signing link</button>
+          </form>
+        </li>
+
+        <li>
+          <strong>Or download Ascend&apos;s application</strong>{" "}
           <a className="button" href={`/deals/${dealId}/ascend-application.pdf`}>
             Download PDF
           </a>
