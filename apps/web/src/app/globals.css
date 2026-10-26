@@ -1147,13 +1147,6 @@ ul.habits {
 .lang-switch {
   font-size: 13px;
 }
-.hp {
-  position: absolute;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
 .review {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

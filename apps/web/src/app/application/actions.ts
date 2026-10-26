@@ -51,7 +51,7 @@ export async function startApplication(form: FormData) {
   const fail = (error: ErrorCode) =>
     redirect(`/application?${new URLSearchParams({ lang, error })}`);
   // Bots fill every field, people never see this one.
-  if (String(form.get("company_website") ?? "")) fail("honeypot");
+  if (String(form.get("hp_x7") ?? "")) fail("honeypot");
   const email = String(form.get("email") ?? "")
     .trim()
     .toLowerCase();
