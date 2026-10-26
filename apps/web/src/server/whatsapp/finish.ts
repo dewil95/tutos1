@@ -27,7 +27,7 @@ export async function consentFor(x: Ctx, lang: Lang = x.lang): Promise<string> {
 
 /** Ascend's application sections for this chat's answers. */
 export function applicationSections(x: Ctx, opts: { masked: boolean }): ApplicationPdfSection[] {
-  return sharedSections(x.draft, x.pii, { ...opts, firstOwnerPhone: formatPhone(x.c.phone) });
+  return sharedSections(x.draft, x.pii, opts);
 }
 
 /** English authorization on the PDF; a Spanish signer also gets the text they agreed to. */

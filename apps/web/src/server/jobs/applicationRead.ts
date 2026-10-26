@@ -2,6 +2,8 @@ import { maskApplication, runApplicationReading } from "@mca/ai";
 import type { ClaimedJob, Prisma, PrismaClient } from "@mca/db";
 import { llmClient } from "../ai";
 import { applyApplication } from "../applicationData";
+import { readApplicationText } from "../applicationText";
+import { fileAscendApplication } from "../applicationFile";
 import { READING_PLACEHOLDER } from "../ascendApplication";
 import { findMerchantMatch } from "../websiteApi";
 import { tenantMailbox } from "../google";
@@ -36,11 +38,18 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
 
   const mailbox = await tenantMailbox(prisma, doc.tenantId);
   const data = await mailbox.drive.download(doc.driveFileId);
-  const { data: reading } = await runApplicationReading(llmClient(prisma), {
-    file: { data, fileName: doc.fileName },
-    tenantId: doc.tenantId,
-    dealId: doc.deal.id,
-  });
+  // A digital PDF is read from its text (no AI, no cost); scans and photos go to the AI.
+  const fromText =
+    doc.mimeType === "application/pdf" ? await readApplicationText(new Uint8Array(data)) : null;
+  const reading =
+    fromText ??
+    (
+      await runApplicationReading(llmClient(prisma), {
+        file: { data, fileName: doc.fileName },
+        tenantId: doc.tenantId,
+        dealId: doc.deal.id,
+      })
+    ).data;
 
   if (!reading.isApplication) {
     await prisma.document.update({
@@ -129,9 +138,10 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
       data: {
         dealId: doc.deal.id,
         type: "application_read",
-        actorType: "ai",
+        actorType: fromText ? "system" : "ai",
         payload: {
           documentId: doc.id,
+          readFrom: fromText ? "text" : "ai",
           conflicts: conflicts.length,
           signed: reading.signed,
           ...(newDeal ? { internalOnly: true } : {}),
@@ -139,4 +149,8 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
       },
     }),
   ]);
+  // The application lenders get, filled from what was just read.
+  await fileAscendApplication(prisma, doc.tenantId, doc.deal.id).catch((err: unknown) =>
+    console.error(`[deal ${doc.deal!.id}] Ascend application not filed`, err),
+  );
 }

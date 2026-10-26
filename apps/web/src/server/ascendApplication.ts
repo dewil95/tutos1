@@ -1,7 +1,7 @@
 import { imagesToPdf, renderApplicationPdf, type ApplicationPdfSection } from "@mca/connectors";
 import { decryptSecret, type PrismaClient } from "@mca/db";
 import { requireEnv } from "./env";
-import { FIELDS, showAddress, type Address, type Draft } from "./whatsapp/questions";
+import { FIELDS, type Address, type Draft } from "./whatsapp/questions";
 
 /**
  * Ascend's own application, filled from what the CRM knows about a deal. The same sections are
@@ -24,9 +24,12 @@ export const APPLICATION_PDF = {
 /** Merchant name a deal has while its uploaded application is still being read. */
 export const READING_PLACEHOLDER = "New application (reading…)";
 
-/** Authorization printed above the signature line on the downloaded application. */
+/**
+ * Authorization printed above the signature (the Terms of use on ascendfund.co's application).
+ * Settings → Ascend application can replace it.
+ */
 export const SIGNATURE_CONSENT =
-  "By signing below, I certify that I am an owner of the business named in this application and that the information in it and in the documents provided is true, correct and complete. I authorize Ascend Fund, its agents and the funding partners it shares this application with to obtain business and personal credit reports, bank and trade references and other information about the business and its owners, and to share this application and its documents with those funding partners. I agree that an electronic signature on this application has the same effect as a handwritten signature.";
+  "By submitting this application, the above listed business and business owner/officer authorize Ascend Fund LLC dba Ascend Fund Business Capital and each of its representatives, successors, assigns, designees to obtain consumer or personal, business and investigative reports and other information about you, including credit card processor statements and bank statements, from one or more consumer reporting agencies. You also authorize Ascend Fund to transmit this application form, along with any of the foregoing information obtained in connection with this application any all of the Recipients for the foregoing purposes. You consent to the release, by any creditor or financial institution, of any information relating to any of you. You may revoke your consent to receive communications from us at any time by contacting us at funding@ascendfund.co or 786-565-0570.";
 
 export interface OwnerPii {
   ssn: string | null;
@@ -39,61 +42,56 @@ export const usDate = (v: string | undefined | null) => {
   return m ? `${m[2]}/${m[3]}/${m[1]}` : (v ?? null);
 };
 
-const label = (key: string) => FIELDS.find((f) => f.key === key)!.label.en;
 const show = (key: string, d: Draft) => {
   const f = FIELDS.find((x) => x.key === key)!;
   return f.show(f.get(d)) || null;
 };
 
-/** Ascend's application sections (English, as lenders read it). */
+/**
+ * Ascend's application sections, field for field as on ascendfund.co's application: business
+ * information (with the amounts) and owner information. No email or phone.
+ */
 export function applicationSections(
   draft: Draft,
   pii: OwnerPii[],
-  opts: { masked: boolean; firstOwnerPhone?: string | null },
+  opts: { masked: boolean },
 ): ApplicationPdfSection[] {
   const b = draft.business;
   const sections: ApplicationPdfSection[] = [
     {
-      heading: "Business",
+      heading: "Business information",
       fields: [
-        [label("business.legalName"), b.legalName ?? null],
-        [label("business.dba"), b.dba ?? null],
-        [label("business.entityType"), show("business.entityType", draft)],
-        [label("business.ein"), b.ein ?? null],
-        [label("business.startDate"), usDate(b.startDate)],
-        [label("business.industry"), b.industry ?? null],
-        [label("business.address"), showAddress(b.address) || null],
-        [label("business.phone"), b.phone ?? null],
-        [label("business.email"), b.email ?? null],
-        ["Website", b.website ?? null],
-      ],
-    },
-    {
-      heading: "Funding request",
-      fields: [
-        [label("request.amount"), show("request.amount", draft)],
-        [label("request.useOfFunds"), draft.request.useOfFunds ?? null],
-        [label("request.monthlyRevenue"), show("request.monthlyRevenue", draft)],
-        [label("request.existingAdvances"), show("request.existingAdvances", draft)],
+        ["Legal Company Name", b.legalName ?? null],
+        ...(b.dba ? ([["Doing Business As", b.dba]] as [string, string][]) : []),
+        ["Entity Type", show("business.entityType", draft)],
+        ["Business Start Date", usDate(b.startDate)],
+        ["Tax ID / EIN", b.ein ?? null],
+        ["Industry", b.industry ?? null],
+        ["Business Address", b.address?.line1 ?? null],
+        ["City", b.address?.city ?? null],
+        ["State", b.address?.state ?? null],
+        ["ZIP", b.address?.postalCode ?? null],
+        ["Financing Amount", show("request.amount", draft)],
+        ["Monthly Revenue", show("request.monthlyRevenue", draft)],
       ],
     },
   ];
   draft.owners.forEach((o, i) => {
     const p = pii[i];
-    const ssn = p?.ssn ? (opts.masked ? `***-**-${p.ssn.slice(-4)}` : p.ssn) : null;
-    const dob = p?.dob ? (opts.masked ? "On file" : usDate(p.dob)) : null;
-    const phone = o.phone ?? (i === 0 ? (opts.firstOwnerPhone ?? null) : null);
     sections.push({
-      heading: draft.owners.length > 1 ? `Owner ${i + 1}` : "Owner",
+      heading: i === 0 ? "Owner information" : `Owner ${i + 1} information`,
       fields: [
-        ["Full name", `${o.firstName ?? ""} ${o.lastName ?? ""}`.trim() || null],
-        ["Ownership", o.ownershipPct !== undefined ? `${o.ownershipPct}%` : null],
-        ["Social Security number", ssn],
-        ["Date of birth", dob],
-        ["Home address", showAddress(o.address) || null],
-        ["Email", o.email ?? null],
-        ["Phone", phone],
-        ["Credit score (estimated)", o.creditScore ? String(o.creditScore) : null],
+        ["Full Name", `${o.firstName ?? ""} ${o.lastName ?? ""}`.trim() || null],
+        ["Date of Birth", p?.dob ? (opts.masked ? "On file" : usDate(p.dob)) : null],
+        ["Ownership %", o.ownershipPct !== undefined ? `${o.ownershipPct}%` : null],
+        [
+          "Social Security No.",
+          p?.ssn ? (opts.masked ? `***-**-${p.ssn.slice(-4)}` : p.ssn) : null,
+        ],
+        ["Address", o.address?.line1 ?? null],
+        ["City", o.address?.city ?? null],
+        ["State", o.address?.state ?? null],
+        ["ZIP", o.address?.postalCode ?? null],
       ],
     });
   });
@@ -191,13 +189,26 @@ export async function dealApplication(prisma: PrismaClient, tenantId: string, de
   return { deal, merchant: m, owners: m.owners, draft, pii };
 }
 
+/** What Ascend's application needs before it goes to lenders (as on ascendfund.co's form). */
+const REQUIRED = [
+  "business.legalName",
+  "business.entityType",
+  "business.ein",
+  "business.startDate",
+  "business.industry",
+  "business.address",
+  "request.amount",
+  "owners.0.name",
+  "owners.0.ownershipPct",
+  "owners.0.address",
+];
+
 /** Required application fields the deal is still missing (labels for the deal page). */
 export function missingFields(draft: Draft, pii: OwnerPii[]): string[] {
   const empty = (v: unknown) => v === undefined || v === null || v === "";
-  // An empty positions box means "no advances", so that one is never reported missing.
-  const out = FIELDS.filter(
-    (f) => f.required && f.key !== "request.existingAdvances" && empty(f.get(draft)),
-  ).map((f) => f.label.en);
+  const out = FIELDS.filter((f) => REQUIRED.includes(f.key) && empty(f.get(draft))).map(
+    (f) => f.label.en,
+  );
   if (!pii[0]?.ssn) out.push("Owner SSN");
   if (!pii[0]?.dob) out.push("Owner date of birth");
   return out;
@@ -218,6 +229,7 @@ export async function renderDealApplication(
     signerName:
       `${app.draft.owners[0]?.firstName ?? ""} ${app.draft.owners[0]?.lastName ?? ""}`.trim() ||
       undefined,
+    date: new Date(),
   });
   const name = app.draft.business.dba ?? app.draft.business.legalName;
   return { fileName: `${applicationFileBase(name)}.pdf`, data };

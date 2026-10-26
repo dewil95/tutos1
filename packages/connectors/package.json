@@ -20,6 +20,7 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "unpdf": "1.8.1"
   }
 }

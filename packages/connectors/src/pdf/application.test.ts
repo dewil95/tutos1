@@ -31,7 +31,7 @@ describe("renderApplicationPdf", () => {
     const signed = await renderApplicationPdf({
       brand: "Ascend Fund",
       title: "Business Funding Application",
-      sections: Array.from({ length: 8 }, () => sections[0]!),
+      sections: Array.from({ length: 24 }, () => sections[0]!),
       consentText: "Consent ".repeat(200),
       signature: {
         name: "José Muñoz",

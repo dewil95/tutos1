@@ -91,6 +91,17 @@ const longDate = (d: Date) =>
     day: "numeric",
   });
 
+/** "October 22, 2026 05:47 PM EDT", as in the header of ascendfund.co's application. */
+export function headerDate(d: Date): string {
+  const time = d.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+  return `${longDate(d)} ${time}`;
+}
+
 const NAVY = rgb(0.13, 0.23, 0.4);
 const WHITE = rgb(1, 1, 1);
 const INK = rgb(0.13, 0.13, 0.15);
@@ -105,8 +116,9 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
-  const W = 612;
-  const H = 792;
+  // A4, like the application PDF on ascendfund.co.
+  const W = 595;
+  const H = 842;
   const M = 42;
   const FOOT = 64;
   const sig = input.signature;
@@ -139,7 +151,7 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
       text(input.brand.toUpperCase(), M, H - 34, { size: 20, f: bold, color: WHITE });
       if (input.tagline) text(input.tagline, M, H - 50, { size: 8.5, color: WHITE });
       right(input.title, W - M, H - 32, 15, bold, WHITE);
-      right(formatSignedAt(date), W - M, H - 48, 8, font, WHITE);
+      right(headerDate(date), W - M, H - 48, 8, font, WHITE);
     } else {
       text(input.brand.toUpperCase(), M, H - 20, { size: 10, f: bold, color: WHITE });
       right(input.title, W - M, H - 20, 9, bold, WHITE);
@@ -255,10 +267,14 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
     const size = 20;
     const name = wrap(sig.name, italic, size, boxW - 20)[0] ?? "";
     text(name, M + 12, y - boxH / 2 - size / 3, { size, f: italic });
+  } else {
+    // Unsigned, as on ascendfund.co's application: a placeholder in the empty box.
+    text("Applicant Signature", M + 12, y - boxH / 2 - 3, { size: 8.5, f: italic, color: MUTED });
   }
   y -= boxH + 12;
   text("Signature", M, y, { size: 7.5, color: MUTED });
-  text(`Date: ${sig ? longDate(sig.signedAt) : "______________________"}`, M + boxW + 40, y + 2, {
+  const signedOn = sig?.signedAt ?? input.date;
+  text(`Date: ${signedOn ? longDate(signedOn) : "______________________"}`, M + boxW + 40, y + 2, {
     size: 8,
     color: MUTED,
   });

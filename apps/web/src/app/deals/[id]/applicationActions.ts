@@ -11,6 +11,7 @@ import {
 } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
 import { storeDealFile } from "@/server/documents";
+import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { sendTracked } from "@/server/email/send";
 import { createWebApplication } from "@/server/webApplication";
@@ -35,6 +36,7 @@ export async function saveApplicationDetails(dealId: string, form: FormData) {
     await prisma.dealEvent.create({
       data: { dealId, type: "application_edited", actorType: "user", actorId: user.id },
     });
+    await fileAscendApplication(prisma, user.tenantId, dealId);
     target = back(dealId, { saved: "1" });
   } catch (err) {
     if (!(err instanceof InputError)) console.error(`[deal ${dealId}] save application`, err);

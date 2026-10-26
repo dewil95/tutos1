@@ -82,6 +82,7 @@ const {
   STARTS_PER_IP_HOUR,
 } = await import("./webApplication");
 const { parseAdvanceLines, writeApplicationForm } = await import("./applicationForm");
+const { fileAscendApplication } = await import("./applicationFile");
 const { handleApplicationRead } = await import("./jobs/applicationRead");
 
 const KEY = Buffer.alloc(32, 5).toString("base64");
@@ -238,13 +239,21 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     expect(snap.missing).toEqual([]);
     expect(snap.fingerprint).not.toBe(before!.fingerprint);
     // The review shows SSN masked; the PDF for lenders has it in full.
-    const owner = snap.masked.find((s) => s.heading === "Owner")!;
-    expect(owner.fields).toContainEqual(["Social Security number", "***-**-6789"]);
-    const business = snap.masked.find((s) => s.heading === "Business")!;
+    const owner = snap.masked.find((s) => s.heading === "Owner information")!;
+    expect(owner.fields).toContainEqual(["Social Security No.", "***-**-6789"]);
+    const business = snap.masked.find((s) => s.heading === "Business information")!;
     expect(business.fields.find(([k]) => /EIN/.test(k))?.[1]).toBe("**-***3333");
-    expect(snap.full.find((s) => s.heading === "Business")!.fields).toContainEqual(
+    expect(snap.full.find((s) => s.heading === "Business information")!.fields).toContainEqual(
       expect.arrayContaining(["11-2223333"]),
     );
+
+    // Complete now: Ascend's application is filed for lenders, unsigned; a newer copy replaces it.
+    await fileAscendApplication(prisma, tenantId, dealId);
+    const first = (await fileAscendApplication(prisma, tenantId, dealId))!;
+    const unsignedForLenders = await prisma.document.findMany({
+      where: { dealId, uploadedVia: "generated", internalOnly: false },
+    });
+    expect(unsignedForLenders.map((d) => d.id)).toEqual([first]);
 
     const fp = snap.fingerprint;
     expect(await sign({ fingerprint: fp, agreed: false })).toEqual({ ok: false, error: "agree" });
@@ -261,8 +270,15 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     expect(signed.ok).toBe(true);
     expect(await sign({ fingerprint: fp })).toEqual({ ok: false, error: "signed" });
 
-    const doc = await prisma.document.findFirstOrThrow({
+    // Only the signed copy goes to lenders now; the unsigned one is kept, team-only.
+    const forLenders = await prisma.document.findMany({
       where: { dealId, type: "APPLICATION", internalOnly: false },
+    });
+    expect(forLenders).toHaveLength(1);
+    const doc = forLenders[0]!;
+    expect(doc.uploadedVia).toBe("website");
+    expect(await prisma.document.findUniqueOrThrow({ where: { id: first } })).toMatchObject({
+      internalOnly: true,
     });
     expect(doc.fileName).toBe("Ascend-Fund-Application-Sample-Grill-LLC.pdf");
     const sig = await prisma.applicationSignature.findFirstOrThrow({ where: { dealId } });
@@ -274,7 +290,7 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       userAgent: "test-browser",
       documentId: doc.id,
     });
-    expect(sig.consentText).toContain("electronic signature");
+    expect(sig.consentText).toContain("sign this application electronically");
     expect(sig.signatureImage).toBe(DRAWING.split(",")[1]);
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
     expect(deal.submissionPositions).toEqual([{ funder: "ABC Funding", balance: 8000 }]);
