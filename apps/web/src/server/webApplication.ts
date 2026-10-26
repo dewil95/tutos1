@@ -2,8 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { dealFolderPath, renderApplicationPdf, type ApplicationPdfSection } from "@mca/connectors";
 import { enqueueJob, type Prisma, type PrismaClient } from "@mca/db";
 import {
-  APPLICATION_TITLE,
-  ASCEND_BRAND,
+  APPLICATION_PDF,
   READING_PLACEHOLDER,
   SIGNATURE_CONSENT,
   applicationFileBase,
@@ -41,9 +40,21 @@ export const hashToken = (t: string) => createHash("sha256").update(t).digest("h
 const sha256 = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
 
 export const ESIGN_AGREEMENT: Record<Lang, string> = {
-  en: "I agree to sign this application electronically. I adopt the name I type below as my signature, and it has the same effect as my handwritten signature.",
-  es: "Acepto firmar esta solicitud electrónicamente. Adopto el nombre que escribo abajo como mi firma, y tiene el mismo efecto que mi firma a mano.",
+  en: "I agree to sign this application electronically. I adopt the signature I draw and the name I type below as my signature, and it has the same effect as my handwritten signature.",
+  es: "Acepto firmar esta solicitud electrónicamente. Adopto la firma que dibujo y el nombre que escribo abajo como mi firma, y tiene el mismo efecto que mi firma a mano.",
 };
+
+/**
+ * The signature drawn on the signing page, sent as a PNG data URL. Only a real, reasonably sized
+ * PNG is accepted (it is embedded in the PDF as is).
+ */
+export function parseDrawing(dataUrl: string | null | undefined): Buffer | null {
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl ?? "");
+  if (!m || m[1]!.length > 400_000) return null;
+  const png = Buffer.from(m[1]!, "base64");
+  const magic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  return png.length > 60 && png.subarray(0, 8).equals(magic) ? png : null;
+}
 
 /** Spanish reading of the default authorization; the English text is the one on the PDF. */
 const CONSENT_ES =
@@ -295,10 +306,13 @@ export async function reviewSnapshot(
 
 export type SignResult =
   | { ok: true; documentId: string }
-  | { ok: false; error: "expired" | "signed" | "changed" | "missing" | "agree" | "name" };
+  | {
+      ok: false;
+      error: "expired" | "signed" | "changed" | "missing" | "agree" | "name" | "drawing";
+    };
 
 /**
- * The merchant ticked the agreement, typed their name and pressed Sign: the signed PDF is filed
+ * The merchant ticked the agreement, drew their signature, typed their name and pressed Sign: the signed PDF is filed
  * on the deal (for lenders) and the proof is recorded (append-only).
  */
 export async function signWebApplication(
@@ -307,6 +321,8 @@ export async function signWebApplication(
   input: {
     name: string;
     agreed: boolean;
+    /** The drawn signature (PNG data URL from the signing page). */
+    drawing: string | null;
     fingerprint: string;
     ip: string | null;
     userAgent: string | null;
@@ -324,6 +340,8 @@ export async function signWebApplication(
   const name = input.name.replace(/\s+/g, " ").trim().slice(0, 120);
   const owner = snap.app.draft.owners[0] ?? {};
   if (!nameMatches(name, owner)) return { ok: false, error: "name" };
+  const drawing = parseDrawing(input.drawing);
+  if (!drawing) return { ok: false, error: "drawing" };
 
   // Claim the link first so a double click signs once.
   const claimed = await prisma.webApplication.updateMany({
@@ -332,7 +350,7 @@ export async function signWebApplication(
   });
   if (claimed.count === 0) return { ok: false, error: "signed" };
   try {
-    return await recordSignature(prisma, row, snap, { ...input, name }, now);
+    return await recordSignature(prisma, row, snap, { ...input, name, drawing }, now);
   } catch (err) {
     await prisma.webApplication.update({ where: { id: row.id }, data: { signedAt: null } });
     throw err;
@@ -343,7 +361,7 @@ async function recordSignature(
   prisma: PrismaClient,
   row: { id: string; tenantId: string; dealId: string },
   snap: NonNullable<Awaited<ReturnType<typeof reviewSnapshot>>>,
-  input: { name: string; ip: string | null; userAgent: string | null },
+  input: { name: string; drawing: Buffer; ip: string | null; userAgent: string | null },
   now: Date,
 ): Promise<SignResult> {
   const { app, consent } = snap;
@@ -353,6 +371,7 @@ async function recordSignature(
     signedAt: now,
     via: `online application${input.ip ? `, IP ${input.ip}` : ""}`,
     ref,
+    image: input.drawing,
   };
   const consentPdf = [
     consent.authorization,
@@ -362,8 +381,7 @@ async function recordSignature(
     .filter(Boolean)
     .join("\n\n");
   const signedPdf = await renderApplicationPdf({
-    brand: ASCEND_BRAND,
-    title: APPLICATION_TITLE,
+    ...APPLICATION_PDF,
     sections: snap.full,
     consentText: consentPdf,
     signature,
@@ -397,6 +415,7 @@ async function recordSignature(
       pdfSha256: sha256(signedPdf),
       signedAt: now,
       ipAddress: input.ip,
+      signatureImage: input.drawing.toString("base64"),
       userAgent: input.userAgent?.slice(0, 500) ?? null,
     },
   });
@@ -454,8 +473,7 @@ export async function merchantCopy(
   if (!sig || !app) return null;
   const sections = maskEin(applicationSections(app.draft, app.pii, { masked: true }));
   const data = await renderApplicationPdf({
-    brand: ASCEND_BRAND,
-    title: APPLICATION_TITLE,
+    ...APPLICATION_PDF,
     sections,
     consentText: sig.consentText,
     signature: {
@@ -463,6 +481,7 @@ export async function merchantCopy(
       signedAt: sig.signedAt,
       via: `online application${sig.ipAddress ? `, IP ${sig.ipAddress}` : ""}`,
       ref: sig.id,
+      ...(sig.signatureImage ? { image: Buffer.from(sig.signatureImage, "base64") } : {}),
     },
   });
   const b = app.draft.business;

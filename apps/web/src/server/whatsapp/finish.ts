@@ -3,8 +3,7 @@ import { dealFolderPath, renderApplicationPdf, type ApplicationPdfSection } from
 import type { Prisma } from "@mca/db";
 import { applyApplication } from "../applicationData";
 import {
-  APPLICATION_TITLE,
-  ASCEND_BRAND,
+  APPLICATION_PDF,
   applicationFileBase,
   applicationSections as sharedSections,
 } from "../ascendApplication";
@@ -13,9 +12,6 @@ import { ApplicationPayloadSchema, findMerchantMatch, payloadToReading } from ".
 import { handoff, say, sendFile, ownerName, type Ctx } from "./chat";
 import { COPY, DEFAULT_CONSENT, tr } from "./copy";
 import { formatPhone, maskPhone, type Lang } from "./questions";
-
-const BRAND = ASCEND_BRAND;
-const TITLE = APPLICATION_TITLE;
 
 /** The authorization the merchant reads in the chat (tenant setting, or the default). */
 export async function consentFor(x: Ctx, lang: Lang = x.lang): Promise<string> {
@@ -51,8 +47,7 @@ export async function renderApplication(
   opts: { masked: boolean },
 ): Promise<{ fileName: string; data: Buffer }> {
   const data = await renderApplicationPdf({
-    brand: BRAND,
-    title: TITLE,
+    ...APPLICATION_PDF,
     sections: applicationSections(x, opts),
     consentText: await pdfConsent(x),
     note: "Preview - not signed yet",
@@ -133,8 +128,7 @@ export async function signApplication(x: Ctx, opts: { agreeMessageId: string | n
   const consentPdf = await pdfConsent(x);
   const sections = applicationSections(x, { masked: false });
   const signedPdf = await renderApplicationPdf({
-    brand: BRAND,
-    title: TITLE,
+    ...APPLICATION_PDF,
     sections,
     consentText: consentPdf,
     signature,
@@ -219,8 +213,7 @@ export async function signApplication(x: Ctx, opts: { agreeMessageId: string | n
   x.c.pendingNameMessageId = null;
   await say(x, tr(COPY.signed, x.lang)(owner.firstName ?? ""));
   const copy = await renderApplicationPdf({
-    brand: BRAND,
-    title: TITLE,
+    ...APPLICATION_PDF,
     sections: applicationSections(x, { masked: true }),
     consentText: consentPdf,
     signature,

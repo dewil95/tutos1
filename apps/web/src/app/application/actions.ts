@@ -197,6 +197,7 @@ export async function sign(token: string, form: FormData) {
     result = await signWebApplication(prisma, token, {
       name: String(form.get("name") ?? ""),
       agreed: form.get("agree") === "yes",
+      drawing: String(form.get("drawing") ?? "") || null,
       fingerprint: String(form.get("fingerprint") ?? ""),
       ip: clientIp(h),
       userAgent: h.get("user-agent"),

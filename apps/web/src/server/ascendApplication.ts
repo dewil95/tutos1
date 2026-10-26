@@ -9,7 +9,17 @@ import { FIELDS, showAddress, type Address, type Draft } from "./whatsapp/questi
  * sent for signature, then uploaded back signed).
  */
 export const ASCEND_BRAND = "Ascend Fund";
-export const APPLICATION_TITLE = "Business Funding Application";
+export const APPLICATION_TITLE = "Funding Application";
+
+/** Header, intro and footer of every Ascend application PDF (same look as ascendfund.co). */
+export const APPLICATION_PDF = {
+  brand: ASCEND_BRAND,
+  tagline: "Business Capital",
+  title: APPLICATION_TITLE,
+  intro:
+    "Thank you for placing your trust in Ascend Fund Business Capital. Please review the information below.",
+  contact: "786-565-0570 | www.ascendfund.co",
+};
 
 /** Merchant name a deal has while its uploaded application is still being read. */
 export const READING_PLACEHOLDER = "New application (reading…)";
@@ -202,8 +212,7 @@ export async function renderDealApplication(
   const app = await dealApplication(prisma, tenantId, dealId);
   if (!app) return null;
   const data = await renderApplicationPdf({
-    brand: ASCEND_BRAND,
-    title: APPLICATION_TITLE,
+    ...APPLICATION_PDF,
     sections: applicationSections(app.draft, app.pii, { masked: false }),
     consentText: await signatureConsent(prisma, tenantId),
     signerName:

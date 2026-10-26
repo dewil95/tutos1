@@ -11,6 +11,7 @@ import { addStatements, sign, switchLanguage } from "../actions";
 import { copyFor, type Copy, type ErrorCode } from "../copy";
 import { DetailsForm, type FormValues } from "./DetailsForm";
 import { ApplyShell } from "../ApplyShell";
+import { SignaturePad } from "./SignaturePad";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -196,6 +197,12 @@ function SignForm({
         <input type="checkbox" name="agree" value="yes" required />
         <span>{snap.consent.agreement}</span>
       </label>
+      <SignaturePad
+        name="drawing"
+        label={t.drawSignature}
+        clearLabel={t.clearSignature}
+        requiredMessage={t.errors.drawing}
+      />
       <label className="field">
         {t.typeName}
         <input name="name" autoComplete="name" required minLength={3} />

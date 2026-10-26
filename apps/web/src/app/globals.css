@@ -1229,3 +1229,16 @@ ul.habits {
     animation: none;
   }
 }
+.sigpad {
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 10 / 3;
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sigpad.warn {
+  border-color: var(--bad);
+}
