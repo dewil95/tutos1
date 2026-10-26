@@ -1101,3 +1101,131 @@ ul.habits {
   display: grid;
   gap: 6px;
 }
+
+/* Merchant application pages (/application) */
+.apply-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 8px 0 48px;
+}
+.apply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.apply-head .brand {
+  color: var(--ink);
+  padding: 0;
+}
+.apply-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+  max-width: 620px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+.apply-card.wide {
+  max-width: none;
+}
+.apply-card h1 {
+  margin: 0;
+}
+.apply-card .field {
+  flex: 1 1 180px;
+}
+.apply-card .field.narrow {
+  flex: 0 1 90px;
+}
+.apply-card .button.primary {
+  padding: 10px 18px;
+}
+.lang-switch {
+  font-size: 13px;
+}
+.hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.review {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+.review h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.review dl {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.review dl div {
+  display: grid;
+  grid-template-columns: 11em 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+.review dt {
+  color: var(--muted);
+}
+.review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sign .consent {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  line-height: 1.5;
+}
+.sign h3 {
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+.check input {
+  margin-top: 3px;
+}
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 640px) {
+  .apply-card {
+    padding: 18px;
+  }
+  .review dl div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
