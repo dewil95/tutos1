@@ -6,7 +6,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { applicationUploadToPdf } from "@/server/ascendApplication";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
-import { sendTracked } from "@/server/email/send";
 import { inlineBudgetMs } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
 import {
@@ -22,7 +21,6 @@ import {
 import { copyFor, type ErrorCode } from "./copy";
 
 const FILE_TYPES = /^(application\/pdf|image\/(jpe?g|png))$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const isFile = (f: FormDataEntryValue): f is File => f instanceof File && f.size > 0;
 const read = async (f: File): Promise<UploadedFile> => ({
@@ -52,16 +50,9 @@ export async function startApplication(form: FormData) {
     redirect(`/application?${new URLSearchParams({ lang, error })}`);
   // Bots fill every field, people never see this one.
   if (String(form.get("hp_x7") ?? "")) fail("honeypot");
-  const email = String(form.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-  if (!EMAIL.test(email) || email.length > 200) fail("email");
-  const phone =
-    String(form.get("phone") ?? "")
-      .trim()
-      .slice(0, 40) || null;
   const appFiles = await Promise.all(form.getAll("application").filter(isFile).map(read));
   const statements = await Promise.all(form.getAll("statements").filter(isFile).map(read));
+  if (!appFiles.length && !statements.length) fail("nofiles");
   if ([...appFiles, ...statements].some((f) => !FILE_TYPES.test(f.type))) fail("files");
 
   const prisma = getPrisma();
@@ -76,51 +67,17 @@ export async function startApplication(form: FormData) {
       tenantId: tid,
       application,
       statements: statements.filter((f) => f.type === "application/pdf"),
-      email,
-      phone,
       lang,
       ip,
     });
     token = started.token;
     const jobId = started.readJobId;
-    after(async () => {
-      if (jobId) await runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] });
-      await emailLink(prisma, { tenantId: tid, dealId: started.dealId, email, token, lang });
-    });
+    if (jobId) after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }));
   } catch (err) {
     console.error("[application] start failed", err);
     return fail("failed");
   }
   redirect(page(token));
-}
-
-/** The merchant gets their link by email too, so they can come back (dry-run aware). */
-async function emailLink(
-  prisma: ReturnType<typeof getPrisma>,
-  x: { tenantId: string; dealId: string; email: string; token: string; lang: Lang },
-) {
-  try {
-    const tenant = await prisma.tenant.findUnique({ where: { id: x.tenantId } });
-    const base = process.env.APP_URL;
-    if (!tenant?.fromAddress || !base) return;
-    const link = `${base}${page(x.token)}`;
-    const es = x.lang === "es";
-    await sendTracked(prisma, {
-      tenantId: x.tenantId,
-      dealId: x.dealId,
-      kind: "web_application_link",
-      target: x.email,
-      from: tenant.fromAddress,
-      to: [x.email],
-      cc: [],
-      subject: es ? "Su solicitud de Ascend Fund" : "Your Ascend Fund application",
-      text: es
-        ? `Gracias por su solicitud. Para revisarla y firmarla, use este enlace privado (vence en 14 días):\n\n${link}\n\nNo comparta este enlace.\n\nAscend Fund`
-        : `Thank you for applying. To review and sign your application, use this private link (it expires in 14 days):\n\n${link}\n\nPlease don't share this link.\n\nAscend Fund`,
-    });
-  } catch (err) {
-    console.error(`[application ${x.dealId}] link email failed`, err);
-  }
 }
 
 export type SaveResult = { error: string } | undefined;

@@ -139,8 +139,8 @@ export async function startPublicApplication(
     tenantId: string;
     application: { fileName: string; data: Buffer } | null;
     statements: UploadedFile[];
-    email: string;
-    phone: string | null;
+    email?: string | null;
+    phone?: string | null;
     lang: Lang;
     ip: string | null;
   },

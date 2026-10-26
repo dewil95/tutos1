@@ -171,8 +171,8 @@ export async function createSigningLink(dealId: string, form: FormData) {
           from: deal.tenant.fromAddress,
           to: [to],
           cc: [],
-          subject: "Please review and sign your Ascend Fund application",
-          text: `Hi${first ? ` ${first}` : ""},\n\nYour Ascend Fund application is ready. Please check the details, add anything missing and sign online with this private link (it expires in 14 days):\n\n${process.env.APP_URL}/application/${token}\n\nPlease don't share this link.\n\nAscend Fund`,
+          subject: "Please review and sign your funding application",
+          text: `Hi${first ? ` ${first}` : ""},\n\nYour funding application is ready. Please check the details, add anything missing and sign online with this private link (it expires in 14 days):\n\n${process.env.APP_URL}/application/${token}\n\nPlease don't share this link.`,
           userId: user.id,
         });
         params.emailed = dryRun ? `dry-run:${to}` : to;
