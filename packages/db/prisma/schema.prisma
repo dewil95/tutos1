@@ -1127,6 +1127,8 @@ model ApplicationSignature {
   /// Signed on the web page: the signer's IP address and browser
   ipAddress      String?
   userAgent      String?
+  /// The signature the signer drew on the web page (PNG, base64)
+  signatureImage String?
 
   @@index([tenantId, dealId])
 }

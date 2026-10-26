@@ -85,6 +85,9 @@ const { parseAdvanceLines, writeApplicationForm } = await import("./applicationF
 const { handleApplicationRead } = await import("./jobs/applicationRead");
 
 const KEY = Buffer.alloc(32, 5).toString("base64");
+// A real (tiny) PNG, as the signing page sends the drawn signature.
+const DRAWING =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 describe("advances typed by the merchant", () => {
   it("reads company and balance per line", () => {
@@ -220,6 +223,7 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       signWebApplication(prisma, token, {
         name: "Robin Sample",
         agreed: true,
+        drawing: DRAWING,
         fingerprint: before!.fingerprint,
         ip: "192.0.2.10",
         userAgent: "test-browser",
@@ -248,6 +252,11 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       ok: false,
       error: "name",
     });
+    expect(await sign({ fingerprint: fp, drawing: null })).toEqual({ ok: false, error: "drawing" });
+    expect(await sign({ fingerprint: fp, drawing: "data:image/png;base64,AAAA" })).toEqual({
+      ok: false,
+      error: "drawing",
+    });
     const signed = await sign({ fingerprint: fp, name: "  robin   SAMPLE " });
     expect(signed.ok).toBe(true);
     expect(await sign({ fingerprint: fp })).toEqual({ ok: false, error: "signed" });
@@ -266,6 +275,7 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       documentId: doc.id,
     });
     expect(sig.consentText).toContain("electronic signature");
+    expect(sig.signatureImage).toBe(DRAWING.split(",")[1]);
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
     expect(deal.submissionPositions).toEqual([{ funder: "ABC Funding", balance: 8000 }]);
     expect(deal.applicationData).toMatchObject({ signed: true, signedVia: "web" });

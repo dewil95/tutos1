@@ -47,6 +47,30 @@ describe("renderApplicationPdf", () => {
     expect(signed.equals(preview)).toBe(false);
   });
 
+  it("puts the drawn signature in the signature box", async () => {
+    const base = {
+      brand: "Ascend Fund",
+      tagline: "Business Capital",
+      title: "Funding Application",
+      intro: "Thank you for placing your trust in Ascend Fund Business Capital.",
+      sections: [sections[0]!, { ...sections[0]!, heading: "Owner" }],
+      consentText: "I authorize Ascend Fund to obtain credit reports.",
+      contact: "786-565-0570 | www.ascendfund.co",
+    };
+    const sig = {
+      name: "José Muñoz",
+      signedAt: new Date("2026-10-08T19:14:00Z"),
+      via: "online application, IP 192.0.2.1",
+      ref: "sig_2",
+    };
+    const typed = await renderApplicationPdf({ ...base, signature: sig });
+    const drawn = await renderApplicationPdf({ ...base, signature: { ...sig, image: PNG } });
+    expect((await PDFDocument.load(drawn)).getPageCount()).toBe(1);
+    // The drawn signature is embedded as an image; the typed one is not.
+    expect(drawn.includes(Buffer.from("/Subtype /Image"))).toBe(true);
+    expect(typed.includes(Buffer.from("/Subtype /Image"))).toBe(false);
+  });
+
   it("formats the signing time in New York time", () => {
     expect(formatSignedAt(new Date("2026-10-08T19:14:00Z"))).toBe("Oct 8, 2026, 3:14 PM ET");
   });
