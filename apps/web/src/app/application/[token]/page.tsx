@@ -201,14 +201,13 @@ function SignForm({
         label={t.drawSignature}
         clearLabel={t.clearSignature}
         requiredMessage={t.errors.drawing}
+        optional
       />
-      <label className="field">
-        {t.typeName}
-        <input name="name" autoComplete="name" required minLength={3} />
-      </label>
       <p>
         <button type="submit" className="button primary">
-          {t.sign}
+          {t.signAs(
+            `${snap.app.draft.owners[0]?.firstName ?? ""} ${snap.app.draft.owners[0]?.lastName ?? ""}`.trim(),
+          )}
         </button>
       </p>
     </form>

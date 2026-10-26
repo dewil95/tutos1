@@ -247,6 +247,26 @@ export default async function DealPage({
       {flash.risk ? (
         <p className="notice ok">Risk report is being regenerated. Refresh in a minute.</p>
       ) : null}
+      {allDocuments.some((d) => d.watermarked) ? (
+        <p className="notice error">
+          Watermarked file(s), not the bank&apos;s original — kept off the lender package:{" "}
+          {allDocuments
+            .filter((d) => d.watermarked)
+            .map((d) => d.fileName)
+            .join(", ")}
+          . Ask the merchant for the original PDF from their bank.
+        </p>
+      ) : null}
+      {signedApp && thisDealSubs.length === 0 ? (
+        <p className="notice ok">
+          Ascend application ready ({signedApp.fileName}).{" "}
+          <a href="#ship">
+            <strong>Choose the lenders and send →</strong>
+          </a>{" "}
+          The application and the newest bank statements are attached.
+          {emailDryRun() ? " Test mode: emails are written to the timeline, not sent." : ""}
+        </p>
+      ) : null}
       {!mailbox ? (
         <p className="notice warn">
           Gmail/Drive not connected yet — an admin can connect the team mailbox in{" "}

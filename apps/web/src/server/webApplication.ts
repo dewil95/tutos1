@@ -12,7 +12,7 @@ import {
   signatureConsent,
 } from "./ascendApplication";
 import { retireGeneratedApplications } from "./applicationFile";
-import { storeDealFile } from "./documents";
+import { assertNoWatermark, storeDealFile } from "./documents";
 import { tenantMailbox } from "./google";
 import { nameMatches } from "./whatsapp/questions";
 
@@ -41,8 +41,8 @@ export const hashToken = (t: string) => createHash("sha256").update(t).digest("h
 const sha256 = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
 
 export const ESIGN_AGREEMENT: Record<Lang, string> = {
-  en: "I agree to sign this application electronically. I adopt the signature I draw and the name I type below as my signature, and it has the same effect as my handwritten signature.",
-  es: "Acepto firmar esta solicitud electrónicamente. Adopto la firma que dibujo y el nombre que escribo abajo como mi firma, y tiene el mismo efecto que mi firma a mano.",
+  en: "I agree to sign this application electronically. I adopt my name as shown on this application (and the signature I draw, if any) as my signature, and it has the same effect as my handwritten signature.",
+  es: "Acepto firmar esta solicitud electrónicamente. Adopto mi nombre como aparece en esta solicitud (y la firma que dibuje, si la hay) como mi firma, y tiene el mismo efecto que mi firma a mano.",
 };
 
 /**
@@ -146,6 +146,19 @@ export async function startPublicApplication(
     ip: string | null;
   },
 ): Promise<{ token: string; dealId: string; readJobId: string | null }> {
+  // Watermarked copies are refused before anything is created.
+  await assertNoWatermark([
+    ...(input.application
+      ? [
+          {
+            name: input.application.fileName,
+            type: "application/pdf",
+            data: input.application.data,
+          },
+        ]
+      : []),
+    ...input.statements,
+  ]);
   const mailbox = await tenantMailbox(prisma, input.tenantId);
   const merchant = await prisma.merchant.create({
     data: { tenantId: input.tenantId, legalName: READING_PLACEHOLDER },
@@ -313,14 +326,15 @@ export type SignResult =
     };
 
 /**
- * The merchant ticked the agreement, drew their signature, typed their name and pressed Sign: the signed PDF is filed
- * on the deal (for lenders) and the proof is recorded (append-only).
+ * The merchant ticked the agreement and pressed "Sign as <their name>" (drawing optional): the
+ * signed PDF is filed on the deal (for lenders) and the proof is recorded (append-only).
  */
 export async function signWebApplication(
   prisma: PrismaClient,
   token: string,
   input: {
-    name: string;
+    /** Typed name; empty → the owner's name on the application, which they sign as. */
+    name?: string | null;
     agreed: boolean;
     /** The drawn signature (PNG data URL from the signing page). */
     drawing: string | null;
@@ -338,11 +352,13 @@ export async function signWebApplication(
   if (snap.fingerprint !== input.fingerprint) return { ok: false, error: "changed" };
   if (snap.missing.length) return { ok: false, error: "missing" };
   if (!input.agreed) return { ok: false, error: "agree" };
-  const name = input.name.replace(/\s+/g, " ").trim().slice(0, 120);
   const owner = snap.app.draft.owners[0] ?? {};
+  const typed = (input.name ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const name = typed || `${owner.firstName ?? ""} ${owner.lastName ?? ""}`.trim();
   if (!nameMatches(name, owner)) return { ok: false, error: "name" };
-  const drawing = parseDrawing(input.drawing);
-  if (!drawing) return { ok: false, error: "drawing" };
+  // Drawing is optional; without it the name is the signature.
+  const drawing = input.drawing ? parseDrawing(input.drawing) : null;
+  if (input.drawing && !drawing) return { ok: false, error: "drawing" };
 
   // Claim the link first so a double click signs once.
   const claimed = await prisma.webApplication.updateMany({
@@ -362,7 +378,7 @@ async function recordSignature(
   prisma: PrismaClient,
   row: { id: string; tenantId: string; dealId: string },
   snap: NonNullable<Awaited<ReturnType<typeof reviewSnapshot>>>,
-  input: { name: string; drawing: Buffer; ip: string | null; userAgent: string | null },
+  input: { name: string; drawing: Buffer | null; ip: string | null; userAgent: string | null },
   now: Date,
 ): Promise<SignResult> {
   const { app, consent } = snap;
@@ -372,7 +388,7 @@ async function recordSignature(
     signedAt: now,
     via: `online application${input.ip ? `, IP ${input.ip}` : ""}`,
     ref,
-    image: input.drawing,
+    ...(input.drawing ? { image: input.drawing } : {}),
   };
   const consentPdf = [
     consent.authorization,
@@ -416,7 +432,7 @@ async function recordSignature(
       pdfSha256: sha256(signedPdf),
       signedAt: now,
       ipAddress: input.ip,
-      signatureImage: input.drawing.toString("base64"),
+      signatureImage: input.drawing?.toString("base64") ?? null,
       userAgent: input.userAgent?.slice(0, 500) ?? null,
     },
   });

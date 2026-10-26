@@ -8,6 +8,7 @@ import { applicationUploadToPdf } from "@/server/ascendApplication";
 import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { inlineBudgetMs } from "@/server/env";
+import { WatermarkedFileError } from "@/server/documents";
 import { runDueJobs } from "@/server/jobs/runner";
 import {
   clientIp,
@@ -75,6 +76,7 @@ export async function startApplication(form: FormData) {
     const jobId = started.readJobId;
     if (jobId) after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }));
   } catch (err) {
+    if (err instanceof WatermarkedFileError) return fail("watermark");
     console.error("[application] start failed", err);
     return fail("failed");
   }
@@ -129,6 +131,7 @@ export async function addStatements(token: string, form: FormData) {
   try {
     n = await storeStatements(prisma, { tenantId: row.tenantId, dealId: row.dealId }, files);
   } catch (err) {
+    if (err instanceof WatermarkedFileError) redirect(page(token, { error: "watermark" }));
     console.error(`[application ${row.dealId}] statements failed`, err);
     redirect(page(token, { error: "failed" }));
   }

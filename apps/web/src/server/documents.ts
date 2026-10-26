@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Attachment, DealSubfolder } from "@mca/connectors";
+import { detectWatermark, type Attachment, type DealSubfolder } from "@mca/connectors";
 import { enqueueJob, type DocumentType, type PrismaClient } from "@mca/db";
 import { dealSubfolder, ensureDealFolder, type Mailbox } from "./google";
 
@@ -38,6 +38,33 @@ export interface StoreFileInput {
   autoProcess?: boolean;
 }
 
+/** A person tried to upload a watermarked PDF (a stamped copy, not the bank's original). */
+export class WatermarkedFileError extends Error {
+  constructor(
+    public readonly fileName: string,
+    reason: string | null,
+  ) {
+    super(
+      `"${fileName}" has a watermark${reason ? ` (${reason.replace(/\.$/, "")})` : ""}. Upload the original PDF, downloaded straight from the bank.`,
+    );
+    this.name = "WatermarkedFileError";
+  }
+}
+
+/** Uploads by a person are refused when watermarked; email attachments are kept but flagged. */
+const REFUSE_WATERMARKED = new Set<StoreFileInput["uploadedVia"]>(["staff", "website", "whatsapp"]);
+
+const isPdf = (f: Attachment) => f.mimeType === "application/pdf" || /\.pdf$/i.test(f.fileName);
+
+/** Throws WatermarkedFileError for the first watermarked PDF (check before creating anything). */
+export async function assertNoWatermark(files: { name: string; type: string; data: Buffer }[]) {
+  for (const f of files) {
+    if (f.type !== "application/pdf") continue;
+    const check = await detectWatermark(new Uint8Array(f.data));
+    if (check.watermarked) throw new WatermarkedFileError(f.name, check.reason);
+  }
+}
+
 /**
  * Uploads one file into the deal's Drive folder and records it as a Document. The same bytes
  * already on the deal (same sha256) are not uploaded twice, so re-synced emails are harmless.
@@ -46,6 +73,15 @@ export async function storeDealFile(prisma: PrismaClient, mailbox: Mailbox, inpu
   const sha256 = createHash("sha256").update(input.file.data).digest("hex");
   const existing = await prisma.document.findFirst({ where: { dealId: input.dealId, sha256 } });
   if (existing) return existing;
+
+  // Statements and applications must be originals. The CRM's own PDFs are not checked.
+  const check =
+    input.uploadedVia !== "generated" && isPdf(input.file)
+      ? await detectWatermark(new Uint8Array(input.file.data))
+      : null;
+  if (check?.watermarked && REFUSE_WATERMARKED.has(input.uploadedVia)) {
+    throw new WatermarkedFileError(input.file.fileName, check.reason);
+  }
 
   const guess = classifyFileName(input.file.fileName);
   const type = input.type ?? guess.type;
@@ -71,6 +107,10 @@ export async function storeDealFile(prisma: PrismaClient, mailbox: Mailbox, inpu
       uploadedVia: input.uploadedVia,
       uploadedById: input.uploadedById ?? null,
       gmailMessageId: input.gmailMessageId ?? null,
+      // An emailed watermarked copy is kept for the team but never goes to a lender.
+      ...(check?.watermarked
+        ? { watermarked: true, watermarkReason: check.reason, internalOnly: true }
+        : {}),
     },
   });
   if (input.autoProcess !== false) await queueDocumentWork(prisma, doc);

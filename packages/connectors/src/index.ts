@@ -12,3 +12,4 @@ export * from "./whatsapp/cloudApi";
 export * from "./pdf/images";
 export * from "./pdf/application";
 export * from "./pdf/text";
+export * from "./pdf/watermarkDetect";

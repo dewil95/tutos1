@@ -83,6 +83,7 @@ const {
 } = await import("./webApplication");
 const { parseAdvanceLines, writeApplicationForm } = await import("./applicationForm");
 const { fileAscendApplication } = await import("./applicationFile");
+const { WatermarkedFileError, storeDealFile } = await import("./documents");
 const { handleApplicationRead } = await import("./jobs/applicationRead");
 
 const KEY = Buffer.alloc(32, 5).toString("base64");
@@ -261,12 +262,12 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       ok: false,
       error: "name",
     });
-    expect(await sign({ fingerprint: fp, drawing: null })).toEqual({ ok: false, error: "drawing" });
     expect(await sign({ fingerprint: fp, drawing: "data:image/png;base64,AAAA" })).toEqual({
       ok: false,
       error: "drawing",
     });
-    const signed = await sign({ fingerprint: fp, name: "  robin   SAMPLE " });
+    // Nothing typed, nothing drawn: they sign as the name on the application.
+    const signed = await sign({ fingerprint: fp, name: null, drawing: null });
     expect(signed.ok).toBe(true);
     expect(await sign({ fingerprint: fp })).toEqual({ ok: false, error: "signed" });
 
@@ -284,14 +285,14 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     const sig = await prisma.applicationSignature.findFirstOrThrow({ where: { dealId } });
     expect(sig).toMatchObject({
       channel: "web",
-      signerName: "robin SAMPLE",
+      signerName: "Robin Sample",
       ownerName: "Robin Sample",
       ipAddress: "192.0.2.10",
       userAgent: "test-browser",
       documentId: doc.id,
     });
     expect(sig.consentText).toContain("sign this application electronically");
-    expect(sig.signatureImage).toBe(DRAWING.split(",")[1]);
+    expect(sig.signatureImage).toBeNull();
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
     expect(deal.submissionPositions).toEqual([{ funder: "ABC Funding", balance: 8000 }]);
     expect(deal.applicationData).toMatchObject({ signed: true, signedVia: "web" });
@@ -301,6 +302,50 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     expect(row.signedAt).not.toBeNull();
     const copy = await merchantCopy(prisma, row);
     expect(copy?.data.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("refuses a watermarked statement from the merchant, flags one that came by email", async () => {
+    const { PDFDocument, rgb } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    for (let p = 0; p < 2; p++) {
+      const page = doc.addPage();
+      for (let i = 0; i < 6; i++) {
+        page.drawRectangle({
+          x: 50 + i * 70,
+          y: 300,
+          width: 50,
+          height: 50,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity: 0.15,
+        });
+      }
+    }
+    const stamped = Buffer.from(await doc.save());
+    const deals = await prisma.deal.count({ where: { tenantId } });
+    await expect(
+      startPublicApplication(prisma, {
+        tenantId,
+        application: null,
+        statements: [{ name: "august.pdf", type: "application/pdf", data: stamped }],
+        lang: "en",
+        ip: "192.0.2.30",
+      }),
+    ).rejects.toBeInstanceOf(WatermarkedFileError);
+    // Refused before anything was created.
+    expect(await prisma.deal.count({ where: { tenantId } })).toBe(deals);
+
+    const { dealId } = await start("192.0.2.31");
+    const { tenantMailbox } = await import("./google");
+    const emailed = await storeDealFile(prisma, await tenantMailbox(prisma, tenantId), {
+      tenantId,
+      dealId,
+      merchantId: null,
+      file: { fileName: "august.pdf", mimeType: "application/pdf", data: stamped },
+      type: "BANK_STATEMENT",
+      uploadedVia: "email",
+    });
+    expect(emailed).toMatchObject({ watermarked: true, internalOnly: true });
+    expect(emailed.watermarkReason).toMatch(/see-through/);
   });
 
   it("keeps the merchant out of other deals' records", async () => {
