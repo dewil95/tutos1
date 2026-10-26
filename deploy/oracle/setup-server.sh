@@ -21,7 +21,24 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 export DEBIAN_FRONTEND=noninteractive
 
+# A fresh server runs its own updates for the first minutes and holds apt's lock; installers
+# that hit the lock can fail quietly (Node's did, leaving Ubuntu's old Node 18), so wait first.
+wait_for_apt() {
+  command -v cloud-init >/dev/null && cloud-init status --wait >/dev/null 2>&1 || true
+  local i=0
+  while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    [ "$i" -eq 0 ] && echo "   Waiting for Ubuntu's own updates to finish..."
+    i=$((i + 1))
+    if [ "$i" -gt 180 ]; then
+      echo "Ubuntu's updates are still running after 15 minutes. Run this script again later." >&2
+      exit 1
+    fi
+    sleep 5
+  done
+}
+
 echo "== System packages and automatic security updates"
+wait_for_apt
 apt-get update -q
 apt-get install -y -q ca-certificates curl git build-essential python3 sqlite3 unattended-upgrades
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'CONF'
@@ -40,8 +57,14 @@ fi
 
 echo "== Node.js 22 and pnpm"
 if ! node -v 2>/dev/null | grep -q '^v22\.'; then
+  wait_for_apt
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  wait_for_apt
   apt-get install -y -q nodejs
+fi
+if ! node -v 2>/dev/null | grep -q '^v22\.'; then
+  echo "Node.js 22 did not install (found $(node -v 2>/dev/null || echo none)). Run this script again." >&2
+  exit 1
 fi
 corepack enable
 
@@ -51,6 +74,7 @@ if ! command -v cloudflared >/dev/null; then
   curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
   echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
     > /etc/apt/sources.list.d/cloudflared.list
+  wait_for_apt
   apt-get update -q
   apt-get install -y -q cloudflared
 fi

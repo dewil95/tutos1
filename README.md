@@ -197,6 +197,30 @@ the URL.)
 6. Open the "Ascend CRM" application → **Overview** → copy the **Application Audience (AUD)
    Tag**.
 
+### 5b. Or, without a domain: a free DuckDNS address and the CRM's own sign-in
+
+Use this instead of step 5 while there's no domain on Cloudflare. The server then answers on the
+internet itself (ports 80 and 443) and the CRM shows its own **Sign in with Google** page, which
+lets in only `@ascendfund.co` accounts on the team list. Leave `CF_ACCESS_*` empty.
+
+1. duckdns.org → sign in → add a subdomain, e.g. `ascendcrm` → set it to the server's public IP.
+   Keep the page open: the **token** at the top is needed in step 3.
+2. Oracle: Networking → Virtual cloud networks → the CRM's network → its subnet → **Default
+   Security List** → **Add Ingress Rules**: source `0.0.0.0/0`, TCP, destination port `80`; and
+   again for `443`.
+3. On the server: `sudo bash /opt/ascend-crm/deploy/oracle/public-https.sh ascendcrm.duckdns.org`
+   and paste the DuckDNS token when it asks (it isn't shown). The script installs Caddy, which
+   gets and renews the HTTPS certificate, opens 80/443 in Ubuntu's firewall, keeps the DuckDNS
+   address up to date, sets `APP_URL` and `SESSION_SECRET` in `/etc/ascend-crm/env` and restarts
+   the CRM.
+4. Google Cloud → the OAuth client from step 4: add the origin `https://ascendcrm.duckdns.org`
+   and the redirect URIs `https://ascendcrm.duckdns.org/api/auth/callback` and
+   `https://ascendcrm.duckdns.org/api/google/callback`.
+
+Caddy blocks `/api/cron/*` and `/api/health` from outside; check health on the server with
+`curl -s http://127.0.0.1:3000/api/health`. To move to a real domain later, do step 5, then
+empty `SESSION_SECRET` and set `APP_URL` to the new address.
+
 ### 6. Backups (Oracle Object Storage, free up to 20 GB)
 
 1. Storage → **Buckets → Create bucket** `ascend-crm-backups` (private, Standard tier).
@@ -209,7 +233,7 @@ the URL.)
 
 On the server: `sudo nano /etc/ascend-crm/env` and fill in every empty line
 ([`deploy/oracle/env.example`](deploy/oracle/env.example) explains each one):
-`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` (leave both empty with step 5b), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 `GEMINI_API_KEY`, `PII_ENCRYPTION_KEY` (`openssl rand -base64 32`; **keep a copy in a password
 manager**: without it the saved SSNs and Google connections can't be read), `CRON_SECRET`
 (`openssl rand -hex 32`) and the five `BACKUP_*` values. Then:

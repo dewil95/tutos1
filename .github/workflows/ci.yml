@@ -32,3 +32,4 @@ jobs:
         run: |
           bash -n deploy/oracle/setup-server.sh
           bash -n deploy/oracle/update.sh
+          bash -n deploy/oracle/public-https.sh

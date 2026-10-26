@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { currentUser, SIGN_OUT_URL } from "@/server/auth";
+import { currentUser, signOutUrl } from "@/server/auth";
 import { emailDryRun } from "@/server/env";
 import { NavLinks } from "./NavLinks";
 import "./globals.css";
@@ -55,7 +55,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   {dryRun ? "Test mode" : "Live sending"}
                 </span>
                 <span>{user.name}</span>
-                <a href={SIGN_OUT_URL} className="link">
+                <a href={signOutUrl()} className="link">
                   Sign out
                 </a>
               </div>
