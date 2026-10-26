@@ -37,15 +37,11 @@ export default async function StartPage({
       ) : null}
       <form action={startApplication} className="stack">
         <input type="hidden" name="lang" value={lang} />
-        {/* Left empty by people; bots fill it in. */}
-        <input
-          type="text"
-          name="company_website"
-          tabIndex={-1}
-          autoComplete="off"
-          className="hp"
-          aria-hidden="true"
-        />
+        {/* Left empty by people; bots fill it in. A meaningless name and display:none keep
+            browser autofill away from it (autofill filled the old "company_website"). */}
+        <div style={{ display: "none" }} aria-hidden="true">
+          <input type="text" name="hp_x7" tabIndex={-1} autoComplete="off" />
+        </div>
         <div className="row">
           <label className="field">
             {t.email}
