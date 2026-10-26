@@ -16,14 +16,14 @@ export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
   state_mismatch: "The Google sign-in expired. Try again.",
-  wrong_account: "Connect a mailbox on the company domain (funding@…).",
+  wrong_account: "Connect a mailbox on the company domain (e.g. jonas@ascendfund.co).",
   missing_permissions: "Allow both Gmail and Google Drive access on the Google screen.",
   no_refresh_token:
     "Google did not return offline access. Remove the app from the account's Google permissions and connect again.",
   access_denied: "Access was not granted.",
   missing_read_permission: "Allow Gmail read access on the Google screen.",
   already_connected:
-    "That mailbox is already connected for another use. Connect a different one (e.g. jonas@).",
+    "That mailbox is the team mailbox; it can't also be a read-only history mailbox.",
 };
 
 async function checkInboxNow() {
@@ -93,7 +93,7 @@ export default async function SettingsPage({
       <ServerStatus />
 
       <section className="panel">
-        <h2>Funding mailbox (Gmail + Google Drive)</h2>
+        <h2>Team mailbox (Gmail + Google Drive)</h2>
         <p className="small muted">
           Sends from {tenant.fromAddress ?? "—"} · team CC on every submission:{" "}
           {asList(tenant.teamCc).join(", ") || "none"} ·{" "}
@@ -110,9 +110,15 @@ export default async function SettingsPage({
         </ul>
         <p className="row">
           {isAdmin ? (
-            <a className="button" href="/api/google/connect">
-              {mailboxes.length ? "Reconnect" : "Connect"} {tenant.fromAddress ?? "mailbox"}
-            </a>
+            <>
+              <a className="button" href="/api/google/connect">
+                {mailboxes.length ? "Reconnect" : "Connect"} the team mailbox
+              </a>
+              <span className="small muted">
+                Pick the Google account to use (e.g. jonas@): the CRM sends from it and stores deal
+                files in its Drive.
+              </span>
+            </>
           ) : (
             <span className="small muted">An admin connects the mailbox.</span>
           )}

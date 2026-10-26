@@ -36,7 +36,7 @@ export async function createDealFromApplication(form: FormData) {
       mailbox = await tenantMailbox(prisma, user.tenantId);
     } catch (err) {
       if (err instanceof MailboxNotConnectedError) {
-        throw new Error("Connect Google Drive first (Settings → Connect funding@).");
+        throw new Error("Connect Google Drive first (Settings → Connect the team mailbox).");
       }
       throw err;
     }
