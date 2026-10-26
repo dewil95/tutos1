@@ -5,11 +5,11 @@ import { copyFor, type ErrorCode } from "./copy";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Ascend Fund – apply",
-  description: "Apply for business funding with Ascend Fund: upload, review and sign online.",
+  title: "Apply for business funding",
+  description: "Upload your application and bank statements.",
 };
 
-/** Public start: the merchant uploads their application and statements (?lang=es for Spanish). */
+/** Public start: just the application and the bank statements (?lang=es for Spanish). */
 export default async function StartPage({
   searchParams,
 }: {
@@ -41,16 +41,6 @@ export default async function StartPage({
             browser autofill away from it (autofill filled the old "company_website"). */}
         <div style={{ display: "none" }} aria-hidden="true">
           <input type="text" name="hp_x7" tabIndex={-1} autoComplete="off" />
-        </div>
-        <div className="row">
-          <label className="field">
-            {t.email}
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label className="field">
-            {t.phone}
-            <input name="phone" type="tel" autoComplete="tel" />
-          </label>
         </div>
         <label className="field">
           {t.appFile}

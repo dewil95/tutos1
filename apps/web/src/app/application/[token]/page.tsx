@@ -15,7 +15,7 @@ import { SignaturePad } from "./SignaturePad";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Ascend Fund – your application",
+  title: "Your application",
   robots: { index: false, follow: false },
   // The link is the merchant's key: never send it to other sites in the Referer header.
   referrer: "no-referrer",
