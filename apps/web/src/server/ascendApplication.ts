@@ -189,13 +189,14 @@ export async function dealApplication(prisma: PrismaClient, tenantId: string, de
   return { deal, merchant: m, owners: m.owners, draft, pii };
 }
 
-/** What Ascend's application needs before it goes to lenders (as on ascendfund.co's form). */
+/**
+ * What Ascend's application needs before it goes to lenders. Entity type and industry are
+ * often blank on other companies' forms, so they are shown when known but never block it.
+ */
 const REQUIRED = [
   "business.legalName",
-  "business.entityType",
   "business.ein",
   "business.startDate",
-  "business.industry",
   "business.address",
   "request.amount",
   "owners.0.name",
