@@ -173,6 +173,9 @@ export async function runEmailRules(
         status: { in: ["SENT", "ACKNOWLEDGED"] },
         sentAt: { lte: cutoff },
         gmailThreadId: { not: null },
+        // Only files the CRM sent (Ship / Ready to shop): deals the team emailed by hand and the
+        // CRM imported from the mailbox never get an automatic follow-up.
+        sentById: { not: null },
         OR: [{ lastFunderMessageAt: null }, { lastFunderMessageAt: { lte: cutoff } }],
         deal: { tenantId, stage: { in: [...OPEN_STAGES] } },
       },

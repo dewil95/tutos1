@@ -119,6 +119,9 @@ describe.runIf(await databaseReady())("email automation (SQLite, dry run)", () =
       },
     });
     await prisma.deal.update({ where: { id: dealId }, data: { stage: "SUBMITTED" } });
+    const sender = await prisma.user.create({
+      data: { tenantId, email: "jonas@ascendfund.co", name: "Jonas", role: "ADMIN" },
+    });
     await prisma.submission.create({
       data: {
         dealId,
@@ -126,9 +129,25 @@ describe.runIf(await databaseReady())("email automation (SQLite, dry run)", () =
         channel: "EMAIL",
         status: "SENT",
         sentAt: hoursAgo(30),
+        sentById: sender.id,
         gmailThreadId: "thread-1",
         toAddresses: ["subs@quiet.test"],
         ccAddresses: ["iso@quiet.test", "jonas@ascendfund.co"],
+      },
+    });
+    // Emailed by hand and imported from the mailbox: never followed up automatically.
+    const other = await prisma.funder.create({
+      data: { tenantId, name: "Hand Sent Lender", submissionTo: "subs@hand.test" },
+    });
+    await prisma.submission.create({
+      data: {
+        dealId,
+        funderId: other.id,
+        channel: "EMAIL",
+        status: "SENT",
+        sentAt: hoursAgo(30),
+        gmailThreadId: "thread-2",
+        toAddresses: ["subs@hand.test"],
       },
     });
     const saturday = new Date("2026-10-17T15:00:00Z");
