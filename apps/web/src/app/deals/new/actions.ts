@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { enqueueJob, getPrisma } from "@mca/db";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -9,6 +10,13 @@ import { assertNoWatermark, storeDealFile } from "@/server/documents";
 import { inlineBudgetMs } from "@/server/env";
 import { MailboxNotConnectedError, tenantMailbox } from "@/server/google";
 import { runDueJobs } from "@/server/jobs/runner";
+
+/** The same application was uploaded recently: go to that deal. */
+class AlreadyUploaded extends Error {
+  constructor(public readonly dealId: string) {
+    super("already uploaded");
+  }
+}
 
 const isFile = (f: FormDataEntryValue): f is File => f instanceof File && f.size > 0;
 /**
@@ -32,6 +40,19 @@ export async function createDealFromApplication(form: FormData) {
     if (appFiles.length === 0) throw new Error("Choose the merchant's application file.");
     await assertNoWatermark([...appFiles, ...statements]);
     const app = await applicationUploadToPdf(appFiles);
+    // The same file uploaded again this week opens its deal instead of starting a duplicate.
+    const sha256 = createHash("sha256").update(app.data).digest("hex");
+    const twin = await prisma.document.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        sha256,
+        type: "APPLICATION",
+        createdAt: { gt: new Date(Date.now() - 7 * 24 * 3_600_000) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { dealId: true },
+    });
+    if (twin?.dealId) throw new AlreadyUploaded(twin.dealId);
     let mailbox;
     try {
       mailbox = await tenantMailbox(prisma, user.tenantId);
@@ -98,7 +119,10 @@ export async function createDealFromApplication(form: FormData) {
     target = `/deals/${deal.id}?reading=1`;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    target = `/deals/new?${new URLSearchParams({ error: message })}`;
+    target =
+      err instanceof AlreadyUploaded
+        ? `/deals/${err.dealId}?again=1`
+        : `/deals/new?${new URLSearchParams({ error: message })}`;
   }
   redirect(target);
 }

@@ -75,10 +75,14 @@ export function AscendApplicationPanel({
             <>
               {open(source)} <span className="small muted">· team only, never sent to lenders</span>
               {reading?.state === "reading" ? (
-                <div className="small">AI is reading it… refresh in a minute.</div>
+                <div className="small">
+                  {/* Reading takes seconds: the page refreshes itself until it is done. */}
+                  <meta httpEquiv="refresh" content="4" />
+                  Reading the application… this page refreshes by itself.
+                </div>
               ) : null}
               {reading?.state === "done" ? (
-                <div className="small ok">Read by AI. Check the details below.</div>
+                <div className="small ok">Read from the application. Check the details below.</div>
               ) : null}
               {reading?.state === "not_application" ? (
                 <div className="small warn">
@@ -100,15 +104,17 @@ export function AscendApplicationPanel({
             </>
           ) : (
             <span className="small muted">
-              none uploaded (start a deal from <a href="/deals/new">New deal</a> to have AI fill
-              this in).
+              none uploaded (start a deal from <a href="/deals/new">New deal</a> to have it filled
+              in from the merchant&apos;s application).
             </span>
           )}
         </li>
 
         <li>
           <strong>Check the details</strong>{" "}
-          {missing.length ? (
+          {reading?.state === "reading" ? (
+            <span className="small muted">Filled in as soon as the reading is done.</span>
+          ) : missing.length ? (
             <span className="small warn">Missing: {missing.join(", ")}</span>
           ) : (
             <span className="small ok">All required fields are filled.</span>

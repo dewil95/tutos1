@@ -237,10 +237,13 @@ export default async function DealPage({
         </p>
       ) : null}
       {flash.wa ? <p className="notice ok">{flash.wa}</p> : null}
-      {flash.reading ? (
-        <p className="notice ok">AI is reading the application. Refresh in a minute.</p>
-      ) : null}
+      {flash.reading ? <p className="notice ok">Reading the application…</p> : null}
       {flash.saved ? <p className="notice ok">Application details saved.</p> : null}
+      {flash.again ? (
+        <p className="notice warn">
+          This application was already uploaded: this is its deal (no duplicate was created).
+        </p>
+      ) : null}
       {flash.signed ? (
         <p className="notice ok">Signed application saved. It is ticked for lenders below.</p>
       ) : null}
