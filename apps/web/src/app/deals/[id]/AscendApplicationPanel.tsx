@@ -341,7 +341,7 @@ export function AscendApplicationPanel({
           {signLink ? (
             <div className="notice ok">
               {signLinkEmailed?.startsWith("dry-run:")
-                ? `Test mode: the email to ${signLinkEmailed.slice(8)} was written to the timeline, not sent. Send the link yourself:`
+                ? `Emails to merchants are off: the email to ${signLinkEmailed.slice(8)} was written to the timeline, not sent. Send the link yourself:`
                 : signLinkEmailed
                   ? `Emailed to ${signLinkEmailed}. The link (works 14 days, shown only now):`
                   : "Send this link to the merchant (works 14 days, shown only now):"}
@@ -351,7 +351,7 @@ export function AscendApplicationPanel({
           <form action={createSigningLink.bind(null, dealId)} className="row">
             <label className="check small">
               <input type="checkbox" name="email" value="yes" defaultChecked />
-              Email it to the owner from the team mailbox
+              Email it to the owner (only if merchant emails are on)
             </label>
             <button type="submit">Create signing link</button>
           </form>

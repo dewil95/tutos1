@@ -2,7 +2,7 @@ import { asList, enqueueJob, getPrisma } from "@mca/db";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
-import { emailDryRun, inlineBudgetMs } from "@/server/env";
+import { emailDryRun, inlineBudgetMs, merchantEmailsOff } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
@@ -120,7 +120,12 @@ export default async function SettingsPage({
         <p className="small muted">
           Sends from {tenant.fromAddress ?? "—"} · team CC on every submission:{" "}
           {asList(tenant.teamCc).join(", ") || "none"} ·{" "}
-          {emailDryRun() ? <strong>dry-run mode (nothing is emailed)</strong> : "live sending"}
+          {emailDryRun() ? (
+            <strong>dry-run mode (nothing is emailed)</strong>
+          ) : (
+            <strong>lender emails: live</strong>
+          )}{" "}
+          · emails to merchants: {merchantEmailsOff() ? <strong>off</strong> : "on"}
         </p>
         {mailboxes.length === 0 ? <p className="empty">Not connected.</p> : null}
         <ul>

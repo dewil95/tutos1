@@ -169,6 +169,7 @@ export async function createSigningLink(dealId: string, form: FormData) {
           tenantId: user.tenantId,
           dealId,
           kind: "web_application_link",
+          audience: "merchant",
           target: to,
           from: deal.tenant.fromAddress,
           to: [to],

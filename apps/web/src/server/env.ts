@@ -14,6 +14,15 @@ export function emailDryRun(): boolean {
   return process.env.MCA_EMAIL_DRY_RUN !== "false";
 }
 
+/**
+ * Emails to merchants (missing documents, stip chases, signing links) are only sent when
+ * MERCHANT_EMAILS is explicitly "on", on top of live sending. Otherwise they are written to the
+ * deal timeline only, so turning lender emails on never emails a merchant.
+ */
+export function merchantEmailsOff(): boolean {
+  return emailDryRun() || process.env.MERCHANT_EMAILS !== "on";
+}
+
 export function allowedEmailDomain(): string {
   return (process.env.ALLOWED_EMAIL_DOMAIN ?? "ascendfund.co").toLowerCase();
 }
