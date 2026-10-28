@@ -26,6 +26,28 @@ const ERRORS: Record<string, string> = {
     "That mailbox is the team mailbox; it can't also be a read-only history mailbox.",
 };
 
+/** Who is CC'd on every lender submission (admins only). */
+async function saveTeamCc(form: FormData) {
+  "use server";
+  const user = await requireUser();
+  if (user.role !== "ADMIN" && user.role !== "MANAGER") redirect("/settings");
+  const list = String(form.get("teamCc") ?? "")
+    .split(/[\s,;]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const bad = list.filter((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if (bad.length) {
+    redirect(
+      `/settings?${new URLSearchParams({ error: `Not an email address: ${bad.join(", ")}` })}`,
+    );
+  }
+  await getPrisma().tenant.update({
+    where: { id: user.tenantId },
+    data: { teamCc: [...new Set(list)] },
+  });
+  redirect("/settings?cc=1");
+}
+
 async function checkInboxNow() {
   "use server";
   const user = await requireUser();
@@ -89,6 +111,7 @@ export default async function SettingsPage({
       {flash.checking ? (
         <p className="notice ok">Checking the inbox now. Refresh in a minute.</p>
       ) : null}
+      {flash.cc ? <p className="notice ok">Team CC saved.</p> : null}
 
       <ServerStatus />
 
@@ -128,6 +151,19 @@ export default async function SettingsPage({
             </form>
           ) : null}
         </p>
+        {isAdmin ? (
+          <form action={saveTeamCc} className="row">
+            <label className="field" style={{ flex: "1 1 420px" }}>
+              Team CC on every lender email (comma separated)
+              <input
+                name="teamCc"
+                defaultValue={asList(tenant.teamCc).join(", ")}
+                placeholder="xavier@ascendfund.co, david@ascendfund.co"
+              />
+            </label>
+            <button type="submit">Save CC</button>
+          </form>
+        ) : null}
       </section>
 
       <section className="panel">

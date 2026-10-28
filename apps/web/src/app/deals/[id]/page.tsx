@@ -483,10 +483,17 @@ export default async function DealPage({
               ))}
             </ul>
 
-            <h3>2. Positions and note (email body)</h3>
+            <h3>2. Message to lenders (email body)</h3>
+            {flash.shop ? (
+              <p className="notice ok">
+                Write the balances of the merchant&apos;s current lenders, tick the lenders and
+                send.
+              </p>
+            ) : null}
             <label className="field">
               <span>
-                Existing positions, one per line (<code>Lender: $balance</code>)
+                Balances of current lenders, one per line (<code>Lender: $balance</code>, e.g.{" "}
+                <code>DLP Funding: $29,081</code>)
               </span>
               <textarea name="positions" rows={4} defaultValue={positionsToText(positions)} />
             </label>
