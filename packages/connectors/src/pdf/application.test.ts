@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { formatSignedAt, renderApplicationPdf } from "./application";
 import { imagesToPdf } from "./images";
+import { pdfTextItems } from "./text";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -69,6 +70,10 @@ describe("renderApplicationPdf", () => {
     // The drawn signature is embedded as an image; the typed one is not.
     expect(drawn.includes(Buffer.from("/Subtype /Image"))).toBe(true);
     expect(typed.includes(Buffer.from("/Subtype /Image"))).toBe(false);
+    // The IP address and reference stay in the CRM's record, never on the application.
+    const words = (await pdfTextItems(new Uint8Array(drawn))).map((i) => i.text).join(" ");
+    expect(words).toContain("Printed Name");
+    expect(words).not.toMatch(/192\.0\.2\.1|sig_2|Signed electronically/);
   });
 
   it("formats the signing time in New York time", () => {

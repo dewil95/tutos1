@@ -290,15 +290,8 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
     });
   y -= 11;
   text("Printed Name", M, y, { size: 7.5, color: MUTED });
-  y -= 14;
-  if (sig) {
-    paragraph(
-      `Signed electronically by ${sig.name} on ${formatSignedAt(sig.signedAt)} via ${sig.via}. Ref ${sig.ref}`,
-      7,
-      font,
-      MUTED,
-    );
-  }
+  // How and where it was signed (IP, reference) stays in the CRM's signature record, not on the
+  // application lenders receive.
 
   const pages = doc.getPages();
   pages.forEach((p, i) => {
