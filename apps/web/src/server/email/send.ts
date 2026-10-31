@@ -1,6 +1,6 @@
 import type { Attachment } from "@mca/connectors";
 import type { PrismaClient } from "@mca/db";
-import { emailDryRun } from "../env";
+import { emailDryRun, merchantEmailsOff } from "../env";
 import { tenantMailbox } from "../google";
 
 export interface TrackedEmail {
@@ -22,6 +22,8 @@ export interface TrackedEmail {
   userId?: string | null;
   /** When the rule ran (defaults to now); used for the "already sent" record. */
   at?: Date;
+  /** Who receives it: merchant emails stay on the timeline unless MERCHANT_EMAILS is "on". */
+  audience: "lender" | "merchant";
 }
 
 /**
@@ -36,7 +38,7 @@ export async function sendTracked(
   if (e.to.length === 0) throw new Error("no recipient");
   let messageId: string | null = null;
   let threadId = e.threadId ?? null;
-  const dryRun = emailDryRun();
+  const dryRun = e.audience === "merchant" ? merchantEmailsOff() : emailDryRun();
   if (!dryRun) {
     const mailbox = await tenantMailbox(prisma, e.tenantId);
     const inReplyTo = e.replyToGmailId

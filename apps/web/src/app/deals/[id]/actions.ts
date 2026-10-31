@@ -283,6 +283,7 @@ export async function requestContracts(dealId: string, form: FormData) {
       tenantId: user.tenantId,
       dealId,
       kind: "CONTRACT_REQUEST",
+      audience: "lender",
       target: sub.id,
       from,
       to: asList(sub.toAddresses),
@@ -345,6 +346,7 @@ export async function confirmClawback(dealId: string, form: FormData) {
       tenantId: user.tenantId,
       dealId,
       kind: "CLAWBACK_CONFIRM",
+      audience: "lender",
       target: activity.id,
       from,
       // Answer whoever sent the funded email, in its thread.

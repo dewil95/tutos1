@@ -88,6 +88,7 @@ export async function runEmailRules(
         tenantId,
         dealId: d.id,
         kind: "MISSING_DOCS",
+        audience: "merchant",
         target: d.id,
         from,
         to: [d.merchant.email!],
@@ -143,6 +144,7 @@ export async function runEmailRules(
         tenantId,
         dealId,
         kind: "STIP_CHASE",
+        audience: "merchant",
         target,
         from,
         to: [deal.merchant.email!],
@@ -171,6 +173,9 @@ export async function runEmailRules(
         status: { in: ["SENT", "ACKNOWLEDGED"] },
         sentAt: { lte: cutoff },
         gmailThreadId: { not: null },
+        // Only files the CRM sent (Ship / Ready to shop): deals the team emailed by hand and the
+        // CRM imported from the mailbox never get an automatic follow-up.
+        sentById: { not: null },
         OR: [{ lastFunderMessageAt: null }, { lastFunderMessageAt: { lte: cutoff } }],
         deal: { tenantId, stage: { in: [...OPEN_STAGES] } },
       },
@@ -190,6 +195,7 @@ export async function runEmailRules(
         tenantId,
         dealId: s.dealId,
         kind: "LENDER_FOLLOW_UP",
+        audience: "lender",
         target: s.id,
         from,
         to: asList(s.toAddresses),
