@@ -170,11 +170,11 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
     text(label.toUpperCase(), x + 8, y - 11.5, { size: 8, f: bold, color: WHITE });
     y -= 16;
   };
-  const paragraph = (s: string, size: number, f = font, color = INK) => {
+  const paragraph = (s: string, size: number, f = font, color = INK, lead = size + 3) => {
     for (const l of wrap(s, f, size, W - 2 * M)) {
-      need(size + 3);
+      need(lead);
       text(l, M, y - size, { size, f, color });
-      y -= size + 3;
+      y -= lead;
     }
   };
 
@@ -233,8 +233,9 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
 
   need(60);
   bar(input.consentHeading ?? "Terms of use", M, W - 2 * M);
-  y -= 6;
-  paragraph(input.consentText, 7.5);
+  y -= 3;
+  // Small print, like the application lenders know.
+  paragraph(input.consentText, 6.5, font, INK, 7.5);
   y -= 16;
 
   // Signature: the drawn signature (or the typed name) in a box, date, printed name.
