@@ -201,6 +201,11 @@ export async function signHereNow(dealId: string, form: FormData) {
   const user = await requireUser();
   const prisma = getPrisma();
   const h = await headers();
+  // Signed from step 2 of New deal: errors go back there.
+  const fail = (error: string) =>
+    form.get("from") === "new"
+      ? `/deals/new?${new URLSearchParams({ deal: dealId, error })}`
+      : back(dealId, { error });
   let target: string;
   try {
     await prisma.deal.findFirstOrThrow({ where: { id: dealId, tenantId: user.tenantId } });
@@ -219,10 +224,10 @@ export async function signHereNow(dealId: string, form: FormData) {
     });
     target = result.ok
       ? back(dealId, { signed: "1" })
-      : back(dealId, { error: TEXT.en.errors[result.error] });
+      : fail(TEXT.en.errors[result.error]);
   } catch (err) {
     console.error(`[deal ${dealId}] sign here`, err);
-    target = back(dealId, { error: "Signing failed. Nothing was signed: try again." });
+    target = fail("Signing failed. Nothing was signed: try again.");
   }
   revalidatePath(`/deals/${dealId}`);
   redirect(target);
