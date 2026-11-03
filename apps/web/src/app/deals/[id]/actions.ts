@@ -373,17 +373,3 @@ export async function confirmClawback(dealId: string, form: FormData) {
   revalidatePath(`/deals/${dealId}`);
   redirect(target);
 }
-
-/** Merchant asked not to receive automated reminders (missing docs, stip chases). */
-export async function setEmailOptOut(dealId: string, form: FormData) {
-  const user = await requireUser();
-  const prisma = getPrisma();
-  const deal = await prisma.deal.findFirstOrThrow({
-    where: { id: dealId, tenantId: user.tenantId },
-  });
-  await prisma.merchant.update({
-    where: { id: deal.merchantId },
-    data: { emailOptOut: form.get("optOut") === "on" },
-  });
-  revalidatePath(`/deals/${dealId}`);
-}
