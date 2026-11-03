@@ -9,6 +9,7 @@ import { EmailRulesSection } from "./EmailRulesSection";
 import { WhatsAppSection } from "./WhatsAppSection";
 import { ApplicationSection } from "./ApplicationSection";
 import { HistorySection } from "./HistorySection";
+import { TeamSection } from "./TeamSection";
 import { serverStatus } from "@/server/serverUsage";
 import { revokeApiKey } from "./apiKeyActions";
 
@@ -112,8 +113,11 @@ export default async function SettingsPage({
         <p className="notice ok">Checking the inbox now. Refresh in a minute.</p>
       ) : null}
       {flash.cc ? <p className="notice ok">Team CC saved.</p> : null}
+      {flash.team ? <p className="notice ok">{flash.team}</p> : null}
 
       <ServerStatus />
+
+      <TeamSection me={user} />
 
       <section className="panel">
         <h2>Team mailbox (Gmail + Google Drive)</h2>
