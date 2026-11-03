@@ -8,7 +8,7 @@ import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { positionsToText } from "@/server/submissions";
-import { reviewSnapshot } from "@/server/webApplication";
+import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
@@ -168,6 +168,7 @@ export default async function DealPage({
           `${signSnap.app.draft.owners[0]?.firstName ?? ""} ${signSnap.app.draft.owners[0]?.lastName ?? ""}`.trim(),
       }
     : null;
+  const signedAtUpload = signedApp ? null : await pendingUploadSignature(prisma, id);
   const preselected = new Set(defaultPackage(documents));
   const submittedFunderIds = new Set(
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
@@ -310,6 +311,7 @@ export default async function DealPage({
         }
         signLinkEmailed={flash.emailed ?? null}
         signHere={signHere}
+        signedAtUpload={signedAtUpload?.at ?? null}
       />
 
       {whatsapp ? (

@@ -4,6 +4,7 @@ import { SignaturePad } from "@/app/application/[token]/SignaturePad";
 import {
   createSigningLink,
   rereadApplication,
+  applySignatureAtUpload,
   saveApplicationDetails,
   signHereNow,
   uploadSignedApplication,
@@ -42,6 +43,7 @@ export function AscendApplicationPanel({
   signLink,
   signLinkEmailed,
   signHere,
+  signedAtUpload,
 }: {
   dealId: string;
   draft: Draft;
@@ -62,6 +64,8 @@ export function AscendApplicationPanel({
     agreement: string;
     ownerName: string;
   } | null;
+  /** When the merchant signed at upload (New deal), if that signature is not applied yet. */
+  signedAtUpload: string | null;
 }) {
   const b = draft.business;
   const r = draft.request;
@@ -346,6 +350,24 @@ export function AscendApplicationPanel({
           <strong>Sign right here</strong>{" "}
           {signed ? (
             <span className="small ok">Signed.</span>
+          ) : signedAtUpload ? (
+            <div className="small">
+              <span className="ok">
+                ✓ The merchant signed at upload ({new Date(signedAtUpload).toLocaleString("en-US")}
+                ).
+              </span>{" "}
+              {reading?.state === "reading" ? (
+                <span className="muted">Check the details once the reading is done.</span>
+              ) : missing.length ? (
+                <span className="warn">Fill in what is missing above, then apply it.</span>
+              ) : (
+                <form action={applySignatureAtUpload.bind(null, dealId)} className="inline">
+                  <button type="submit" className="primary">
+                    Details are right: apply the merchant&apos;s signature
+                  </button>
+                </form>
+              )}
+            </div>
           ) : reading?.state === "reading" ? (
             <span className="small muted">
               The signature box appears as soon as the reading is done.

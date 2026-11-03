@@ -1,9 +1,14 @@
 import { getPrisma } from "@mca/db";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
-import { readingInProgress, reviewSnapshot } from "@/server/webApplication";
+import {
+  consentFor,
+  pendingUploadSignature,
+  readingInProgress,
+  reviewSnapshot,
+} from "@/server/webApplication";
 import { SignaturePad } from "@/app/application/[token]/SignaturePad";
-import { signHereNow } from "../[id]/applicationActions";
+import { applySignatureAtUpload, signHereNow } from "../[id]/applicationActions";
 import { createDealFromApplication } from "./actions";
 
 /**
@@ -22,14 +27,23 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   if ((deal.applicationData as { signed?: boolean } | null)?.signed) {
     redirect(`${dealPage}?signed=1#ascend-application`);
   }
+  const pending = await pendingUploadSignature(prisma, deal.id);
+  const signedNote = pending ? (
+    <p className="small ok">
+      ✓ The merchant signed at upload ({new Date(pending.at).toLocaleString("en-US")}).
+    </p>
+  ) : null;
   if (await readingInProgress(prisma, deal.id)) {
     return (
       <>
         {/* Reading takes seconds: the page refreshes itself until it is done. */}
         <meta httpEquiv="refresh" content="4" />
+        {signedNote}
         <p className="muted">
-          Reading the application… the box to sign appears here as soon as it is done. This page
-          refreshes by itself.
+          {pending
+            ? "Reading the application… then check Ascend's application below and apply the signature."
+            : "Reading the application… the box to sign appears here as soon as it is done."}{" "}
+          This page refreshes by itself.
         </p>
         <div className="spinner" aria-hidden="true" />
       </>
@@ -46,6 +60,7 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   return (
     <>
       {error ? <p className="notice error">{error}</p> : null}
+      {signedNote}
       {snap.missing.length ? (
         <>
           <p className="notice warn">
@@ -57,14 +72,18 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
               Fill in the details on the deal
             </a>{" "}
             <span className="small muted">
-              then sign in &quot;Sign right here&quot; on the deal page.
+              {pending
+                ? "then apply the merchant's signature there (it is kept)."
+                : 'then sign in "Sign right here" on the deal page.'}
             </span>
           </p>
         </>
       ) : (
         <>
           <p className="muted">
-            The merchant checks the details, ticks the agreement and signs in the box.
+            {pending
+              ? "Check Ascend's application, then apply the merchant's signature."
+              : "The merchant checks the details, ticks the agreement and signs in the box."}
           </p>
           <div className="review">
             {snap.full.map((s) => (
@@ -86,27 +105,36 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
           <p className="small">
             Something wrong? <a href={`${dealPage}#ascend-application`}>Fix it on the deal</a>.
           </p>
-          <form action={signHereNow.bind(null, deal.id)} className="stack sign">
-            <input type="hidden" name="fingerprint" value={snap.fingerprint} />
-            <input type="hidden" name="from" value="new" />
-            <h2>Terms of use</h2>
-            <p className="small consent">{snap.consent.authorization}</p>
-            <label className="check">
-              <input type="checkbox" name="agree" value="yes" required />
-              <span>{snap.consent.agreement}</span>
-            </label>
-            <SignaturePad
-              name="drawing"
-              label="Signature"
-              clearLabel="Clear"
-              requiredMessage="Draw the signature in the box."
-            />
-            <p>
+          {pending ? (
+            <form action={applySignatureAtUpload.bind(null, deal.id)}>
+              <input type="hidden" name="from" value="new" />
               <button type="submit" className="primary">
-                Sign as {ownerName}
+                Details are right: apply the merchant&apos;s signature
               </button>
-            </p>
-          </form>
+            </form>
+          ) : (
+            <form action={signHereNow.bind(null, deal.id)} className="stack sign">
+              <input type="hidden" name="fingerprint" value={snap.fingerprint} />
+              <input type="hidden" name="from" value="new" />
+              <h2>Terms of use</h2>
+              <p className="small consent">{snap.consent.authorization}</p>
+              <label className="check">
+                <input type="checkbox" name="agree" value="yes" required />
+                <span>{snap.consent.agreement}</span>
+              </label>
+              <SignaturePad
+                name="drawing"
+                label="Signature"
+                clearLabel="Clear"
+                requiredMessage="Draw the signature in the box."
+              />
+              <p>
+                <button type="submit" className="primary">
+                  Sign as {ownerName}
+                </button>
+              </p>
+            </form>
+          )}
         </>
       )}
       <p className="small">
@@ -181,8 +209,9 @@ export default async function NewDealPage({
 }: {
   searchParams: Promise<{ error?: string; deal?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const { error, deal } = await searchParams;
+  const consent = deal ? null : await consentFor(getPrisma(), user.tenantId, "en");
   return (
     <section className="panel narrow">
       <h1>New deal</h1>
@@ -214,25 +243,38 @@ export default async function NewDealPage({
               <input type="file" name="statements" accept="application/pdf" multiple />
             </label>
             <p className="small muted">Up to 10 MB in total per upload.</p>
+
+            <h2>2. Merchant signs Ascend&apos;s application here</h2>
+            <div className="stack sign">
+              <p className="small consent">{consent!.authorization}</p>
+              <label className="check">
+                <input type="checkbox" name="agree" value="yes" />
+                <span>{consent!.agreement}</span>
+              </label>
+              <SignaturePad
+                name="drawing"
+                label="Signature"
+                clearLabel="Clear"
+                requiredMessage="Draw the signature in the box."
+                optional
+              />
+              <p className="small muted">
+                Optional: without a signature here, the merchant can sign after the reading.
+              </p>
+            </div>
             <button type="submit" className="primary">
-              Upload and read the application
+              Upload, read and sign
             </button>
           </form>
         </>
       )}
 
-      <h2>2. Merchant signs Ascend&apos;s application here</h2>
       {deal ? (
-        <SignStep dealId={deal} error={error} />
-      ) : (
         <>
-          <div className="sigpad sigpad-waiting" aria-hidden="true" />
-          <p className="small muted">
-            Upload the application above: Ascend&apos;s application is filled in from it and the
-            merchant checks it and signs in this box.
-          </p>
+          <h2>2. Merchant signs Ascend&apos;s application here</h2>
+          <SignStep dealId={deal} error={error} />
         </>
-      )}
+      ) : null}
 
       {deal ? null : (
         <details>

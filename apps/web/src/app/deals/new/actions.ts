@@ -1,9 +1,16 @@
 "use server";
 
 import { createHash } from "node:crypto";
-import { enqueueJob, getPrisma } from "@mca/db";
+import { enqueueJob, getPrisma, type Prisma } from "@mca/db";
+import { headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import {
+  SIGNED_AT_UPLOAD,
+  clientIp,
+  parseDrawing,
+  type UploadSignature,
+} from "@/server/webApplication";
 import { READING_PLACEHOLDER, applicationUploadToPdf } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
 import { assertNoWatermark, storeDealFile } from "@/server/documents";
@@ -34,10 +41,19 @@ export async function createDealFromApplication(form: FormData) {
   });
   const appFiles = await Promise.all(form.getAll("application").filter(isFile).map(read));
   const statements = await Promise.all(form.getAll("statements").filter(isFile).map(read));
+  // The merchant may sign right away, before Ascend's application is filled in.
+  const drawn = String(form.get("drawing") ?? "");
+  const h = await headers();
+  const signedAt = new Date();
 
   let target: string;
   try {
     if (appFiles.length === 0) throw new Error("Choose the merchant's application file.");
+    const drawing = drawn ? parseDrawing(drawn) : null;
+    if (drawn && !drawing) throw new Error("The signature could not be read: sign again.");
+    if (drawing && form.get("agree") !== "yes") {
+      throw new Error("The merchant signed: tick the agreement under the terms of use too.");
+    }
     await assertNoWatermark([...appFiles, ...statements]);
     const app = await applicationUploadToPdf(appFiles);
     // The same file uploaded again this week opens its deal instead of starting a duplicate.
@@ -113,6 +129,22 @@ export async function createDealFromApplication(form: FormData) {
         payload: { documentId: doc.id, statements: statements.length },
       },
     });
+    if (drawing) {
+      const signature: UploadSignature = {
+        image: drawing.toString("base64"),
+        at: signedAt.toISOString(),
+        ip: clientIp(h),
+        userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
+      };
+      await prisma.dealEvent.create({
+        data: {
+          dealId: deal.id,
+          type: SIGNED_AT_UPLOAD,
+          actorType: "merchant",
+          payload: signature as unknown as Prisma.InputJsonObject,
+        },
+      });
+    }
     after(() =>
       runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
     );
