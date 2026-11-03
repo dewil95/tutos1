@@ -68,6 +68,21 @@ export default async function NewDealPage({
           <input type="file" name="statements" accept="application/pdf" multiple />
         </label>
         <p className="small muted">Up to 10 MB in total per upload.</p>
+        <fieldset className="stack">
+          <legend className="small">Sign Ascend&apos;s application</legend>
+          <label className="check small">
+            <input type="radio" name="sign" value="later" defaultChecked />
+            Later, from the deal page
+          </label>
+          <label className="check small">
+            <input type="radio" name="sign" value="here" />
+            Merchant signs now on this device (the signing page opens as soon as it is read)
+          </label>
+          <label className="check small">
+            <input type="radio" name="sign" value="link" />
+            Create the signing link now, to send to the merchant
+          </label>
+        </fieldset>
         <button type="submit" className="primary">
           Read application and create deal
         </button>
