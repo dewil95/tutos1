@@ -3,17 +3,18 @@ import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
 import {
   consentFor,
+  hasSignedApplication,
   pendingUploadSignature,
   readingInProgress,
   reviewSnapshot,
 } from "@/server/webApplication";
 import { SignaturePad } from "@/app/application/[token]/SignaturePad";
-import { applySignatureAtUpload, signHereNow } from "../[id]/applicationActions";
+import { applySignatureAtUpload } from "../[id]/applicationActions";
 import { createDealFromApplication } from "./actions";
 
 /**
- * Step 2 of New deal: once the upload is read, the merchant (with the team) checks Ascend's
- * application on this screen and signs it in the box. Then the deal opens.
+ * Step 2 of New deal, after the upload: the merchant signed in the upload form, so this only
+ * waits for the reading and shows the signed Ascend application (or what is still missing).
  */
 async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   const user = await requireUser();
@@ -24,17 +25,41 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   });
   if (!deal) notFound();
   const dealPage = `/deals/${deal.id}`;
-  // Ascend's application signed for real (not the other company's form, not the unsigned copy).
-  const signed = await prisma.document.count({
-    where: {
-      dealId: deal.id,
-      type: "APPLICATION",
-      internalOnly: false,
-      uploadedVia: { not: "generated" },
-    },
-  });
-  if (signed) {
-    redirect(`${dealPage}?signed=1#ascend-application`);
+  if (await hasSignedApplication(prisma, deal.id)) {
+    const signedDoc = await prisma.document.findFirst({
+      where: {
+        dealId: deal.id,
+        type: "APPLICATION",
+        internalOnly: false,
+        uploadedVia: { not: "generated" },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { fileName: true, driveWebViewLink: true },
+    });
+    const merchant = await prisma.deal.findUnique({
+      where: { id: deal.id },
+      select: { merchant: { select: { legalName: true, dba: true } } },
+    });
+    return (
+      <>
+        <p className="notice ok">
+          ✓ Signed. Ascend&apos;s application for{" "}
+          {merchant?.merchant.dba ?? merchant?.merchant.legalName} is ready for lenders:{" "}
+          {signedDoc?.driveWebViewLink ? (
+            <a href={signedDoc.driveWebViewLink} target="_blank" rel="noreferrer">
+              {signedDoc.fileName}
+            </a>
+          ) : (
+            signedDoc?.fileName
+          )}
+        </p>
+        <p>
+          <a className="button primary" href={`${dealPage}#ascend-application`}>
+            Open the deal
+          </a>
+        </p>
+      </>
+    );
   }
   const pending = await pendingUploadSignature(prisma, deal.id);
   const signedNote = pending ? (
@@ -64,8 +89,6 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
     lang: "en",
   });
   if (!snap) notFound();
-  const owner = snap.app.draft.owners[0];
-  const ownerName = `${owner?.firstName ?? ""} ${owner?.lastName ?? ""}`.trim();
   return (
     <>
       {error ? <p className="notice error">{error}</p> : null}
@@ -82,8 +105,8 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
             </a>{" "}
             <span className="small muted">
               {pending
-                ? "then apply the merchant's signature there (it is kept)."
-                : 'then sign in "Sign right here" on the deal page.'}
+                ? "The merchant's signature is kept: it goes on Ascend's application as soon as the details are saved."
+                : 'Then the merchant signs in "Sign right here" on the deal page.'}
             </span>
           </p>
         </>
@@ -92,7 +115,7 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
           <p className="muted">
             {pending
               ? "Check Ascend's application, then apply the merchant's signature."
-              : "The merchant checks the details, ticks the agreement and signs in the box."}
+              : "Ascend's application is complete but not signed yet."}
           </p>
           <div className="review">
             {snap.full.map((s) => (
@@ -122,27 +145,11 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
               </button>
             </form>
           ) : (
-            <form action={signHereNow.bind(null, deal.id)} className="stack sign">
-              <input type="hidden" name="fingerprint" value={snap.fingerprint} />
-              <input type="hidden" name="from" value="new" />
-              <h2>Terms of use</h2>
-              <p className="small consent">{snap.consent.authorization}</p>
-              <label className="check">
-                <input type="checkbox" name="agree" value="yes" required />
-                <span>{snap.consent.agreement}</span>
-              </label>
-              <SignaturePad
-                name="drawing"
-                label="Signature"
-                clearLabel="Clear"
-                requiredMessage="Draw the signature in the box."
-              />
-              <p>
-                <button type="submit" className="primary">
-                  Sign as {ownerName}
-                </button>
-              </p>
-            </form>
+            <p>
+              <a className="button primary" href={`${dealPage}#ascend-application`}>
+                Sign on the deal page
+              </a>
+            </p>
           )}
         </>
       )}
@@ -257,18 +264,18 @@ export default async function NewDealPage({
             <div className="stack sign">
               <p className="small consent">{consent!.authorization}</p>
               <label className="check">
-                <input type="checkbox" name="agree" value="yes" />
+                <input type="checkbox" name="agree" value="yes" defaultChecked required />
                 <span>{consent!.agreement}</span>
               </label>
               <SignaturePad
                 name="drawing"
-                label="Signature"
+                label="Signature *"
                 clearLabel="Clear"
-                requiredMessage="Draw the signature in the box."
-                optional
+                requiredMessage="The merchant signs in the box before the upload."
               />
               <p className="small muted">
-                Optional: without a signature here, the merchant can sign after the reading.
+                The signature goes on Ascend&apos;s application as soon as it is filled in from the
+                upload.
               </p>
             </div>
             <button type="submit" className="primary">

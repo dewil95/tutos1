@@ -520,6 +520,24 @@ export interface UploadSignature {
   userAgent: string | null;
 }
 
+/**
+ * Whether Ascend's application on this deal is signed for real: a signed copy from the signing
+ * page, from upload at New deal, or uploaded by the team. The unsigned copy the CRM files after
+ * the reading ("generated") does not count, nor does the other company's form (team only).
+ */
+export async function hasSignedApplication(prisma: PrismaClient, dealId: string): Promise<boolean> {
+  return (
+    (await prisma.document.count({
+      where: {
+        dealId,
+        type: "APPLICATION",
+        internalOnly: false,
+        uploadedVia: { not: "generated" },
+      },
+    })) > 0
+  );
+}
+
 /** The signature given at upload that is not on a signed application yet, if any. */
 export async function pendingUploadSignature(
   prisma: PrismaClient,

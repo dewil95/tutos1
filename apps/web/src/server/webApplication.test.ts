@@ -74,6 +74,7 @@ const {
   SIGNED_AT_UPLOAD,
   applyUploadSignature,
   autoApplyUploadSignature,
+  hasSignedApplication,
   createWebApplication,
   findWebApplication,
   hashToken,
@@ -351,6 +352,47 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
       ok: false,
       error: "none",
     });
+  });
+
+  it("signs by itself right after the reading when the application is complete", async () => {
+    const { dealId } = await start("192.0.2.30");
+    const at = new Date(Date.now() - 30_000);
+    // New deal keeps the signature before the reading is queued.
+    await prisma.dealEvent.create({
+      data: {
+        dealId,
+        type: SIGNED_AT_UPLOAD,
+        actorType: "merchant",
+        payload: {
+          image: DRAWING.split(",")[1]!,
+          at: at.toISOString(),
+          ip: "192.0.2.30",
+          userAgent: "tablet",
+        },
+      },
+    });
+    // This application has everything, SSN and date of birth included.
+    const owner = READING.owners[0]!;
+    const was = { ssn: owner.ssn, dob: owner.dob };
+    Object.assign(owner, { ssn: "987-65-4321", dob: "1979-01-14" });
+    try {
+      await readNow(dealId);
+    } finally {
+      Object.assign(owner, was);
+    }
+    expect(await hasSignedApplication(prisma, dealId)).toBe(true);
+    expect(await pendingUploadSignature(prisma, dealId)).toBeNull();
+    // Only the signed copy is for lenders; no unsigned copy was filed next to it.
+    const forLenders = await prisma.document.findMany({
+      where: { dealId, type: "APPLICATION", internalOnly: false },
+    });
+    expect(forLenders.map((d) => d.uploadedVia)).toEqual(["website"]);
+    const sig = await prisma.applicationSignature.findFirstOrThrow({ where: { dealId } });
+    expect(sig).toMatchObject({ signerName: "Robin Sample", ipAddress: "192.0.2.30" });
+    expect(sig.signedAt.getTime()).toBe(at.getTime());
+    expect(sig.signatureImage).toBe(DRAWING.split(",")[1]);
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+    expect(deal.applicationData).toMatchObject({ signed: true, signedVia: "web" });
   });
 
   it("refuses a watermarked statement from the merchant, flags one that came by email", async () => {

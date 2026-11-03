@@ -357,9 +357,13 @@ export function AscendApplicationPanel({
                 ).
               </span>{" "}
               {reading?.state === "reading" ? (
-                <span className="muted">Check the details once the reading is done.</span>
+                <span className="muted">
+                  It goes on Ascend&apos;s application as soon as the reading is done.
+                </span>
               ) : missing.length ? (
-                <span className="warn">Fill in what is missing above, then apply it.</span>
+                <span className="warn">
+                  Fill in what is missing above: it goes on when you save.
+                </span>
               ) : (
                 <form action={applySignatureAtUpload.bind(null, dealId)} className="inline">
                   <button type="submit" className="primary">
@@ -382,7 +386,7 @@ export function AscendApplicationPanel({
               </span>
               <p className="small consent">{signHere.authorization}</p>
               <label className="check small">
-                <input type="checkbox" name="agree" value="yes" required />
+                <input type="checkbox" name="agree" value="yes" defaultChecked required />
                 <span>{signHere.agreement}</span>
               </label>
               <SignaturePad
