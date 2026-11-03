@@ -114,6 +114,10 @@ export default async function DealPage({
   const signedApp =
     allDocuments.filter((d) => !d.internalOnly && d.type === "APPLICATION").sort(newestFirst)[0] ??
     null;
+  // Signed for real: a signature recorded in the CRM, or a signed copy the team uploaded. The
+  // unsigned Ascend application the CRM files after the reading ("generated") is not signed.
+  const signedCopy =
+    signedApp && (signature || signedApp.uploadedVia !== "generated") ? signedApp : null;
   const application = (await dealApplication(prisma, user.tenantId, id))!;
   const jobs = await prisma.job.findMany({
     where: {
@@ -156,7 +160,7 @@ export default async function DealPage({
           : null;
   // Signing right here on the deal page (the merchant is with the team): what they sign.
   const signSnap =
-    signedApp || reading?.state === "reading"
+    signedCopy || reading?.state === "reading"
       ? null
       : await reviewSnapshot(prisma, { tenantId: user.tenantId, dealId: id, lang: "en" });
   const signHere = signSnap
@@ -168,7 +172,7 @@ export default async function DealPage({
           `${signSnap.app.draft.owners[0]?.firstName ?? ""} ${signSnap.app.draft.owners[0]?.lastName ?? ""}`.trim(),
       }
     : null;
-  const signedAtUpload = signedApp ? null : await pendingUploadSignature(prisma, id);
+  const signedAtUpload = signedCopy ? null : await pendingUploadSignature(prisma, id);
   const preselected = new Set(defaultPackage(documents));
   const submittedFunderIds = new Set(
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
@@ -302,7 +306,7 @@ export default async function DealPage({
         ownerIds={application.owners.map((o) => o.id)}
         missing={missingFields(application.draft, application.pii)}
         source={sourceApp}
-        signed={signedApp}
+        signed={signedCopy}
         reading={reading}
         signLink={
           flash.signlink

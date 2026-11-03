@@ -20,11 +20,20 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   const prisma = getPrisma();
   const deal = await prisma.deal.findFirst({
     where: { id: dealId, tenantId: user.tenantId },
-    select: { id: true, applicationData: true },
+    select: { id: true },
   });
   if (!deal) notFound();
   const dealPage = `/deals/${deal.id}`;
-  if ((deal.applicationData as { signed?: boolean } | null)?.signed) {
+  // Ascend's application signed for real (not the other company's form, not the unsigned copy).
+  const signed = await prisma.document.count({
+    where: {
+      dealId: deal.id,
+      type: "APPLICATION",
+      internalOnly: false,
+      uploadedVia: { not: "generated" },
+    },
+  });
+  if (signed) {
     redirect(`${dealPage}?signed=1#ascend-application`);
   }
   const pending = await pendingUploadSignature(prisma, deal.id);
