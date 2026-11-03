@@ -73,6 +73,7 @@ vi.mock("./google", async (orig) => ({
 const {
   SIGNED_AT_UPLOAD,
   applyUploadSignature,
+  autoApplyUploadSignature,
   createWebApplication,
   findWebApplication,
   hashToken,
@@ -333,7 +334,8 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     expect(await prisma.applicationSignature.count({ where: { dealId } })).toBe(0);
 
     await completeDetails(dealId);
-    expect((await applyUploadSignature(prisma, tenantId, dealId)).ok).toBe(true);
+    // Complete now: it goes on by itself (as when the team saves the last missing detail).
+    expect(await autoApplyUploadSignature(prisma, tenantId, dealId)).toBe(true);
     const sig = await prisma.applicationSignature.findFirstOrThrow({ where: { dealId } });
     // Signed as the owner on the application, at the moment they signed, with their drawing.
     expect(sig).toMatchObject({

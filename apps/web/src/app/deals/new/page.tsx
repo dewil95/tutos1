@@ -50,7 +50,7 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
         {signedNote}
         <p className="muted">
           {pending
-            ? "Reading the application… then check Ascend's application below and apply the signature."
+            ? "Reading the application… the merchant's signature goes on Ascend's application as soon as it is filled in."
             : "Reading the application… the box to sign appears here as soon as it is done."}{" "}
           This page refreshes by itself.
         </p>
