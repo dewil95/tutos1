@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 /**
  * The merchant draws their signature with a finger or the mouse. The drawing goes into a hidden
  * field as a PNG data URL; unless optional, the form will not submit without one.
+ *
+ * The hidden field is controlled (React state), never set through the DOM: for a hidden input the
+ * browser keeps value and default value as one, so React's re-render after the first stroke reset
+ * an imperatively set value to "" and the drawing was lost.
  */
 export function SignaturePad({
   name,
@@ -21,9 +25,14 @@ export function SignaturePad({
   optional?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const field = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
-  const [empty, setEmpty] = useState(true);
+  const [value, setValue] = useState("");
+  // What the submit check reads (the effect's closure would see a stale state).
+  const valueRef = useRef("");
+  const set = (v: string) => {
+    valueRef.current = v;
+    setValue(v);
+  };
   const [warn, setWarn] = useState(false);
 
   useEffect(() => {
@@ -35,7 +44,7 @@ export function SignaturePad({
     ctx.strokeStyle = "#13223f";
     const form = c.closest("form");
     const onSubmit = (e: SubmitEvent) => {
-      if (!optional && !field.current?.value) {
+      if (!optional && !valueRef.current) {
         e.preventDefault();
         setWarn(true);
         c.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -74,15 +83,13 @@ export function SignaturePad({
   const up = () => {
     if (!drawing.current) return;
     drawing.current = false;
-    field.current!.value = canvas.current!.toDataURL("image/png");
-    setEmpty(false);
+    set(canvas.current!.toDataURL("image/png"));
     setWarn(false);
   };
   const clear = () => {
     const c = canvas.current!;
     c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
-    field.current!.value = "";
-    setEmpty(true);
+    set("");
   };
 
   return (
@@ -99,10 +106,10 @@ export function SignaturePad({
         onPointerCancel={up}
         aria-label={label}
       />
-      <input ref={field} type="hidden" name={name} defaultValue="" />
+      <input type="hidden" name={name} value={value} readOnly />
       <span className="row">
         {warn ? <span className="small error">{requiredMessage}</span> : null}
-        {!empty ? (
+        {value ? (
           <button type="button" className="link" onClick={clear}>
             {clearLabel}
           </button>
