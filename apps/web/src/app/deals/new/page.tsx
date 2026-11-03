@@ -24,17 +24,15 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   }
   if (await readingInProgress(prisma, deal.id)) {
     return (
-      <section className="panel narrow">
+      <>
         {/* Reading takes seconds: the page refreshes itself until it is done. */}
         <meta httpEquiv="refresh" content="4" />
-        <h1>New deal</h1>
-        <h2>Reading the application…</h2>
         <p className="muted">
-          Ascend&apos;s application is filled in from it, then the merchant signs it here. This
-          page refreshes by itself.
+          Reading the application… the box to sign appears here as soon as it is done. This page
+          refreshes by itself.
         </p>
         <div className="spinner" aria-hidden="true" />
-      </section>
+      </>
     );
   }
   const snap = await reviewSnapshot(prisma, {
@@ -46,13 +44,13 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
   const owner = snap.app.draft.owners[0];
   const ownerName = `${owner?.firstName ?? ""} ${owner?.lastName ?? ""}`.trim();
   return (
-    <section className="panel">
-      <h1>Sign Ascend&apos;s application</h1>
+    <>
       {error ? <p className="notice error">{error}</p> : null}
       {snap.missing.length ? (
         <>
           <p className="notice warn">
             The application could not be filled in completely. Missing: {snap.missing.join(", ")}.
+            Photos and scans are read by the AI; a digital PDF is read without it.
           </p>
           <p>
             <a className="button primary" href={`${dealPage}#ascend-application`}>
@@ -114,7 +112,36 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
       <p className="small">
         <a href={dealPage}>Skip, open the deal</a>
       </p>
-    </section>
+    </>
+  );
+}
+
+/** Step 1 done: what was uploaded for this deal. */
+async function Uploaded({ dealId }: { dealId: string }) {
+  const user = await requireUser();
+  const docs = await getPrisma().document.findMany({
+    where: {
+      dealId,
+      tenantId: user.tenantId,
+      OR: [{ type: "BANK_STATEMENT" }, { type: "APPLICATION", internalOnly: true }],
+    },
+    select: { id: true, fileName: true, type: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return (
+    <>
+      <ul className="small">
+        {docs.map((d) => (
+          <li key={d.id}>
+            <span className="ok">✓</span> {d.type === "APPLICATION" ? "Application" : "Statement"}:{" "}
+            {d.fileName}
+          </li>
+        ))}
+      </ul>
+      <p className="small">
+        <a href="/deals/new">Start another deal</a>
+      </p>
+    </>
   );
 }
 
@@ -156,73 +183,95 @@ export default async function NewDealPage({
 }) {
   await requireUser();
   const { error, deal } = await searchParams;
-  if (deal) return <SignStep dealId={deal} error={error} />;
   return (
     <section className="panel narrow">
       <h1>New deal</h1>
-      {error ? <p className="notice error">{error}</p> : null}
+      {error && !deal ? <p className="notice error">{error}</p> : null}
 
-      <h2>Start from the merchant&apos;s application</h2>
-      <p className="small muted">
-        Upload the application the merchant signed with another company (PDF, or photos of the
-        pages). AI reads it and fills Ascend&apos;s application. That file stays with the team and
-        is never sent to lenders.
-      </p>
-      <form action={createDealFromApplication} className="stack">
-        <label className="field">
-          Application (PDF or JPG/PNG photos) *
-          <input
-            type="file"
-            name="application"
-            accept="application/pdf,image/jpeg,image/png"
-            multiple
-            required
-          />
-        </label>
-        <label className="field">
-          Bank statements (optional, PDF)
-          <input type="file" name="statements" accept="application/pdf" multiple />
-        </label>
-        <p className="small muted">Up to 10 MB in total per upload.</p>
-        <button type="submit" className="primary">
-          Read application and create deal
-        </button>
-      </form>
+      <h2>1. Merchant&apos;s application and bank statements</h2>
+      {deal ? (
+        <Uploaded dealId={deal} />
+      ) : (
+        <>
+          <p className="small muted">
+            Upload the application the merchant signed with another company (PDF, or photos of the
+            pages). AI reads it and fills Ascend&apos;s application. That file stays with the team
+            and is never sent to lenders.
+          </p>
+          <form action={createDealFromApplication} className="stack">
+            <label className="field">
+              Application (PDF or JPG/PNG photos) *
+              <input
+                type="file"
+                name="application"
+                accept="application/pdf,image/jpeg,image/png"
+                multiple
+                required
+              />
+            </label>
+            <label className="field">
+              Bank statements (optional, PDF)
+              <input type="file" name="statements" accept="application/pdf" multiple />
+            </label>
+            <p className="small muted">Up to 10 MB in total per upload.</p>
+            <button type="submit" className="primary">
+              Upload and read the application
+            </button>
+          </form>
+        </>
+      )}
 
-      <h2>Or type it in</h2>
-      <form action={createDeal} className="stack">
-        <label className="field">
-          Business legal name *
-          <input name="legalName" required />
-        </label>
-        <label className="field">
-          DBA (used in the email subject if set)
-          <input name="dba" />
-        </label>
-        <label className="field">
-          Merchant email (their attachments get filed automatically)
-          <input name="email" type="email" />
-        </label>
-        <label className="field">
-          Phone
-          <input name="phone" />
-        </label>
-        <div className="row">
-          <label className="field">
-            State
-            <input name="state" maxLength={2} size={3} />
-          </label>
-          <label className="field">
-            Industry
-            <input name="industry" />
-          </label>
-          <label className="field">
-            Requested amount
-            <input name="requestedAmount" inputMode="decimal" />
-          </label>
-        </div>
-        <button type="submit">Create deal</button>
-      </form>
+      <h2>2. Merchant signs Ascend&apos;s application here</h2>
+      {deal ? (
+        <SignStep dealId={deal} error={error} />
+      ) : (
+        <>
+          <div className="sigpad sigpad-waiting" aria-hidden="true" />
+          <p className="small muted">
+            Upload the application above: Ascend&apos;s application is filled in from it and the
+            merchant checks it and signs in this box.
+          </p>
+        </>
+      )}
+
+      {deal ? null : (
+        <details>
+          <summary className="small">No application? Type the deal in</summary>
+          <form action={createDeal} className="stack">
+            <label className="field">
+              Business legal name *
+              <input name="legalName" required />
+            </label>
+            <label className="field">
+              DBA (used in the email subject if set)
+              <input name="dba" />
+            </label>
+            <label className="field">
+              Merchant email (their attachments get filed automatically)
+              <input name="email" type="email" />
+            </label>
+            <label className="field">
+              Phone
+              <input name="phone" />
+            </label>
+            <div className="row">
+              <label className="field">
+                State
+                <input name="state" maxLength={2} size={3} />
+              </label>
+              <label className="field">
+                Industry
+                <input name="industry" />
+              </label>
+              <label className="field">
+                Requested amount
+                <input name="requestedAmount" inputMode="decimal" />
+              </label>
+            </div>
+            <button type="submit">Create deal</button>
+          </form>
+        </details>
+      )}
     </section>
   );
 }
