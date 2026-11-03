@@ -1236,9 +1236,3 @@ ul.habits {
 .sigpad.warn {
   border-color: var(--bad);
 }
-/* New deal: where the merchant will sign, before the upload is read. */
-.sigpad-waiting {
-  display: block;
-  opacity: 0.45;
-  cursor: default;
-}

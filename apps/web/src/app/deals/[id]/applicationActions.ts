@@ -15,7 +15,12 @@ import { storeDealFile } from "@/server/documents";
 import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { sendTracked } from "@/server/email/send";
-import { clientIp, createWebApplication, signWebApplication } from "@/server/webApplication";
+import {
+  applyUploadSignature,
+  clientIp,
+  createWebApplication,
+  signWebApplication,
+} from "@/server/webApplication";
 import { TEXT } from "@/app/application/copy";
 import { inlineBudgetMs } from "@/server/env";
 import { tenantMailbox } from "@/server/google";
@@ -222,12 +227,49 @@ export async function signHereNow(dealId: string, form: FormData) {
       ip: clientIp(h),
       userAgent: h.get("user-agent"),
     });
-    target = result.ok
-      ? back(dealId, { signed: "1" })
-      : fail(TEXT.en.errors[result.error]);
+    target = result.ok ? back(dealId, { signed: "1" }) : fail(TEXT.en.errors[result.error]);
   } catch (err) {
     console.error(`[deal ${dealId}] sign here`, err);
     target = fail("Signing failed. Nothing was signed: try again.");
+  }
+  revalidatePath(`/deals/${dealId}`);
+  redirect(target);
+}
+
+/**
+ * The merchant signed at upload, before Ascend's application was filled in: once the team has
+ * checked the filled application, that signature goes on it.
+ */
+export async function applySignatureAtUpload(dealId: string, form: FormData) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const fromNew = form.get("from") === "new";
+  const fail = (error: string) =>
+    fromNew
+      ? `/deals/new?${new URLSearchParams({ deal: dealId, error })}`
+      : back(dealId, { error });
+  let target: string;
+  try {
+    await prisma.deal.findFirstOrThrow({ where: { id: dealId, tenantId: user.tenantId } });
+    const result = await applyUploadSignature(prisma, user.tenantId, dealId);
+    if (result.ok) {
+      await prisma.dealEvent.create({
+        data: {
+          dealId,
+          type: "upload_signature_applied",
+          actorType: "user",
+          actorId: user.id,
+        },
+      });
+    }
+    target = result.ok
+      ? back(dealId, { signed: "1" })
+      : result.error === "none"
+        ? fail("There is no signature from the upload to apply.")
+        : fail(TEXT.en.errors[result.error]);
+  } catch (err) {
+    console.error(`[deal ${dealId}] apply upload signature`, err);
+    target = fail("Applying the signature failed. Nothing was signed: try again.");
   }
   revalidatePath(`/deals/${dealId}`);
   redirect(target);

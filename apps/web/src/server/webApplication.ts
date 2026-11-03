@@ -505,3 +505,64 @@ export async function merchantCopy(
   const b = app.draft.business;
   return { fileName: `${applicationFileBase(b.dba ?? b.legalName)}.pdf`, data };
 }
+
+/**
+ * Signed at upload (New deal): the merchant ticked the agreement and drew their signature before
+ * Ascend's application was filled in. It is kept on the deal's timeline until the team checks the
+ * filled application and applies it.
+ */
+export const SIGNED_AT_UPLOAD = "signed_at_upload";
+
+export interface UploadSignature {
+  image: string;
+  at: string;
+  ip: string | null;
+  userAgent: string | null;
+}
+
+/** The signature given at upload that is not on a signed application yet, if any. */
+export async function pendingUploadSignature(
+  prisma: PrismaClient,
+  dealId: string,
+): Promise<UploadSignature | null> {
+  const ev = await prisma.dealEvent.findFirst({
+    where: { dealId, type: SIGNED_AT_UPLOAD },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!ev) return null;
+  const sig = ev.payload as unknown as UploadSignature;
+  // Applied already: a signature on this deal from that moment on.
+  const at = new Date(sig.at);
+  if (await prisma.applicationSignature.count({ where: { dealId, signedAt: { gte: at } } })) {
+    return null;
+  }
+  return sig;
+}
+
+/** Puts the signature given at upload on Ascend's application as it is filled in now. */
+export async function applyUploadSignature(
+  prisma: PrismaClient,
+  tenantId: string,
+  dealId: string,
+): Promise<SignResult | { ok: false; error: "none" }> {
+  const pending = await pendingUploadSignature(prisma, dealId);
+  if (!pending) return { ok: false, error: "none" };
+  const snap = await reviewSnapshot(prisma, { tenantId, dealId, lang: "en" });
+  if (!snap) return { ok: false, error: "expired" };
+  const at = new Date(pending.at);
+  const token = await createWebApplication(prisma, { tenantId, dealId, origin: "team" });
+  return signWebApplication(
+    prisma,
+    token,
+    {
+      name: "",
+      agreed: true,
+      drawing: `data:image/png;base64,${pending.image}`,
+      fingerprint: snap.fingerprint,
+      ip: pending.ip,
+      userAgent: pending.userAgent,
+    },
+    // Signed when the merchant signed, not when the team applied it.
+    Number.isNaN(at.getTime()) ? new Date() : at,
+  );
+}

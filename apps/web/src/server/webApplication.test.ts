@@ -71,10 +71,13 @@ vi.mock("./google", async (orig) => ({
 }));
 
 const {
+  SIGNED_AT_UPLOAD,
+  applyUploadSignature,
   createWebApplication,
   findWebApplication,
   hashToken,
   merchantCopy,
+  pendingUploadSignature,
   publicStartAllowed,
   reviewSnapshot,
   signWebApplication,
@@ -302,6 +305,50 @@ describe.runIf(await databaseReady())("merchant application page (SQLite)", () =
     expect(row.signedAt).not.toBeNull();
     const copy = await merchantCopy(prisma, row);
     expect(copy?.data.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("applies the signature given at upload once Ascend's application is complete", async () => {
+    const { dealId } = await start("192.0.2.20");
+    const at = new Date(Date.now() - 60_000);
+    await prisma.dealEvent.create({
+      data: {
+        dealId,
+        type: SIGNED_AT_UPLOAD,
+        actorType: "merchant",
+        payload: {
+          image: DRAWING.split(",")[1]!,
+          at: at.toISOString(),
+          ip: "192.0.2.20",
+          userAgent: "front-desk-tablet",
+        },
+      },
+    });
+    await readNow(dealId);
+    expect((await pendingUploadSignature(prisma, dealId))?.ip).toBe("192.0.2.20");
+    // Read from the upload: SSN and date of birth still missing, so nothing is signed yet.
+    expect(await applyUploadSignature(prisma, tenantId, dealId)).toEqual({
+      ok: false,
+      error: "missing",
+    });
+    expect(await prisma.applicationSignature.count({ where: { dealId } })).toBe(0);
+
+    await completeDetails(dealId);
+    expect((await applyUploadSignature(prisma, tenantId, dealId)).ok).toBe(true);
+    const sig = await prisma.applicationSignature.findFirstOrThrow({ where: { dealId } });
+    // Signed as the owner on the application, at the moment they signed, with their drawing.
+    expect(sig).toMatchObject({
+      signerName: "Robin Sample",
+      ipAddress: "192.0.2.20",
+      userAgent: "front-desk-tablet",
+    });
+    expect(sig.signedAt.getTime()).toBe(at.getTime());
+    expect(sig.signatureImage).toBe(DRAWING.split(",")[1]);
+    // Used once.
+    expect(await pendingUploadSignature(prisma, dealId)).toBeNull();
+    expect(await applyUploadSignature(prisma, tenantId, dealId)).toEqual({
+      ok: false,
+      error: "none",
+    });
   });
 
   it("refuses a watermarked statement from the merchant, flags one that came by email", async () => {
