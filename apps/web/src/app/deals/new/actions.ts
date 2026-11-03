@@ -10,6 +10,7 @@ import { assertNoWatermark, storeDealFile } from "@/server/documents";
 import { inlineBudgetMs } from "@/server/env";
 import { MailboxNotConnectedError, tenantMailbox } from "@/server/google";
 import { runDueJobs } from "@/server/jobs/runner";
+import { createWebApplication } from "@/server/webApplication";
 
 /** The same application was uploaded recently: go to that deal. */
 class AlreadyUploaded extends Error {
@@ -116,7 +117,30 @@ export async function createDealFromApplication(form: FormData) {
     after(() =>
       runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
     );
-    target = `/deals/${deal.id}?reading=1`;
+    // Sign right away: the signing page waits for the reading, then shows Ascend's application.
+    const sign = form.get("sign");
+    if (sign === "here" || sign === "link") {
+      const token = await createWebApplication(prisma, {
+        tenantId: user.tenantId,
+        dealId: deal.id,
+        origin: "team",
+      });
+      await prisma.dealEvent.create({
+        data: {
+          dealId: deal.id,
+          type: "signing_link_created",
+          actorType: "user",
+          actorId: user.id,
+          payload: { atUpload: sign },
+        },
+      });
+      target =
+        sign === "here"
+          ? `/application/${encodeURIComponent(token)}`
+          : `/deals/${deal.id}?${new URLSearchParams({ reading: "1", signlink: token })}#ascend-application`;
+    } else {
+      target = `/deals/${deal.id}?reading=1`;
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     target =
