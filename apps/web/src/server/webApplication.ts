@@ -539,6 +539,23 @@ export async function pendingUploadSignature(
   return sig;
 }
 
+/**
+ * As soon as Ascend's application is complete (after the reading, or once the team fills in what
+ * was missing), the signature given at upload goes on it by itself. Nothing to do otherwise.
+ */
+export async function autoApplyUploadSignature(
+  prisma: PrismaClient,
+  tenantId: string,
+  dealId: string,
+): Promise<boolean> {
+  if (!(await pendingUploadSignature(prisma, dealId))) return false;
+  const result = await applyUploadSignature(prisma, tenantId, dealId);
+  if (!result.ok && result.error !== "missing" && result.error !== "none") {
+    console.error(`[deal ${dealId}] upload signature not applied: ${result.error}`);
+  }
+  return result.ok;
+}
+
 /** Puts the signature given at upload on Ascend's application as it is filled in now. */
 export async function applyUploadSignature(
   prisma: PrismaClient,

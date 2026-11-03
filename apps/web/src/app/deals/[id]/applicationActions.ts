@@ -17,6 +17,7 @@ import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { sendTracked } from "@/server/email/send";
 import {
   applyUploadSignature,
+  autoApplyUploadSignature,
   clientIp,
   createWebApplication,
   signWebApplication,
@@ -43,8 +44,10 @@ export async function saveApplicationDetails(dealId: string, form: FormData) {
     await prisma.dealEvent.create({
       data: { dealId, type: "application_edited", actorType: "user", actorId: user.id },
     });
+    // The last missing detail filled in: the signature given at upload goes on now.
+    const signed = await autoApplyUploadSignature(prisma, user.tenantId, dealId);
     await fileAscendApplication(prisma, user.tenantId, dealId);
-    target = back(dealId, { saved: "1" });
+    target = back(dealId, signed ? { saved: "1", signed: "1" } : { saved: "1" });
   } catch (err) {
     if (!(err instanceof InputError)) console.error(`[deal ${dealId}] save application`, err);
     target = back(dealId, { error: err instanceof Error ? err.message : String(err) });

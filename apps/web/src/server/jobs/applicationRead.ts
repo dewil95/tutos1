@@ -7,6 +7,7 @@ import { fileAscendApplication } from "../applicationFile";
 import { READING_PLACEHOLDER } from "../ascendApplication";
 import { findMerchantMatch } from "../websiteApi";
 import { tenantMailbox } from "../google";
+import { autoApplyUploadSignature } from "../webApplication";
 import { PermanentJobError } from "./errors";
 
 export interface ApplicationReadPayload {
@@ -149,7 +150,12 @@ export async function handleApplicationRead(prisma: PrismaClient, job: ClaimedJo
       },
     }),
   ]);
-  // The application lenders get, filled from what was just read.
+  // Signed at upload (New deal): the signature goes on Ascend's application as soon as it is
+  // complete; then the signed copy is the one lenders get.
+  await autoApplyUploadSignature(prisma, doc.tenantId, doc.deal.id).catch((err: unknown) =>
+    console.error(`[deal ${doc.deal!.id}] upload signature not applied`, err),
+  );
+  // The application lenders get, filled from what was just read (skipped once signed).
   await fileAscendApplication(prisma, doc.tenantId, doc.deal.id).catch((err: unknown) =>
     console.error(`[deal ${doc.deal!.id}] Ascend application not filed`, err),
   );
