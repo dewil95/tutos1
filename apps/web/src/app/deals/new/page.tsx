@@ -1,7 +1,122 @@
 import { getPrisma } from "@mca/db";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
+import { readingInProgress, reviewSnapshot } from "@/server/webApplication";
+import { SignaturePad } from "@/app/application/[token]/SignaturePad";
+import { signHereNow } from "../[id]/applicationActions";
 import { createDealFromApplication } from "./actions";
+
+/**
+ * Step 2 of New deal: once the upload is read, the merchant (with the team) checks Ascend's
+ * application on this screen and signs it in the box. Then the deal opens.
+ */
+async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, tenantId: user.tenantId },
+    select: { id: true, applicationData: true },
+  });
+  if (!deal) notFound();
+  const dealPage = `/deals/${deal.id}`;
+  if ((deal.applicationData as { signed?: boolean } | null)?.signed) {
+    redirect(`${dealPage}?signed=1#ascend-application`);
+  }
+  if (await readingInProgress(prisma, deal.id)) {
+    return (
+      <section className="panel narrow">
+        {/* Reading takes seconds: the page refreshes itself until it is done. */}
+        <meta httpEquiv="refresh" content="4" />
+        <h1>New deal</h1>
+        <h2>Reading the application…</h2>
+        <p className="muted">
+          Ascend&apos;s application is filled in from it, then the merchant signs it here. This
+          page refreshes by itself.
+        </p>
+        <div className="spinner" aria-hidden="true" />
+      </section>
+    );
+  }
+  const snap = await reviewSnapshot(prisma, {
+    tenantId: user.tenantId,
+    dealId: deal.id,
+    lang: "en",
+  });
+  if (!snap) notFound();
+  const owner = snap.app.draft.owners[0];
+  const ownerName = `${owner?.firstName ?? ""} ${owner?.lastName ?? ""}`.trim();
+  return (
+    <section className="panel">
+      <h1>Sign Ascend&apos;s application</h1>
+      {error ? <p className="notice error">{error}</p> : null}
+      {snap.missing.length ? (
+        <>
+          <p className="notice warn">
+            The application could not be filled in completely. Missing: {snap.missing.join(", ")}.
+          </p>
+          <p>
+            <a className="button primary" href={`${dealPage}#ascend-application`}>
+              Fill in the details on the deal
+            </a>{" "}
+            <span className="small muted">
+              then sign in &quot;Sign right here&quot; on the deal page.
+            </span>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="muted">
+            The merchant checks the details, ticks the agreement and signs in the box.
+          </p>
+          <div className="review">
+            {snap.full.map((s) => (
+              <section key={s.heading}>
+                <h2>{s.heading}</h2>
+                <dl>
+                  {s.fields
+                    .filter(([, v]) => v)
+                    .map(([k, v]) => (
+                      <div key={k}>
+                        <dt>{k}</dt>
+                        <dd>{v}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+          <p className="small">
+            Something wrong? <a href={`${dealPage}#ascend-application`}>Fix it on the deal</a>.
+          </p>
+          <form action={signHereNow.bind(null, deal.id)} className="stack sign">
+            <input type="hidden" name="fingerprint" value={snap.fingerprint} />
+            <input type="hidden" name="from" value="new" />
+            <h2>Terms of use</h2>
+            <p className="small consent">{snap.consent.authorization}</p>
+            <label className="check">
+              <input type="checkbox" name="agree" value="yes" required />
+              <span>{snap.consent.agreement}</span>
+            </label>
+            <SignaturePad
+              name="drawing"
+              label="Signature"
+              clearLabel="Clear"
+              requiredMessage="Draw the signature in the box."
+            />
+            <p>
+              <button type="submit" className="primary">
+                Sign as {ownerName}
+              </button>
+            </p>
+          </form>
+        </>
+      )}
+      <p className="small">
+        <a href={dealPage}>Skip, open the deal</a>
+      </p>
+    </section>
+  );
+}
 
 async function createDeal(form: FormData) {
   "use server";
@@ -37,10 +152,11 @@ async function createDeal(form: FormData) {
 export default async function NewDealPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; deal?: string }>;
 }) {
   await requireUser();
-  const { error } = await searchParams;
+  const { error, deal } = await searchParams;
+  if (deal) return <SignStep dealId={deal} error={error} />;
   return (
     <section className="panel narrow">
       <h1>New deal</h1>

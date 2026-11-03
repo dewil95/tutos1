@@ -116,7 +116,8 @@ export async function createDealFromApplication(form: FormData) {
     after(() =>
       runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
     );
-    target = `/deals/${deal.id}?reading=1`;
+    // Step 2 on New deal: the merchant checks and signs Ascend's application right there.
+    target = `/deals/new?deal=${deal.id}`;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     target =
