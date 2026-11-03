@@ -8,6 +8,7 @@ import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { positionsToText } from "@/server/submissions";
+import { reviewSnapshot } from "@/server/webApplication";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
@@ -153,6 +154,20 @@ export default async function DealPage({
         : appData?.documentId === sourceApp.id
           ? { state: appData.notAnApplication ? ("not_application" as const) : ("done" as const) }
           : null;
+  // Signing right here on the deal page (the merchant is with the team): what they sign.
+  const signSnap =
+    signedApp || reading?.state === "reading"
+      ? null
+      : await reviewSnapshot(prisma, { tenantId: user.tenantId, dealId: id, lang: "en" });
+  const signHere = signSnap
+    ? {
+        fingerprint: signSnap.fingerprint,
+        authorization: signSnap.consent.authorization,
+        agreement: signSnap.consent.agreement,
+        ownerName:
+          `${signSnap.app.draft.owners[0]?.firstName ?? ""} ${signSnap.app.draft.owners[0]?.lastName ?? ""}`.trim(),
+      }
+    : null;
   const preselected = new Set(defaultPackage(documents));
   const submittedFunderIds = new Set(
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
@@ -294,6 +309,7 @@ export default async function DealPage({
             : null
         }
         signLinkEmailed={flash.emailed ?? null}
+        signHere={signHere}
       />
 
       {whatsapp ? (

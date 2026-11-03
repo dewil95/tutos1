@@ -1226,7 +1226,8 @@ ul.habits {
   width: 100%;
   max-width: 600px;
   aspect-ratio: 10 / 3;
-  background: var(--surface);
+  /* Paper white in both themes: the ink is dark. */
+  background: #ffffff;
   border: 1px dashed var(--line-strong);
   border-radius: 8px;
   touch-action: none;

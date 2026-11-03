@@ -1,9 +1,11 @@
 import type { OwnerPii } from "@/server/ascendApplication";
 import type { Draft } from "@/server/whatsapp/questions";
+import { SignaturePad } from "@/app/application/[token]/SignaturePad";
 import {
   createSigningLink,
   rereadApplication,
   saveApplicationDetails,
+  signHereNow,
   uploadSignedApplication,
 } from "./applicationActions";
 
@@ -39,6 +41,7 @@ export function AscendApplicationPanel({
   reading,
   signLink,
   signLinkEmailed,
+  signHere,
 }: {
   dealId: string;
   draft: Draft;
@@ -52,6 +55,13 @@ export function AscendApplicationPanel({
   signLink: string | null;
   /** Where it was emailed ("dry-run:…" in test mode). */
   signLinkEmailed: string | null;
+  /** What the merchant signs right here on this screen (null once signed or while reading). */
+  signHere: {
+    fingerprint: string;
+    authorization: string;
+    agreement: string;
+    ownerName: string;
+  } | null;
 }) {
   const b = draft.business;
   const r = draft.request;
@@ -333,7 +343,43 @@ export function AscendApplicationPanel({
         </li>
 
         <li>
-          <strong>Send the merchant a link to sign online</strong>{" "}
+          <strong>Sign right here</strong>{" "}
+          {signed ? (
+            <span className="small ok">Signed.</span>
+          ) : reading?.state === "reading" ? (
+            <span className="small muted">
+              The signature box appears as soon as the reading is done.
+            </span>
+          ) : !signHere ? null : missing.length ? (
+            <span className="small warn">Fill in what is missing above first.</span>
+          ) : (
+            <form action={signHereNow.bind(null, dealId)} className="stack sign">
+              <input type="hidden" name="fingerprint" value={signHere.fingerprint} />
+              <span className="small muted">
+                The merchant checks the details above, then signs on this screen (finger or mouse).
+              </span>
+              <p className="small consent">{signHere.authorization}</p>
+              <label className="check small">
+                <input type="checkbox" name="agree" value="yes" required />
+                <span>{signHere.agreement}</span>
+              </label>
+              <SignaturePad
+                name="drawing"
+                label="Signature"
+                clearLabel="Clear"
+                requiredMessage="Draw the signature in the box."
+              />
+              <p>
+                <button type="submit" className="primary">
+                  Sign as {signHere.ownerName}
+                </button>
+              </p>
+            </form>
+          )}
+        </li>
+
+        <li>
+          <strong>Or send the merchant a link to sign online</strong>{" "}
           <span className="small muted">
             They check the details, add what&apos;s missing (SSN, date of birth, statements) and
             sign by typing their name. The signed PDF lands here by itself.

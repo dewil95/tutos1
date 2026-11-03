@@ -3,6 +3,7 @@
 import { enqueueJob, getPrisma } from "@mca/db";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   READING_PLACEHOLDER,
@@ -14,7 +15,8 @@ import { storeDealFile } from "@/server/documents";
 import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { sendTracked } from "@/server/email/send";
-import { createWebApplication } from "@/server/webApplication";
+import { clientIp, createWebApplication, signWebApplication } from "@/server/webApplication";
+import { TEXT } from "@/app/application/copy";
 import { inlineBudgetMs } from "@/server/env";
 import { tenantMailbox } from "@/server/google";
 import { runDueJobs } from "@/server/jobs/runner";
@@ -189,4 +191,39 @@ export async function createSigningLink(dealId: string, form: FormData) {
     data: { dealId, type: "signing_link_created", actorType: "user", actorId: user.id },
   });
   redirect(back(dealId, params));
+}
+
+/**
+ * The merchant signs Ascend's application right on the deal page (they are with the team): same
+ * checks and proof as the online signing page, through a team link that is used at once.
+ */
+export async function signHereNow(dealId: string, form: FormData) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const h = await headers();
+  let target: string;
+  try {
+    await prisma.deal.findFirstOrThrow({ where: { id: dealId, tenantId: user.tenantId } });
+    const token = await createWebApplication(prisma, {
+      tenantId: user.tenantId,
+      dealId,
+      origin: "team",
+    });
+    const result = await signWebApplication(prisma, token, {
+      name: "",
+      agreed: form.get("agree") === "yes",
+      drawing: String(form.get("drawing") ?? "") || null,
+      fingerprint: String(form.get("fingerprint") ?? ""),
+      ip: clientIp(h),
+      userAgent: h.get("user-agent"),
+    });
+    target = result.ok
+      ? back(dealId, { signed: "1" })
+      : back(dealId, { error: TEXT.en.errors[result.error] });
+  } catch (err) {
+    console.error(`[deal ${dealId}] sign here`, err);
+    target = back(dealId, { error: "Signing failed. Nothing was signed: try again." });
+  }
+  revalidatePath(`/deals/${dealId}`);
+  redirect(target);
 }
