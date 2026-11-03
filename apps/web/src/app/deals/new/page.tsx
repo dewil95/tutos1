@@ -69,7 +69,7 @@ async function SignStep({ dealId, error }: { dealId: string; error?: string }) {
             The merchant checks the details, ticks the agreement and signs in the box.
           </p>
           <div className="review">
-            {snap.masked.map((s) => (
+            {snap.full.map((s) => (
               <section key={s.heading}>
                 <h2>{s.heading}</h2>
                 <dl>
