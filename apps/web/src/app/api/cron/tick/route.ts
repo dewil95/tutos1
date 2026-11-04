@@ -46,15 +46,9 @@ async function tick(req: Request) {
       dedupeKey: `sync:${m.id}`,
     });
   }
-  // Automated emails (missing docs, stip chases, lender follow-ups) for every tenant.
+  // No automated emails: lenders and merchants only get what a person sends from the CRM.
   const tenants = await prisma.tenant.findMany({ select: { id: true } });
   for (const t of tenants) {
-    await enqueueJob(prisma, {
-      tenantId: t.id,
-      type: "EMAIL_RULES",
-      payload: {},
-      dedupeKey: `rules:${t.id}`,
-    });
     // WhatsApp applications: reminders and any message left unprocessed.
     if (whatsappConfigured()) {
       await enqueueJob(prisma, {

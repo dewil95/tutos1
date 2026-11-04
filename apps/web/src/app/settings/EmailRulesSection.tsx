@@ -22,7 +22,10 @@ async function saveRule(form: FormData) {
   revalidatePath("/settings");
 }
 
-/** Automated emails: on/off, timing and wording. Placeholders like {{business}} are filled per deal. */
+/**
+ * Lender emails sent with one click from the deal page: on/off and wording. Nothing is sent
+ * automatically. Placeholders like {{business}} are filled per deal.
+ */
 export async function EmailRulesSection({
   tenantId,
   canEdit,
@@ -33,12 +36,12 @@ export async function EmailRulesSection({
   const rules = await ensureRules(getPrisma(), tenantId);
   return (
     <section className="panel">
-      <h2>Email automation</h2>
+      <h2>Lender email templates</h2>
       <p className="small muted">
-        Checked every 2 minutes. Merchant emails skip merchants marked &quot;no automated
-        emails&quot;. Dry-run mode writes them to the deal timeline instead of sending.
-        Placeholders: {"{{business}}"}, {"{{contact}}"}, {"{{missing}}"}, {"{{stips}}"},{" "}
-        {"{{amount}}"}, {"{{factor}}"}, {"{{term}}"}, {"{{merchantEmail}}"}, {"{{broker}}"}.
+        The CRM sends no automatic emails to lenders or merchants: besides shopping the file, these
+        go out only when someone clicks send on the deal page. Dry-run mode writes them to the deal
+        timeline instead of sending. Placeholders: {"{{business}}"}, {"{{amount}}"}, {"{{factor}}"},{" "}
+        {"{{term}}"}, {"{{merchantEmail}}"}, {"{{subject}}"}.
       </p>
       {DEFAULT_RULES.map((d) => {
         const r = rules.find((x) => x.kind === d.kind);
@@ -48,7 +51,7 @@ export async function EmailRulesSection({
             <summary>
               <strong>{d.label}</strong>{" "}
               <span className={`tag ${r.enabled ? "on" : ""}`}>
-                {r.enabled ? (r.requiresApproval ? "one click" : "automatic") : "off"}
+                {r.enabled ? "one click" : "off"}
               </span>
               <div className="small muted">{d.description}</div>
             </summary>
@@ -64,38 +67,8 @@ export async function EmailRulesSection({
                   />{" "}
                   On
                 </label>
-                {!r.requiresApproval ? (
-                  <>
-                    <label className="field">
-                      Wait (hours)
-                      <input
-                        name="delayHours"
-                        type="number"
-                        min={0}
-                        defaultValue={r.delayHours}
-                        size={4}
-                        disabled={!canEdit}
-                      />
-                    </label>
-                    <label className="field">
-                      Max sends
-                      <input
-                        name="maxSends"
-                        type="number"
-                        min={1}
-                        max={10}
-                        defaultValue={r.maxSends}
-                        size={3}
-                        disabled={!canEdit}
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <input type="hidden" name="delayHours" value={r.delayHours} />
-                    <input type="hidden" name="maxSends" value={r.maxSends} />
-                  </>
-                )}
+                <input type="hidden" name="delayHours" value={r.delayHours} />
+                <input type="hidden" name="maxSends" value={r.maxSends} />
               </div>
               <label className="field">
                 Subject

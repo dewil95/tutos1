@@ -45,7 +45,8 @@ Deal tracking and one-click lender submissions for Ascend Fund (MCA broker / ISO
 - Scrubs every bank statement (balance math, missing months, NSFs, negative days, existing
   advances, new funding, signs of PDF editing) and writes an internal AI Risk Report.
 - Stamps each lender's copy of the PDFs with a traceable watermark.
-- Sends routine emails on its own (missing documents, stip chases, lender follow-ups).
+- Sends no emails on its own: lenders get the file only when you shop it, and the contract
+  request or clawback confirmation only when you click them.
 - Takes applications from Ascend's website through an API key ([`docs/API.md`](docs/API.md)).
 - WhatsApp applications are built and **switched off** (see "WhatsApp applications" below).
 

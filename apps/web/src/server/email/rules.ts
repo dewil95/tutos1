@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@mca/db";
 
-export type RuleKind =
-  "MISSING_DOCS" | "STIP_CHASE" | "LENDER_FOLLOW_UP" | "CONTRACT_REQUEST" | "CLAWBACK_CONFIRM";
+/** Lender emails a person sends from the deal page. Nothing is sent automatically. */
+export type RuleKind = "CONTRACT_REQUEST" | "CLAWBACK_CONFIRM";
 
 export interface RuleDefaults {
   kind: RuleKind;
@@ -11,49 +11,13 @@ export interface RuleDefaults {
   enabled: boolean;
   delayHours: number;
   maxSends: number;
-  /** true = a person clicks send on the deal page (draft); false = sent by the cron tick. */
+  /** Always true: a person clicks send on the deal page. */
   requiresApproval: boolean;
   subject: string;
   body: string;
 }
 
 export const DEFAULT_RULES: RuleDefaults[] = [
-  {
-    kind: "MISSING_DOCS",
-    label: "Missing documents (to merchant)",
-    description:
-      "Deal waiting on documents: asks the merchant for what is missing, up to 3 times, a day apart.",
-    enabled: true,
-    delayHours: 24,
-    maxSends: 3,
-    requiresApproval: false,
-    subject: "Documents needed for your funding request - {{business}}",
-    body: "Hi {{contact}},\n\nTo move your funding request forward we still need:\n{{missing}}\n\nYou can reply to this email with the files attached.\n\nThank you,\n{{broker}}",
-  },
-  {
-    kind: "STIP_CHASE",
-    label: "Stip chase (to merchant)",
-    description:
-      "Lender asked for something (stip): asks the merchant, up to 3 times, a day apart.",
-    enabled: true,
-    delayHours: 24,
-    maxSends: 3,
-    requiresApproval: false,
-    subject: "Items needed to finish your approval - {{business}}",
-    body: "Hi {{contact}},\n\nThe funder needs the following to finish your file:\n{{stips}}\n\nPlease reply to this email with them as soon as you can.\n\nThank you,\n{{broker}}",
-  },
-  {
-    kind: "LENDER_FOLLOW_UP",
-    label: "Lender follow-up (in the lender's thread)",
-    description:
-      "No reply from a lender a day after sending: one follow-up in the same thread, same To/CC. Weekdays only.",
-    enabled: true,
-    delayHours: 24,
-    maxSends: 1,
-    requiresApproval: false,
-    subject: "Re: New Deal Submission - {{business}}",
-    body: "Hello,\n\nFollowing up on {{business}}. Any update on this file?\n\nThank you.",
-  },
   {
     kind: "CONTRACT_REQUEST",
     label: "Contract request (to lender, you click send)",
@@ -109,13 +73,4 @@ export async function ensureRules(prisma: PrismaClient, tenantId: string) {
     });
   }
   return prisma.emailRule.findMany({ where: { tenantId } });
-}
-
-/** Weekend in New York (lender follow-ups wait for Monday). */
-export function isWeekendNY(now: Date): boolean {
-  const day = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-  }).format(now);
-  return day === "Sat" || day === "Sun";
 }
