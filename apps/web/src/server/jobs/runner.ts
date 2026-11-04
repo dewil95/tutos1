@@ -9,7 +9,6 @@ import {
 import { AiUnavailableError } from "@mca/ai";
 import { PermanentJobError } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
-import { handleEmailRules } from "./emailRules";
 import { handleHistoryImport } from "./historyImport";
 import { handleInboxSync } from "./inboxSync";
 import { handleParseReply } from "./parseReply";
@@ -31,7 +30,8 @@ const HANDLERS: Partial<Record<JobType, JobHandler>> = {
   STATEMENT_EXTRACT: handleStatementExtract,
   STATEMENT_SCRUB: handleStatementScrub,
   RISK_REPORT: handleRiskReport,
-  EMAIL_RULES: handleEmailRules,
+  // Automated emails were removed: a job still queued from before finishes without sending.
+  EMAIL_RULES: async () => undefined,
   WHATSAPP_MESSAGE: handleWhatsAppMessage,
   WHATSAPP_APP_READ: handleWhatsAppAppRead,
   WHATSAPP_NUDGES: handleWhatsAppNudges,

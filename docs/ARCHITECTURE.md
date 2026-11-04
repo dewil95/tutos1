@@ -78,7 +78,7 @@ flowchart LR
 ```
 
 The same email read from two mailboxes is stored once (by its Message-ID). Imported history
-never triggers follow-ups, stip chases or file downloads, and nothing is ever sent from the
+never triggers file downloads, and nothing is ever sent from the
 history mailbox.
 
 ## 2. Ship the file: one email per lender
@@ -192,22 +192,20 @@ flowchart LR
 
 Lender replies go through A8 (Gemini 3 Flash) to update each lender's status row.
 
-## 6. Watermarks and email automation
+## 6. Watermarks and lender emails
 
 Every PDF in a lender's copy of the package is stamped on each page ("Submitted by Ascend Fund
 to <Lender> only · date · Ref <tag>") and carries the tag in its metadata. The tag is stored on
 that lender's submission, so a file that turns up elsewhere shows whose copy it was.
 
-| Email                 | To                              | When                                   | Default                         |
-| --------------------- | ------------------------------- | -------------------------------------- | ------------------------------- |
-| Missing documents     | merchant                        | deal waiting on application/statements | automatic, up to 3, a day apart |
-| Stip chase            | merchant                        | a lender asked for something           | automatic, up to 3, a day apart |
-| Lender follow-up      | lender, same thread, same To/CC | no reply a day after sending           | automatic, once, weekdays       |
-| Contract request      | lender, same thread             | rep clicks on an approved row          | one click, DL/VC attached       |
-| Clawback confirmation | lender, same thread             | funded email asks for it               | one click                       |
+| Email                 | To                  | When                          | Default                   |
+| --------------------- | ------------------- | ----------------------------- | ------------------------- |
+| Contract request      | lender, same thread | rep clicks on an approved row | one click, DL/VC attached |
+| Clawback confirmation | lender, same thread | funded email asks for it      | one click                 |
 
-All of them can be edited or turned off in Settings, skip merchants marked "no automated
-emails", follow dry-run mode, and never use BCC.
+Nothing is sent automatically: besides shopping the file, lenders get only these two, when a
+person clicks. Both can be edited or turned off in Settings, follow dry-run mode, and never use
+BCC.
 
 The AI provider sits behind one interface, so Gemini can be swapped for Claude with one setting:
 
@@ -281,7 +279,7 @@ sequenceDiagram
 | Website API                                  | `apps/web/src/app/api/v1/`, `docs/API.md`                                      |
 | Bank scrub checks, risk score, lender rank   | `packages/domain/src/scrub.ts`, `riskScore.ts`, `funderMatch.ts`               |
 | Watermark, PDF checks, report PDF            | `packages/connectors/src/pdf/`                                                 |
-| Email automation                             | `apps/web/src/server/email/`, `server/jobs/emailRules.ts`                      |
+| Lender email templates                       | `apps/web/src/server/email/`                                                   |
 | WhatsApp bot, questions, signature           | `apps/web/src/server/whatsapp/`, `app/api/whatsapp/webhook/`                   |
 | WhatsApp Cloud API client, application PDF   | `packages/connectors/src/whatsapp/`, `pdf/application.ts`                      |
 | Deal page                                    | `apps/web/src/app/deals/[id]/`                                                 |

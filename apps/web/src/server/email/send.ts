@@ -15,7 +15,7 @@ export interface TrackedEmail {
   subject: string;
   text: string;
   attachments?: Attachment[];
-  /** Reply in this Gmail thread (lender follow-ups, contract requests). */
+  /** Reply in this Gmail thread (contract requests, clawback confirmations). */
   threadId?: string | null;
   /** Gmail id of the message being answered, for In-Reply-To. */
   replyToGmailId?: string | null;
@@ -90,25 +90,4 @@ export async function sendTracked(
     }),
   ]);
   return { dryRun, messageId };
-}
-
-/** How many times (and when last) a rule already sent to this target. */
-export async function sentHistory(
-  prisma: PrismaClient,
-  dealId: string,
-  kind: string,
-  target: string,
-) {
-  // D1/SQLite has no JSON filters in Prisma: read this deal's rule events and match in code.
-  const events = (
-    await prisma.dealEvent.findMany({
-      where: { dealId, type: "email_rule_sent" },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true, payload: true },
-    })
-  ).filter((e) => {
-    const p = e.payload as { kind?: string; target?: string } | null;
-    return p?.kind === kind && p?.target === target;
-  });
-  return { count: events.length, last: events[0]?.createdAt ?? null };
 }
