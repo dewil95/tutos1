@@ -6,7 +6,7 @@
   --surface-2: #f7f9f8;
   --ink: #15201d;
   --muted: #5d6b67;
-  --faint: #8a9692;
+  --faint: #68766f;
   --line: #e1e7e4;
   --line-strong: #cdd6d2;
   --accent: #0f6e66;
@@ -33,7 +33,7 @@
     --surface-2: #18231f;
     --ink: #e4ece9;
     --muted: #9db0aa;
-    --faint: #6f8580;
+    --faint: #839a93;
     --line: #23312d;
     --line-strong: #2f403b;
     --accent: #3fb3a6;
@@ -90,7 +90,7 @@ h3 {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   color: var(--muted);
   margin: 18px 0 8px;
 }
@@ -98,6 +98,13 @@ code,
 .mono {
   font-family: var(--font-mono);
   font-size: 0.92em;
+}
+strong,
+b {
+  font-weight: 600;
+}
+textarea.mono {
+  font-size: 13px;
 }
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -208,9 +215,14 @@ code,
 .mode.live::before {
   background: #5cc98c;
 }
-.sidebar-foot button.link {
+.sidebar-foot button.link,
+.sidebar-foot a.link {
   color: var(--sidebar-muted);
   text-align: left;
+  text-decoration: none;
+}
+.sidebar-foot a.link:hover {
+  color: var(--sidebar-ink);
 }
 .content {
   padding: 28px 32px 64px;
@@ -310,7 +322,7 @@ code,
 @media (max-width: 860px) {
   .cols {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    gap: 18px;
   }
 }
 .row {
@@ -344,6 +356,9 @@ code,
   gap: 16px;
   flex-wrap: wrap;
 }
+.deal-title > .button {
+  margin-top: 24px;
+}
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -357,6 +372,11 @@ code,
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.facts .num {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+}
 .stepper {
   list-style: none;
   margin: 0;
@@ -368,7 +388,7 @@ code,
 .stepper li {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--faint);
   padding-top: 8px;
@@ -401,6 +421,11 @@ code,
   padding: 8px 4px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.subnav::-webkit-scrollbar {
+  display: none;
 }
 .subnav a {
   padding: 6px 10px;
@@ -573,7 +598,22 @@ input[type="checkbox"] {
   vertical-align: -2px;
 }
 input[type="file"] {
-  padding: 5px;
+  padding: 4px 6px;
+}
+input[type="file"]::file-selector-button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+input[type="file"]::file-selector-button:hover {
+  border-color: var(--faint);
 }
 
 /* ---------- Lists ---------- */
@@ -599,35 +639,91 @@ ul.lenders li label,
 ul.files li label {
   cursor: pointer;
 }
-ul.lenders li > div {
-  margin: 3px 0 0 23px;
+ul.lenders li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 2px;
 }
-ul.lenders li.disabled {
-  opacity: 0.5;
+.lender-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.lender-head label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+.lender-head strong {
+  font-weight: 600;
+}
+.lender-meta,
+ul.lenders li > .addr {
+  margin-left: 23px;
+}
+.lender-meta {
+  color: var(--muted);
+}
+ul.lenders li > .addr {
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ul.lenders li.disabled strong,
+ul.lenders li.disabled .lender-head {
+  color: var(--muted);
+  font-weight: 500;
+}
+ul.lenders li.disabled > .addr,
+ul.lenders li.disabled .lender-meta {
+  display: none;
 }
 ul.lenders li.outside strong {
   color: var(--muted);
 }
+/* Ship the file: files and message as one band, the lenders as a full-width ledger beneath,
+   and the send row kept in view while the ledger scrolls. */
+.ship-lenders {
+  margin-top: 18px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.ship-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px -20px 0;
+  padding: 12px 20px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--line);
+}
 .score {
   font-family: var(--font-mono);
   font-size: 11px;
-  padding: 0 6px;
+  line-height: 18px;
+  padding: 0 7px;
   border-radius: 999px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid transparent;
   color: var(--muted);
+  background: var(--surface-2);
   font-variant-numeric: tabular-nums;
-  margin-left: 4px;
+  white-space: nowrap;
 }
 .score.fit {
   color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 45%, transparent);
   background: var(--good-soft);
 }
 .score.nofit {
   color: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
   background: var(--warn-soft);
-  font-family: var(--font-ui);
 }
 .addr {
   font-family: var(--font-mono);
@@ -652,6 +748,9 @@ ul.timeline li::before {
 }
 ul.timeline li.inbound::before {
   background: var(--accent);
+}
+ul.timeline li:last-child {
+  border-bottom: 0;
 }
 ul.conflicts {
   display: grid;
@@ -697,6 +796,19 @@ table.num th {
 table.num td {
   font-family: var(--font-mono);
   font-size: 12.5px;
+}
+table.grid td.when {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  /* Phones: the status table keeps its columns and scrolls sideways instead of stacking
+     every address into a screen-tall row. */
+  table.grid {
+    min-width: 600px;
+  }
 }
 table.offers {
   margin: 6px 0 2px;
@@ -754,7 +866,8 @@ table.offers td {
 }
 .tag.on {
   color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 45%, transparent);
+  background: var(--good-soft);
+  border-color: transparent;
 }
 .grade {
   display: inline-grid;
@@ -778,6 +891,7 @@ table.offers td {
   color: var(--bad);
 }
 .notice {
+  max-width: 72ch;
   padding: 10px 14px;
   border-radius: 8px;
   margin: 10px 0;
@@ -1080,12 +1194,12 @@ code.secret {
 /* Ascend application steps on the deal page */
 ol.steps {
   margin: 0;
-  padding-left: 1.4rem;
+  padding-left: 22px;
   display: grid;
-  gap: 0.9rem;
+  gap: 14px;
 }
 ol.steps > li > form {
-  margin-top: 0.4rem;
+  margin-top: 6px;
 }
 .appform fieldset {
   margin-bottom: 0.6rem;

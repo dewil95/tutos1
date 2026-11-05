@@ -31,7 +31,7 @@ export function RiskReportPanel({
         AI Risk Report <span className="tag">internal</span>
       </h2>
       {error ? (
-        <p className="small error">
+        <p className="notice error">
           The AI could not write the report ({error.slice(0, 160)}). The deal works without it;
           regenerate below to try again.
         </p>

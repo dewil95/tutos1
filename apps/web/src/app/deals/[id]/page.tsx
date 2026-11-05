@@ -372,7 +372,7 @@ export default async function DealPage({
                           <div className="small muted">{s.declineReason}</div>
                         ) : null}
                       </td>
-                      <td className="small">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
+                      <td className="when">{s.sentAt ? s.sentAt.toLocaleString("en-US") : "—"}</td>
                       <td className="addr">
                         <div>To: {asList(s.toAddresses).join(", ")}</div>
                         {asList(s.ccAddresses).length ? (
@@ -472,7 +472,7 @@ export default async function DealPage({
             upload the signed copy so it goes to lenders.
           </p>
         ) : null}
-        <div className="cols">
+        <div className="cols ship-top">
           <div>
             <h3>1. Files from Google Drive</h3>
             {documents.length === 0 ? (
@@ -518,14 +518,21 @@ export default async function DealPage({
                 Balances of current lenders, one per line (<code>Lender: $balance</code>, e.g.{" "}
                 <code>DLP Funding: $29,081</code>)
               </span>
-              <textarea name="positions" rows={4} defaultValue={positionsToText(positions)} />
+              <textarea
+                name="positions"
+                rows={4}
+                className="mono"
+                defaultValue={positionsToText(positions)}
+              />
             </label>
             <label className="field">
               Note (optional, e.g. industry or why revenue dipped)
               <textarea name="note" rows={2} defaultValue={deal.submissionNote ?? ""} />
             </label>
           </div>
+        </div>
 
+        <div className="ship-lenders">
           <div>
             <h3>3. Lenders — one separate email each</h3>
             <p className="small muted">
@@ -534,50 +541,67 @@ export default async function DealPage({
             </p>
             <SelectTopLenders />
             <ul className="lenders">
-              {rows.map(({ funder: f, to, cc, problem, already, eligible, score, reasons }) => (
-                <li
-                  key={f.id}
-                  className={already || problem ? "disabled" : eligible ? "" : "outside"}
-                >
-                  <label>
-                    <input
-                      type="checkbox"
-                      name="funderIds"
-                      value={f.id}
-                      disabled={already || !!problem}
-                      data-recommended={!already && !problem && eligible ? "1" : undefined}
-                    />{" "}
-                    <strong>{f.name}</strong>
-                  </label>{" "}
-                  {!already && !problem ? (
-                    <span className={`score ${eligible ? "fit" : "nofit"}`} title="Fit score 0-100">
-                      {eligible ? `fit ${score}` : "outside appetite"}
-                    </span>
-                  ) : null}
-                  {already ? (
-                    <span className="small muted"> already submitted for this merchant</span>
-                  ) : null}
-                  {problem ? <span className="small error"> {problem}</span> : null}
-                  {!problem ? (
-                    <div className="addr">
-                      To: {to.join(", ")}
-                      {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
-                    </div>
-                  ) : null}
-                  {appetiteSummary(f) ? (
-                    <div className="small appetite">{appetiteSummary(f)}</div>
-                  ) : null}
-                  {reasons.length && !already ? (
-                    <div className={`small ${eligible ? "muted" : "warn"}`}>
-                      {reasons.join(" · ")}
-                    </div>
-                  ) : null}
-                </li>
-              ))}
+              {rows.map(
+                ({ funder: f, to, cc, problem, already, eligible, score, reasons: all }) => {
+                  const appetite = appetiteSummary(f);
+                  const reasons = all.filter((r) => !appetite.includes(r));
+                  return (
+                    <li
+                      key={f.id}
+                      className={already || problem ? "disabled" : eligible ? "" : "outside"}
+                    >
+                      <div className="lender-head">
+                        <label>
+                          <input
+                            type="checkbox"
+                            name="funderIds"
+                            value={f.id}
+                            disabled={already || !!problem}
+                            data-recommended={!already && !problem && eligible ? "1" : undefined}
+                          />{" "}
+                          <strong>{f.name}</strong>
+                        </label>{" "}
+                        {!already && !problem ? (
+                          <span
+                            className={`score ${eligible ? "fit" : "nofit"}`}
+                            title="Fit score 0-100"
+                          >
+                            {eligible ? `fit ${score}` : "outside appetite"}
+                          </span>
+                        ) : null}
+                        {already ? (
+                          <span className="small muted"> already submitted for this merchant</span>
+                        ) : null}
+                        {problem ? <span className="small error"> {problem}</span> : null}
+                      </div>
+                      {appetite || (reasons.length && !already) ? (
+                        <div className="lender-meta small">
+                          {appetite ? <span className="appetite">{appetite}</span> : null}
+                          {appetite && reasons.length && !already ? " · " : ""}
+                          {reasons.length && !already ? (
+                            <span className={eligible ? "muted" : "warn"}>
+                              {reasons.join(" · ")}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {!problem ? (
+                        <div
+                          className="addr"
+                          title={`To: ${to.join(", ")}${cc.length ? ` · CC: ${cc.join(", ")}` : ""}`}
+                        >
+                          To: {to.join(", ")}
+                          {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                },
+              )}
             </ul>
           </div>
         </div>
-        <p>
+        <div className="ship-actions">
           <button type="submit" className="primary">
             Send to selected lenders
           </button>{" "}
@@ -585,7 +609,7 @@ export default async function DealPage({
             Subject: &quot;New Deal Submission - {merchantName}&quot;. Packages over 18 MB go as
             Drive links shared only with that lender.
           </span>
-        </p>
+        </div>
         <p>
           <button type="submit" formAction={analyseDealStatements.bind(null, id)}>
             Re-run bank scrub on checked statements

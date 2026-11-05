@@ -50,7 +50,7 @@ export function DealHeader(p: DealHeaderProps) {
             {p.legalName !== p.name ? <div className="small muted">{p.legalName}</div> : null}
             <div className="facts">
               <span>
-                Requested <b>{p.requested ? money(p.requested) : "—"}</b>
+                Requested <b className="num">{p.requested ? money(p.requested) : "—"}</b>
               </span>
               <span>
                 Grade {p.grade ? <span className={`grade ${p.grade}`}>{p.grade}</span> : <b>—</b>}
