@@ -46,14 +46,14 @@ export function BankScrubPanel({
   const problems = (
     <>
       {unreadable.length ? (
-        <p className="small error">
+        <p className="notice error">
           The AI could not read {unreadable.join(", ")}. Review{" "}
           {unreadable.length > 1 ? "them" : "it"} by hand, or tick it above and use “Re-run bank
           scrub” to try again.
         </p>
       ) : null}
       {error ? (
-        <p className="small error">
+        <p className="notice error">
           The bank scrub did not finish ({error.slice(0, 160)}). Use “Re-run bank scrub” to try
           again.
         </p>
