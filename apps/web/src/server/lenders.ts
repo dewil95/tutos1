@@ -44,7 +44,7 @@ export function appetiteSummary(f: FunderWithPrograms): string {
   if (!p) return "";
   const parts: string[] = [];
   if (p.minMonthlyRevenue)
-    parts.push(`min revenue ${Number(p.minMonthlyRevenue).toLocaleString()}`);
+    parts.push(`min revenue $${Number(p.minMonthlyRevenue).toLocaleString()}`);
   const excluded = asList(p.excludedStates);
   if (excluded.length) parts.push(`not in ${excluded.join(", ")}`);
   const allowed = asList(p.allowedStates).filter((s) => s !== "ALL");
