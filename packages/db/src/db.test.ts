@@ -51,7 +51,9 @@ describe("funder CSV", () => {
     const loan23 = seeds.find((s) => s.name === "Loan23")!;
     expect(loan23.program.excludedStates).toEqual(["TX"]);
     const cashable = seeds.find((s) => s.name === "Cashable Funding")!;
-    expect(cashable.program.minMonthlyRevenue).toBe(30000);
+    expect(cashable.program.minMonthlyRevenue).toBe(20000); // the team's sheet (was 30000 from replies)
+    expect(mazal.program.positionAppetite).toContain("1st");
+    expect(mazal.program.preferredPositions).toEqual(["1st"]);
     for (const s of seeds.filter((x) => x.isActive)) expect(s.submissionTo).toMatch(/@/);
     // A lender on a free mailbox is matched by its exact address, never by gmail.com.
     expect(seeds.find((s) => s.name === "Fund Me Fast")!.emailDomains).toEqual([
