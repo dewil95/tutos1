@@ -1,4 +1,4 @@
-import { asList, enqueueJob, getPrisma } from "@mca/db";
+import { asList, enqueueJob, getPrisma, type JobType } from "@mca/db";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
@@ -49,6 +49,21 @@ async function saveTeamCc(form: FormData) {
     data: { teamCc: [...new Set(list)] },
   });
   redirect("/settings?cc=1");
+}
+
+/** AI jobs that gave up (e.g. during an API quota outage) run again now that it is fixed. */
+async function retryFailedJobs() {
+  "use server";
+  const user = await requireUser();
+  if (user.role !== "ADMIN" && user.role !== "MANAGER") redirect("/settings");
+  const prisma = getPrisma();
+  const types: JobType[] = ["PARSE_REPLY", "STATEMENT_EXTRACT", "APPLICATION_READ"];
+  const { count } = await prisma.job.updateMany({
+    where: { tenantId: user.tenantId, status: "FAILED", type: { in: types } },
+    data: { status: "QUEUED", attempts: 0, runAt: new Date(), lockedAt: null, lastError: null },
+  });
+  after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs(), types }).then(() => undefined));
+  redirect(`/settings?${new URLSearchParams({ retried: String(count) })}`);
 }
 
 async function checkInboxNow() {
@@ -121,6 +136,12 @@ export default async function SettingsPage({
       {flash.cc ? <p className="notice ok">Team CC saved.</p> : null}
       {flash.team ? <p className="notice ok">{flash.team}</p> : null}
       {flash.lenders ? <p className="notice ok">{flash.lenders}</p> : null}
+      {flash.retried ? (
+        <p className="notice ok">
+          {flash.retried} failed job(s) queued again. The first ones run now; the rest within a few
+          minutes.
+        </p>
+      ) : null}
 
       <ServerStatus />
 
@@ -291,6 +312,15 @@ export default async function SettingsPage({
               </li>
             ))}
           </ul>
+          {isAdmin ? (
+            <form action={retryFailedJobs} className="row">
+              <button type="submit">Retry failed jobs</button>
+              <span className="small muted">
+                Reads lender replies, bank statements and applications that failed (for example
+                while the AI quota was exceeded). Fix the cause first, then retry.
+              </span>
+            </form>
+          ) : null}
         </section>
       ) : null}
     </>
