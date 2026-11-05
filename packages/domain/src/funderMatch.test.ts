@@ -12,11 +12,13 @@ const programs: FunderProgramRule[] = [
     minFico: 550,
     maxExistingPositions: 1,
     positionAppetite: ["1st", "2nd"],
+    preferredPositions: ["1st"],
     minAdvance: 10_000,
     maxAdvance: 250_000,
     allowedStates: ["ALL"],
     excludedStates: ["CA", "NY"],
     excludedNaics: ["7132"],
+    excludedIndustries: ["trucking", "gas stations"],
     isActive: true,
   },
   {
@@ -29,14 +31,48 @@ const programs: FunderProgramRule[] = [
     minFico: 500,
     maxExistingPositions: 2,
     positionAppetite: ["2nd", "3rd"],
+    preferredPositions: [],
     minAdvance: 5_000,
     maxAdvance: 100_000,
     allowedStates: [],
     excludedStates: [],
     excludedNaics: [],
+    excludedIndustries: [],
     isActive: true,
   },
 ];
+
+describe("the team's lender sheet", () => {
+  const base: DealProfile = {
+    paperGrade: "A",
+    avgMonthlyTrueRevenue: 40_000,
+    timeInBusinessMonths: 24,
+    ficoEstimate: 600,
+    existingPositions: 0,
+    requestedAmount: 20_000,
+    state: "FL",
+    naics: null,
+    industry: null,
+  };
+  it("keeps a lender off a merchant in an industry it does not fund", () => {
+    const a = (industry: string | null) =>
+      matchFunders({ ...base, industry }, programs).find((m) => m.programId === "a-core")!;
+    expect(a("Trucking / Logistics").eligible).toBe(false);
+    expect(a("Trucking / Logistics").failedRules).toEqual(["does not fund trucking"]);
+    expect(a("Gas Station").eligible).toBe(false);
+    expect(a("Restaurant").eligible).toBe(true);
+    expect(a(null).eligible).toBe(true);
+  });
+  it("ranks the lender's preferred position up and says so", () => {
+    const first = rankFunders(base, programs).find((r) => r.programId === "a-core")!;
+    expect(first.reasons).toContain("prefers 1st position");
+    const second = rankFunders({ ...base, existingPositions: 1 }, programs).find(
+      (r) => r.programId === "a-core",
+    )!;
+    expect(second.reasons).toContain("prefers 1st position");
+    expect(second.score).toBeLessThan(first.score);
+  });
+});
 
 describe("matchFunders", () => {
   it("admits the first-position A-paper deal only to Funder A", () => {
@@ -50,6 +86,7 @@ describe("matchFunders", () => {
         requestedAmount: 50_000,
         state: "FL",
         naics: "722511",
+        industry: null,
       },
       programs,
     );
@@ -71,6 +108,7 @@ describe("matchFunders", () => {
         requestedAmount: 20_000,
         state: "NY",
         naics: "238220",
+        industry: null,
       },
       programs,
     );
@@ -98,6 +136,7 @@ describe("matchFunders", () => {
         requestedAmount: 20_000,
         state: "TX",
         naics: "238220",
+        industry: null,
       },
       programs.map((p) => ({ ...p, isActive: false })),
     );
@@ -115,6 +154,7 @@ describe("rankFunders", () => {
     requestedAmount: 25_000,
     state: "FL",
     naics: "722511",
+    industry: null,
   };
 
   it("puts eligible lenders first, with reasons for the rest", () => {

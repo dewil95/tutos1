@@ -42,17 +42,40 @@ export async function seedTenant(prisma: PrismaClient, opts: SeedOptions = {}) {
       create: { ...u, tenantId: tenant.id },
     });
   }
-  const seeds = funderSeedsFromCsv(opts.csv ?? FUNDER_ROSTER_CSV);
-  for (const f of seeds) {
-    const { program, ...funder } = f;
-    const saved = await prisma.funder.upsert({
-      where: { tenantId_name: { tenantId: tenant.id, name: f.name } },
-      update: {},
-      create: { ...funder, tenantId: tenant.id },
+  const lenders = await syncFunders(prisma, tenant.id, opts.csv);
+  return { tenant, users: team.length, lenders: lenders.added + lenders.updated };
+}
+
+/**
+ * Brings a tenant's lender directory in line with the roster: a lender new on the roster is
+ * added; one already there gets the roster's addresses and appetite (minimum revenue, states,
+ * positions, industries). Nothing is ever deleted, and a lender's own isActive flag is kept.
+ */
+export async function syncFunders(
+  prisma: PrismaClient,
+  tenantId: string,
+  csv?: string,
+): Promise<{ added: number; updated: number }> {
+  let added = 0;
+  let updated = 0;
+  for (const f of funderSeedsFromCsv(csv ?? FUNDER_ROSTER_CSV)) {
+    const { program, isActive, ...funder } = f;
+    const existing = await prisma.funder.findUnique({
+      where: { tenantId_name: { tenantId, name: f.name } },
     });
-    if (!(await prisma.funderProgram.findFirst({ where: { funderId: saved.id } }))) {
+    const saved = existing
+      ? await prisma.funder.update({ where: { id: existing.id }, data: funder })
+      : await prisma.funder.create({ data: { ...funder, isActive, tenantId } });
+    const current = await prisma.funderProgram.findFirst({
+      where: { funderId: saved.id, name: program.name },
+    });
+    if (current) {
+      await prisma.funderProgram.update({ where: { id: current.id }, data: program });
+    } else {
       await prisma.funderProgram.create({ data: { ...program, funderId: saved.id } });
     }
+    if (existing) updated++;
+    else added++;
   }
-  return { tenant, users: team.length, lenders: seeds.length };
+  return { added, updated };
 }

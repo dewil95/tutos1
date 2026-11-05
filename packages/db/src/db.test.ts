@@ -121,8 +121,26 @@ describe("seed", () => {
     const prisma = getPrisma();
     const slug = `seed-${Date.now()}`;
     const first = await seedTenant(prisma, { slug });
+    // The roster changed for one lender: a repeat brings that lender up to date.
+    const zlur = await prisma.funderProgram.findFirstOrThrow({
+      where: { funder: { tenantId: first.tenant.id, name: "Zlur" } },
+    });
+    await prisma.funderProgram.update({
+      where: { id: zlur.id },
+      data: { minMonthlyRevenue: 1, preferredPositions: [] },
+    });
     const again = await seedTenant(prisma, { slug });
     expect(again.tenant.id).toBe(first.tenant.id);
+    expect(await prisma.funderProgram.findUniqueOrThrow({ where: { id: zlur.id } })).toMatchObject({
+      preferredPositions: ["1st"],
+      excludedStates: ["VT", "ND"],
+    });
+    expect(
+      Number(
+        (await prisma.funderProgram.findUniqueOrThrow({ where: { id: zlur.id } }))
+          .minMonthlyRevenue,
+      ),
+    ).toBe(5000);
     expect(await prisma.user.count({ where: { tenantId: first.tenant.id } })).toBe(3);
     const lenders = await prisma.funder.findMany({
       where: { tenantId: first.tenant.id },

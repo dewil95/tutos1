@@ -23,14 +23,37 @@ export function programRules(funders: FunderWithPrograms[]): FunderProgramRule[]
       minFico: p?.minFico ?? null,
       maxExistingPositions: p?.maxExistingPositions ?? null,
       positionAppetite: asList(p?.positionAppetite),
+      preferredPositions: asList(p?.preferredPositions),
       minAdvance: p?.minAdvance ? Number(p.minAdvance) : null,
       maxAdvance: p?.maxAdvance ? Number(p.maxAdvance) : null,
       allowedStates: asList(p?.allowedStates),
       excludedStates: asList(p?.excludedStates),
       excludedNaics: asList(p?.excludedNaics),
+      excludedIndustries: asList(p?.excludedIndustries),
       isActive: p?.isActive ?? true,
     })),
   );
+}
+
+/**
+ * What the team's lender sheet says about a lender, in one line for the lender list: minimum
+ * monthly revenue, states it does not fund, the position it prefers, industries it avoids.
+ */
+export function appetiteSummary(f: FunderWithPrograms): string {
+  const p = f.programs.find((x) => x.isActive) ?? f.programs[0];
+  if (!p) return "";
+  const parts: string[] = [];
+  if (p.minMonthlyRevenue)
+    parts.push(`min revenue ${Number(p.minMonthlyRevenue).toLocaleString()}`);
+  const excluded = asList(p.excludedStates);
+  if (excluded.length) parts.push(`not in ${excluded.join(", ")}`);
+  const allowed = asList(p.allowedStates).filter((s) => s !== "ALL");
+  if (allowed.length) parts.push(`only ${allowed.join(", ")}`);
+  const preferred = asList(p.preferredPositions);
+  if (preferred.length) parts.push(`prefers ${preferred.join("/")} position`);
+  const industries = asList(p.excludedIndustries);
+  if (industries.length) parts.push(`no ${industries.join(", ")}`);
+  return parts.join(" · ");
 }
 
 /** Approval history per lender across all of the tenant's submissions. */
@@ -135,6 +158,7 @@ export function dealProfile(input: {
   requestedAmount: number | null;
   state: string | null;
   naics: string | null;
+  industry?: string | null;
 }): DealProfile {
   const grade =
     input.paperGrade && /^[ABCD]$/.test(input.paperGrade) ? (input.paperGrade as PaperGrade) : null;
@@ -149,5 +173,6 @@ export function dealProfile(input: {
     requestedAmount: input.requestedAmount,
     state: input.state,
     naics: input.naics,
+    industry: input.industry ?? null,
   };
 }

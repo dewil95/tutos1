@@ -11,11 +11,15 @@ export interface FunderProgramRule {
   minFico: number | null;
   maxExistingPositions: number | null;
   positionAppetite: string[]; // "1st" | "2nd" | ...
+  /** The position the lender prefers (ranking hint), e.g. ["2nd"]; empty = no preference. */
+  preferredPositions: string[];
   minAdvance: number | null;
   maxAdvance: number | null;
   allowedStates: string[]; // empty = all
   excludedStates: string[];
   excludedNaics: string[];
+  /** Industries not funded, as words matched against the merchant's industry. */
+  excludedIndustries: string[];
   isActive: boolean;
 }
 
@@ -30,6 +34,20 @@ export interface DealProfile {
   requestedAmount: number | null;
   state: string | null;
   naics: string | null;
+  /** The merchant's industry as typed or read from the application. */
+  industry: string | null;
+}
+
+/** Whether a lender's restricted industry (a word or two) describes this merchant's industry. */
+export function industryRestricted(industry: string | null, excluded: string[]): string | null {
+  const ind = industry?.trim().toLowerCase();
+  if (!ind) return null;
+  return (
+    excluded.find((word) => {
+      const w = word.trim().toLowerCase();
+      return !!w && (ind.includes(w) || (ind.length >= 4 && w.includes(ind)));
+    }) ?? null
+  );
 }
 
 export interface FunderMatch {
@@ -90,6 +108,8 @@ export function matchFunders(deal: DealProfile, programs: FunderProgramRule[]): 
       }
       if (deal.naics && p.excludedNaics.some((prefix) => deal.naics!.startsWith(prefix)))
         failed.push(`industry ${deal.naics} excluded`);
+      const restricted = industryRestricted(deal.industry, p.excludedIndustries);
+      if (restricted) failed.push(`does not fund ${restricted}`);
 
       return {
         programId: p.programId,
@@ -151,6 +171,16 @@ export function rankFunders(
     }
     if (p.positionAppetite.includes(ORDINALS[nextPositionIndex]!)) {
       score += 5;
+    }
+    if (p.preferredPositions.length) {
+      const next = ORDINALS[nextPositionIndex]!;
+      if (p.preferredPositions.includes(next)) {
+        score += 8;
+        reasons.push(`prefers ${next} position`);
+      } else {
+        score -= 3;
+        reasons.push(`prefers ${p.preferredPositions.join("/")} position`);
+      }
     }
     if (deal.paperGrade && p.paperGrades.includes(deal.paperGrade)) score += 5;
     if (

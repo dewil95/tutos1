@@ -95,6 +95,7 @@ export interface FunderSeed {
     minFico: number | null;
     maxExistingPositions: number | null;
     positionAppetite: string[];
+    preferredPositions: string[];
     minAdvance: number | null;
     maxAdvance: number | null;
     maxFactorSell: number | null;
@@ -103,6 +104,7 @@ export interface FunderSeed {
     allowedStates: string[];
     excludedStates: string[];
     excludedNaics: string[];
+    excludedIndustries: string[];
     requiredDocs: string[];
     typicalTurnaroundHours: number | null;
     renewalEligibilityPct: number | null;
@@ -144,6 +146,7 @@ export function funderSeedsFromCsv(text: string): FunderSeed[] {
         minFico: num(r.min_fico),
         maxExistingPositions: num(r.max_existing_positions),
         positionAppetite: list(r.position_appetite),
+        preferredPositions: list(r.preferred_positions),
         minAdvance: num(r.min_advance),
         maxAdvance: num(r.max_advance),
         maxFactorSell: num(r.max_factor_sell),
@@ -152,6 +155,7 @@ export function funderSeedsFromCsv(text: string): FunderSeed[] {
         allowedStates: list(r.allowed_states).map((s) => s.toUpperCase()),
         excludedStates: list(r.excluded_states).map((s) => s.toUpperCase()),
         excludedNaics: list(r.excluded_industries_naics),
+        excludedIndustries: list(r.excluded_industries).map((s) => s.toLowerCase()),
         requiredDocs: list(r.required_docs),
         typicalTurnaroundHours: num(r.typical_turnaround_hours),
         renewalEligibilityPct: num(r.renewal_eligibility_pct),

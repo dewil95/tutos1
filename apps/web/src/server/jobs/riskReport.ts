@@ -109,6 +109,7 @@ export async function handleRiskReport(prisma: PrismaClient, job: ClaimedJob): P
       requestedAmount: deal.requestedAmount ? Number(deal.requestedAmount) : null,
       state: deal.merchant.state,
       naics: deal.merchant.naics,
+      industry: deal.merchant.industry,
     }),
   });
   const lenders = ranked
