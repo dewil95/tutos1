@@ -71,26 +71,28 @@ export default async function LendersPage() {
             </div>
             <div>
               <h3>Answers by positions on the file</h3>
-              <table className="grid">
-                <thead>
-                  <tr>
-                    <th>Positions</th>
-                    <th>Sent</th>
-                    <th>Approved</th>
-                    <th>Declined</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {habits.byPositions.map((b) => (
-                    <tr key={b.positions}>
-                      <td>{b.positions}</td>
-                      <td>{b.sent}</td>
-                      <td>{b.approved}</td>
-                      <td>{b.declined}</td>
+              <div className="tablewrap">
+                <table className="grid">
+                  <thead>
+                    <tr>
+                      <th>Positions</th>
+                      <th>Sent</th>
+                      <th>Approved</th>
+                      <th>Declined</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {habits.byPositions.map((b) => (
+                      <tr key={b.positions}>
+                        <td>{b.positions}</td>
+                        <td>{b.sent}</td>
+                        <td>{b.approved}</td>
+                        <td>{b.declined}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
