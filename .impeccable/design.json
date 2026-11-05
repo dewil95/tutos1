@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T00:00:00Z",
+  "title": "Design System: Ascend CRM",
+  "extensions": {
+    "colorMeta": {
+      "teal": { "role": "primary", "displayName": "Ascend Teal", "canonical": "#0f6e66", "dark": "#3fb3a6" },
+      "teal-ink": { "role": "primary", "displayName": "On Teal", "canonical": "#ffffff", "dark": "#06201c" },
+      "teal-wash": { "role": "primary", "displayName": "Teal Wash", "canonical": "#e3f1ef", "dark": "#15302c" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#15201d", "dark": "#e4ece9" },
+      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#5d6b67", "dark": "#9db0aa" },
+      "ink-faint": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#8a9692", "dark": "#6f8580" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f3f5f4", "dark": "#0d1513" },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#ffffff", "dark": "#141e1c" },
+      "surface-2": { "role": "neutral", "displayName": "Surface 2", "canonical": "#f7f9f8", "dark": "#18231f" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#e1e7e4", "dark": "#23312d" },
+      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#cdd6d2", "dark": "#2f403b" },
+      "pine": { "role": "neutral", "displayName": "Pine (sidebar)", "canonical": "#10211e", "dark": "#0a1210" },
+      "pine-ink": { "role": "neutral", "displayName": "Pine Ink", "canonical": "#d6e3df", "dark": "#d6e3df" },
+      "pine-muted": { "role": "neutral", "displayName": "Pine Muted", "canonical": "#8aa29b", "dark": "#7d958e" },
+      "good": { "role": "semantic", "displayName": "Good", "canonical": "#1d7a46", "dark": "#5cc98c" },
+      "good-wash": { "role": "semantic", "displayName": "Good Wash", "canonical": "#e2f3e8", "dark": "#15301f" },
+      "warn": { "role": "semantic", "displayName": "Warn", "canonical": "#9a5c00", "dark": "#e6a94a" },
+      "warn-wash": { "role": "semantic", "displayName": "Warn Wash", "canonical": "#fbf0dc", "dark": "#33270f" },
+      "bad": { "role": "semantic", "displayName": "Bad", "canonical": "#b3261e", "dark": "#f07f76" },
+      "bad-wash": { "role": "semantic", "displayName": "Bad Wash", "canonical": "#fbe5e3", "dark": "#3a1a17" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "The page title; one per page." },
+      "title": { "displayName": "Title", "purpose": "Panel headings." },
+      "body": { "displayName": "Body", "purpose": "Running text; controls at 13px." },
+      "small": { "displayName": "Small", "purpose": "Helper text, meta rows, field labels (500, muted)." },
+      "label": { "displayName": "Label", "purpose": "Uppercase eyebrows, table headers, stepper, stat keys." },
+      "figure": { "displayName": "Figure", "purpose": "Money, counts, dates in tables, emails, scores: mono with tabular numerals." }
+    },
+    "shadows": [
+      { "name": "panel-whisper", "value": "0 1px 2px rgba(16, 33, 30, 0.06), 0 1px 1px rgba(16, 33, 30, 0.04)", "purpose": "Separates white panels from the near-white page; light mode only (dark mode: none)." },
+      { "name": "input-focus-halo", "value": "0 0 0 3px var(--accent-soft)", "purpose": "Focused inputs, with the border turned teal." }
+    ],
+    "motion": [
+      { "name": "card-hover", "value": "border-color 0.12s, transform 0.12s", "purpose": "Board cards; the only transition. Reduced motion disables all transitions." }
+    ],
+    "breakpoints": [
+      { "name": "tablet", "value": "860px", "purpose": "Sidebar becomes a top bar; two-column layouts stack." },
+      { "name": "phone", "value": "560px", "purpose": "Stage stepper shows bars only plus the current stage." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action that advances the deal; one per panel.",
+      "html": "<button class=\"ds-btn-primary\">Send to selected lenders</button>",
+      "css": ".ds-btn-primary { font: 600 13px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--accent-ink, #fff); background: var(--accent, #0f6e66); border: 1px solid var(--accent, #0f6e66); border-radius: 7px; padding: 7px 11px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; } .ds-btn-primary:hover { filter: brightness(1.06); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #0f6e66); outline-offset: 2px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Every other action: white, hairline, medium weight.",
+      "html": "<button class=\"ds-btn\">Read again</button>",
+      "css": ".ds-btn { font: 500 13px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink, #15201d); background: var(--surface, #fff); border: 1px solid var(--line-strong, #cdd6d2); border-radius: 7px; padding: 7px 11px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; } .ds-btn:hover { border-color: var(--faint, #8a9692); } .ds-btn:disabled { opacity: .55; cursor: default; } .ds-btn:focus-visible { outline: 2px solid var(--accent, #0f6e66); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Field label above a hairline input; teal border and wash halo on focus.",
+      "html": "<label class=\"ds-field\">Legal name<input class=\"ds-input\" value=\"NICOLE LLC.\"></label>",
+      "css": ".ds-field { display: grid; gap: 5px; font: 500 12px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--muted, #5d6b67); } .ds-input { font: 400 13px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink, #15201d); background: var(--surface, #fff); border: 1px solid var(--line-strong, #cdd6d2); border-radius: 7px; padding: 7px 11px; min-width: 0; } .ds-input:focus { outline: none; border-color: var(--accent, #0f6e66); box-shadow: 0 0 0 3px var(--accent-soft, #e3f1ef); }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "Lender status: colored text on its wash, no border on semantic variants.",
+      "html": "<span class=\"ds-pill\">Draft</span> <span class=\"ds-pill ds-pill-review\">In review</span> <span class=\"ds-pill ds-pill-approved\">Approved</span> <span class=\"ds-pill ds-pill-declined\">Declined</span> <span class=\"ds-pill ds-pill-stips\">Stips requested</span>",
+      "css": ".ds-pill { display: inline-block; font: 600 11.5px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; padding: 2px 9px; border-radius: 999px; background: var(--surface-2, #f7f9f8); border: 1px solid var(--line, #e1e7e4); color: var(--muted, #5d6b67); white-space: nowrap; } .ds-pill-review { background: var(--accent-soft, #e3f1ef); border-color: transparent; color: var(--accent, #0f6e66); } .ds-pill-approved { background: var(--good-soft, #e2f3e8); border-color: transparent; color: var(--good, #1d7a46); } .ds-pill-declined { background: var(--bad-soft, #fbe5e3); border-color: transparent; color: var(--bad, #b3261e); } .ds-pill-stips { background: var(--warn-soft, #fbf0dc); border-color: transparent; color: var(--warn, #9a5c00); }"
+    },
+    {
+      "name": "Board Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A deal on the pipeline board: name, mono amount, meta row; teal border on hover.",
+      "html": "<a class=\"ds-card\" href=\"#\"><span class=\"ds-card-name\">Surf's Up Pool and Spa Services</span><span class=\"ds-card-amount\">$40,000</span><span class=\"ds-card-meta\"><span>Jonas Abreu</span><span>6d</span></span></a>",
+      "css": ".ds-card { display: grid; gap: 4px; font: 400 14px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink, #15201d); background: var(--surface, #fff); border: 1px solid var(--line, #e1e7e4); border-radius: 8px; padding: 10px 12px; text-decoration: none; box-shadow: 0 1px 2px rgba(16,33,30,.06), 0 1px 1px rgba(16,33,30,.04); transition: border-color .12s; } .ds-card:hover { border-color: var(--accent, #0f6e66); } .ds-card-name { font-weight: 600; line-height: 1.3; } .ds-card-amount { font: 400 13px/1.4 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; } .ds-card-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted, #5d6b67); }"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Pine sidebar items with a 16px line icon; active = teal wash and white text.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-active\" href=\"#\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><rect x=\"1.75\" y=\"2.75\" width=\"3.5\" height=\"10.5\" rx=\"1\"/><rect x=\"6.25\" y=\"2.75\" width=\"3.5\" height=\"7\" rx=\"1\"/><rect x=\"10.75\" y=\"2.75\" width=\"3.5\" height=\"4.5\" rx=\"1\"/></svg>Deals</a><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><circle cx=\"8\" cy=\"8\" r=\"6.25\"/><path d=\"M8 5v6M5 8h6\"/></svg>New deal</a></nav>",
+      "css": ".ds-nav { display: grid; gap: 2px; padding: 14px; background: var(--sidebar, #10211e); border-radius: 10px; width: 196px; } .ds-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; font: 500 14px/1.5 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; color: var(--sidebar-ink, #d6e3df); text-decoration: none; } .ds-nav-item svg { width: 16px; height: 16px; opacity: .75; } .ds-nav-item:hover { background: rgba(255,255,255,.06); } .ds-nav-active { background: rgba(63,179,166,.16); color: #fff; } .ds-nav-active svg { opacity: 1; }"
+    },
+    {
+      "name": "Stage Stepper",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Six equal columns with a 3px top bar; done and current steps turn teal.",
+      "html": "<ol class=\"ds-stepper\"><li class=\"done\">Documents</li><li class=\"done\">Scrub</li><li class=\"current\">Submitted</li><li>Offers</li><li>Contract</li><li>Funded</li></ol>",
+      "css": ".ds-stepper { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; } .ds-stepper li { font: 600 11px/1.4 'Instrument Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: var(--faint, #8a9692); padding-top: 8px; border-top: 3px solid var(--line, #e1e7e4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-stepper li.done { border-color: var(--accent, #0f6e66); color: var(--muted, #5d6b67); } .ds-stepper li.current { border-color: var(--accent, #0f6e66); color: var(--accent, #0f6e66); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Underwriter's Desk",
+    "overview": "Ascend CRM is a working desk, not a showcase. A rep opens a deal and needs the merchant, the files, the bank scrub, the lenders and the timeline on one scrolling page, readable at a glance and dense enough that nothing important is a click away. The design serves that scene with calm restraint: a near-white page, white panels separated by hairlines, one teal accent used for the single action that matters and for \"this is live\" states, and a dark pine sidebar that holds navigation out of the way. Numbers are the content: money, balances, scores, dates, emails and file sizes are set in JetBrains Mono with tabular figures. Color is reserved for meaning. The same system runs in light and dark mode through one set of tokens.",
+    "keyCharacteristics": [
+      "One accent (teal), used sparingly: primary buttons, links, active navigation, focus rings, \"sent / in review\" states.",
+      "Structure by hairline borders on white panels; shadows are a whisper in light mode and absent in dark mode.",
+      "Figures in mono with tabular numerals; prose in Instrument Sans; uppercase 11px tracked labels for sections and table headers.",
+      "Dense but breathable: 14px body, 18/20px panel padding, 14px between panels, 1240px content column beside a 224px sidebar.",
+      "Status as soft pills (tinted wash, no border) and small square grade chips; never as loud banners."
+    ],
+    "rules": [
+      { "name": "The One Teal Rule", "body": "Teal is the only accent and it marks action or progress: one primary button per panel, links, the active nav item, focus. It is never used as decoration, background fill or heading color.", "section": "colors" },
+      { "name": "The Wash-Not-Border Rule", "body": "Semantic states are shown as colored text on the matching pale wash with no border (pills, notices, score badges). Hairline borders are reserved for neutral structure.", "section": "colors" },
+      { "name": "The Mono Figures Rule", "body": "Any value a rep compares or copies (money, percentages, counts, dates in tables, emails, file sizes) is set in JetBrains Mono with tabular numerals. Prose never is.", "section": "typography" },
+      { "name": "The Weight-Not-Size Rule", "body": "Hierarchy inside a panel comes from weight (650/600/500/400) and the uppercase label, not from larger type. Only the page headline exceeds 17px.", "section": "typography" },
+      { "name": "The Hairline-First Rule", "body": "If a border can carry the structure, no shadow is added. Shadows never signal importance.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep one teal primary button per panel and make every other control a default or link button.",
+      "Do set every comparable figure (money, counts, dates in tables, emails) in JetBrains Mono with tabular numerals.",
+      "Do carry hierarchy with weight (650/600/500) and 11px uppercase tracked labels; keep body at 14px and controls at 13px.",
+      "Do build structure from hairlines on white panels (10px radius, 18px 20px padding, 14px apart) and let the panel whisper be the only shadow.",
+      "Do express state as colored text on its pale wash (good/warn/bad/teal) with no border.",
+      "Do define every color once as a token so dark mode stays a recolor, and check both themes.",
+      "Do keep the sidebar pine and the page near-white; the content column stays at or under 1240px."
+    ],
+    "donts": [
+      "Don't add gradients, colored panel backgrounds, large radii (over 14px) or drop shadows to signal importance.",
+      "Don't use teal for headings, backgrounds or decoration, or add a second accent.",
+      "Don't nest boxes inside boxes; rows are separated by hairlines, not cards within panels.",
+      "Don't raise type sizes to create hierarchy; only the page headline exceeds 17px.",
+      "Don't put icon tiles above headings or illustrations in empty states; an empty state is one line of faint text.",
+      "Don't change wording, behavior or data in a visual pass; refinement keeps copy and function exactly as they are."
+    ]
+  }
+}
