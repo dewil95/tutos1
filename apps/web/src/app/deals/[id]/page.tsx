@@ -9,7 +9,7 @@ import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { positionsToText } from "@/server/submissions";
 import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
-import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
+import { appetiteSummary, dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
 import { DealHeader } from "./DealHeader";
@@ -207,6 +207,7 @@ export default async function DealPage({
       requestedAmount: deal.requestedAmount ? Number(deal.requestedAmount) : null,
       state: deal.merchant.state,
       naics: deal.merchant.naics,
+      industry: deal.merchant.industry,
     }),
   });
 
@@ -562,6 +563,9 @@ export default async function DealPage({
                       To: {to.join(", ")}
                       {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
                     </div>
+                  ) : null}
+                  {appetiteSummary(f) ? (
+                    <div className="small appetite">{appetiteSummary(f)}</div>
                   ) : null}
                   {reasons.length && !already ? (
                     <div className={`small ${eligible ? "muted" : "warn"}`}>

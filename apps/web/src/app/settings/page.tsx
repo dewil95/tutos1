@@ -12,6 +12,8 @@ import { HistorySection } from "./HistorySection";
 import { TeamSection } from "./TeamSection";
 import { serverStatus } from "@/server/serverUsage";
 import { revokeApiKey } from "./apiKeyActions";
+import { updateLendersFromRoster } from "./lenderActions";
+import { appetiteSummary } from "@/server/lenders";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +89,11 @@ export default async function SettingsPage({
   const [tenant, allMailboxes, funders, failedJobs, apiKeys] = await Promise.all([
     prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId } }),
     prisma.mailboxConnection.findMany({ where: { tenantId: user.tenantId } }),
-    prisma.funder.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),
+    prisma.funder.findMany({
+      where: { tenantId: user.tenantId },
+      orderBy: { name: "asc" },
+      include: { programs: true },
+    }),
     prisma.job.findMany({
       where: { tenantId: user.tenantId, status: "FAILED" },
       orderBy: { updatedAt: "desc" },
@@ -114,6 +120,7 @@ export default async function SettingsPage({
       ) : null}
       {flash.cc ? <p className="notice ok">Team CC saved.</p> : null}
       {flash.team ? <p className="notice ok">{flash.team}</p> : null}
+      {flash.lenders ? <p className="notice ok">{flash.lenders}</p> : null}
 
       <ServerStatus />
 
@@ -243,6 +250,7 @@ export default async function SettingsPage({
                 <th>Lender</th>
                 <th>To</th>
                 <th>CC</th>
+                <th>Appetite</th>
                 <th>Reply domains</th>
               </tr>
             </thead>
@@ -255,6 +263,7 @@ export default async function SettingsPage({
                   </td>
                   <td className="small">{f.submissionTo ?? "—"}</td>
                   <td className="small">{asList(f.submissionCc).join(", ") || "—"}</td>
+                  <td className="small">{appetiteSummary(f) || "—"}</td>
                   <td className="small">{asList(f.emailDomains).join(", ")}</td>
                 </tr>
               ))}
@@ -262,8 +271,14 @@ export default async function SettingsPage({
           </table>
         </div>
         <p className="small muted">
-          Lender addresses come from docs/funder-appetite-matrix.csv (<code>pnpm db:seed</code>).
+          Lender addresses and appetite come from the roster in the app
+          (docs/funder-appetite-matrix.csv). Changed the roster? Update the list here.
         </p>
+        {isAdmin ? (
+          <form action={updateLendersFromRoster}>
+            <button type="submit">Update lenders from the roster</button>
+          </form>
+        ) : null}
       </section>
 
       {failedJobs.length ? (

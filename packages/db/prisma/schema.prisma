@@ -511,6 +511,8 @@ model FunderProgram {
   minFico                 Int?
   maxExistingPositions    Int?
   positionAppetite        Json              @default("[]") // ["1st","2nd"]
+  /// The position this lender prefers (ranking hint from the team's sheet), e.g. ["2nd"]
+  preferredPositions      Json              @default("[]")
   minAdvance              Decimal?
   maxAdvance              Decimal?
   maxFactorSell           Decimal?
@@ -519,6 +521,8 @@ model FunderProgram {
   allowedStates           Json              @default("[]")
   excludedStates          Json              @default("[]")
   excludedNaics           Json              @default("[]")
+  /// Industries this lender does not fund, as words matched against the merchant's industry
+  excludedIndustries      Json              @default("[]")
   requiredDocs            Json              @default("[]")
   typicalTurnaroundHours  Int?
   renewalEligibilityPct   Decimal?
