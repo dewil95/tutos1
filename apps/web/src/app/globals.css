@@ -229,6 +229,7 @@ textarea.mono {
   max-width: 1240px;
   width: 100%;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 @media (max-width: 860px) {
   .shell {
@@ -238,17 +239,25 @@ textarea.mono {
     position: static;
     height: auto;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
   }
   .brand-name small {
     display: none;
   }
   .nav {
     grid-auto-flow: column;
+    gap: 0;
     margin-left: auto;
+  }
+  .nav a {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    justify-content: center;
   }
   .nav a span {
     display: none;
@@ -257,9 +266,61 @@ textarea.mono {
     margin: 0;
     grid-auto-flow: column;
     align-items: center;
+    gap: 10px;
   }
   .content {
     padding: 20px 16px 48px;
+  }
+}
+@media (max-width: 560px) {
+  /* Phones: the brand mark, the five icons, the live/test dot and sign-out, on one row. */
+  .brand-name {
+    display: none;
+  }
+  .sidebar-foot > span:not(.mode) {
+    display: none;
+  }
+  .mode {
+    font-size: 0;
+    gap: 0;
+    padding: 4px;
+    border-color: transparent;
+  }
+}
+/* Touch screens: text fields at 16px (no zoom on focus) and thumb-sized targets; the marks
+   keep their size, the hit areas grow. Mouse layouts are unchanged. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  button,
+  .button {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+  .nav a,
+  .subnav a {
+    min-height: 44px;
+  }
+  .subnav a {
+    padding: 12px;
+  }
+  .sidebar-foot a.link {
+    padding: 12px 0;
+  }
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+  ul.files li label,
+  .lender-head label,
+  label.check {
+    min-height: 32px;
+  }
+  input[type="file"]::file-selector-button {
+    padding: 8px 12px;
   }
 }
 
@@ -556,6 +617,10 @@ button:disabled {
   opacity: 0.55;
   cursor: default;
 }
+table button,
+table .button {
+  white-space: nowrap;
+}
 .primary,
 button.primary {
   background: var(--accent);
@@ -594,7 +659,10 @@ input[type="checkbox"] {
   accent-color: var(--accent);
   width: 15px;
   height: 15px;
+  min-width: 15px;
+  flex: none;
   padding: 0;
+  margin: 0;
   vertical-align: -2px;
 }
 input[type="file"] {
@@ -638,6 +706,10 @@ ul.lenders li:last-child {
 ul.lenders li label,
 ul.files li label {
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
 }
 ul.lenders li {
   display: grid;
@@ -804,10 +876,16 @@ table.grid td.when {
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 560px) {
-  /* Phones: the status table keeps its columns and scrolls sideways instead of stacking
-     every address into a screen-tall row. */
-  table.grid {
+  /* Phones: tables keep their columns and scroll sideways inside their box instead of
+     stacking every cell into a screen-tall row; the faded edge says there is more. */
+  .tablewrap table.grid {
     min-width: 600px;
+  }
+  .tablewrap,
+  .subnav,
+  .board {
+    padding-right: 28px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   }
 }
 table.offers {
