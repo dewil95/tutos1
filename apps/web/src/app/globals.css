@@ -501,6 +501,11 @@ textarea.mono {
   color: var(--ink);
 }
 
+/* The pipeline board is the one screen that earns the whole width: wide monitors see every
+   stage instead of a 1240px slice with the rest hidden behind a scrollbar at the page bottom. */
+.content:has(> .board, > * > .board) {
+  max-width: none;
+}
 /* ---------- Board ---------- */
 .board {
   display: grid;
@@ -509,6 +514,8 @@ textarea.mono {
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 12px;
+  /* Each column is as tall as its own cards; an empty stage is a short box, not a 3000px one. */
+  align-items: start;
 }
 .column {
   background: var(--surface-2);
