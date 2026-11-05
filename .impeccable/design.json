@@ -4,45 +4,169 @@
   "title": "Design System: Ascend CRM",
   "extensions": {
     "colorMeta": {
-      "teal": { "role": "primary", "displayName": "Ascend Teal", "canonical": "#0f6e66", "dark": "#3fb3a6" },
-      "teal-ink": { "role": "primary", "displayName": "On Teal", "canonical": "#ffffff", "dark": "#06201c" },
-      "teal-wash": { "role": "primary", "displayName": "Teal Wash", "canonical": "#e3f1ef", "dark": "#15302c" },
+      "teal": {
+        "role": "primary",
+        "displayName": "Ascend Teal",
+        "canonical": "#0f6e66",
+        "dark": "#3fb3a6"
+      },
+      "teal-ink": {
+        "role": "primary",
+        "displayName": "On Teal",
+        "canonical": "#ffffff",
+        "dark": "#06201c"
+      },
+      "teal-wash": {
+        "role": "primary",
+        "displayName": "Teal Wash",
+        "canonical": "#e3f1ef",
+        "dark": "#15302c"
+      },
       "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#15201d", "dark": "#e4ece9" },
-      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#5d6b67", "dark": "#9db0aa" },
-      "ink-faint": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#8a9692", "dark": "#6f8580" },
-      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f3f5f4", "dark": "#0d1513" },
-      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#ffffff", "dark": "#141e1c" },
-      "surface-2": { "role": "neutral", "displayName": "Surface 2", "canonical": "#f7f9f8", "dark": "#18231f" },
-      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#e1e7e4", "dark": "#23312d" },
-      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#cdd6d2", "dark": "#2f403b" },
-      "pine": { "role": "neutral", "displayName": "Pine (sidebar)", "canonical": "#10211e", "dark": "#0a1210" },
-      "pine-ink": { "role": "neutral", "displayName": "Pine Ink", "canonical": "#d6e3df", "dark": "#d6e3df" },
-      "pine-muted": { "role": "neutral", "displayName": "Pine Muted", "canonical": "#8aa29b", "dark": "#7d958e" },
-      "good": { "role": "semantic", "displayName": "Good", "canonical": "#1d7a46", "dark": "#5cc98c" },
-      "good-wash": { "role": "semantic", "displayName": "Good Wash", "canonical": "#e2f3e8", "dark": "#15301f" },
-      "warn": { "role": "semantic", "displayName": "Warn", "canonical": "#9a5c00", "dark": "#e6a94a" },
-      "warn-wash": { "role": "semantic", "displayName": "Warn Wash", "canonical": "#fbf0dc", "dark": "#33270f" },
-      "bad": { "role": "semantic", "displayName": "Bad", "canonical": "#b3261e", "dark": "#f07f76" },
-      "bad-wash": { "role": "semantic", "displayName": "Bad Wash", "canonical": "#fbe5e3", "dark": "#3a1a17" }
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#5d6b67",
+        "dark": "#9db0aa"
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink",
+        "canonical": "#8a9692",
+        "dark": "#6f8580"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f3f5f4",
+        "dark": "#0d1513"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#ffffff",
+        "dark": "#141e1c"
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Surface 2",
+        "canonical": "#f7f9f8",
+        "dark": "#18231f"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e1e7e4",
+        "dark": "#23312d"
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#cdd6d2",
+        "dark": "#2f403b"
+      },
+      "pine": {
+        "role": "neutral",
+        "displayName": "Pine (sidebar)",
+        "canonical": "#10211e",
+        "dark": "#0a1210"
+      },
+      "pine-ink": {
+        "role": "neutral",
+        "displayName": "Pine Ink",
+        "canonical": "#d6e3df",
+        "dark": "#d6e3df"
+      },
+      "pine-muted": {
+        "role": "neutral",
+        "displayName": "Pine Muted",
+        "canonical": "#8aa29b",
+        "dark": "#7d958e"
+      },
+      "good": {
+        "role": "semantic",
+        "displayName": "Good",
+        "canonical": "#1d7a46",
+        "dark": "#5cc98c"
+      },
+      "good-wash": {
+        "role": "semantic",
+        "displayName": "Good Wash",
+        "canonical": "#e2f3e8",
+        "dark": "#15301f"
+      },
+      "warn": {
+        "role": "semantic",
+        "displayName": "Warn",
+        "canonical": "#9a5c00",
+        "dark": "#e6a94a"
+      },
+      "warn-wash": {
+        "role": "semantic",
+        "displayName": "Warn Wash",
+        "canonical": "#fbf0dc",
+        "dark": "#33270f"
+      },
+      "bad": {
+        "role": "semantic",
+        "displayName": "Bad",
+        "canonical": "#b3261e",
+        "dark": "#f07f76"
+      },
+      "bad-wash": {
+        "role": "semantic",
+        "displayName": "Bad Wash",
+        "canonical": "#fbe5e3",
+        "dark": "#3a1a17"
+      }
     },
     "typographyMeta": {
       "headline": { "displayName": "Headline", "purpose": "The page title; one per page." },
       "title": { "displayName": "Title", "purpose": "Panel headings." },
       "body": { "displayName": "Body", "purpose": "Running text; controls at 13px." },
-      "small": { "displayName": "Small", "purpose": "Helper text, meta rows, field labels (500, muted)." },
-      "label": { "displayName": "Label", "purpose": "Uppercase eyebrows, table headers, stepper, stat keys." },
-      "figure": { "displayName": "Figure", "purpose": "Money, counts, dates in tables, emails, scores: mono with tabular numerals." }
+      "small": {
+        "displayName": "Small",
+        "purpose": "Helper text, meta rows, field labels (500, muted)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase eyebrows, table headers, stepper, stat keys."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Money, counts, dates in tables, emails, scores: mono with tabular numerals."
+      }
     },
     "shadows": [
-      { "name": "panel-whisper", "value": "0 1px 2px rgba(16, 33, 30, 0.06), 0 1px 1px rgba(16, 33, 30, 0.04)", "purpose": "Separates white panels from the near-white page; light mode only (dark mode: none)." },
-      { "name": "input-focus-halo", "value": "0 0 0 3px var(--accent-soft)", "purpose": "Focused inputs, with the border turned teal." }
+      {
+        "name": "panel-whisper",
+        "value": "0 1px 2px rgba(16, 33, 30, 0.06), 0 1px 1px rgba(16, 33, 30, 0.04)",
+        "purpose": "Separates white panels from the near-white page; light mode only (dark mode: none)."
+      },
+      {
+        "name": "input-focus-halo",
+        "value": "0 0 0 3px var(--accent-soft)",
+        "purpose": "Focused inputs, with the border turned teal."
+      }
     ],
     "motion": [
-      { "name": "card-hover", "value": "border-color 0.12s, transform 0.12s", "purpose": "Board cards; the only transition. Reduced motion disables all transitions." }
+      {
+        "name": "card-hover",
+        "value": "border-color 0.12s, transform 0.12s",
+        "purpose": "Board cards; the only transition. Reduced motion disables all transitions."
+      }
     ],
     "breakpoints": [
-      { "name": "tablet", "value": "860px", "purpose": "Sidebar becomes a top bar; two-column layouts stack." },
-      { "name": "phone", "value": "560px", "purpose": "Stage stepper shows bars only plus the current stage." }
+      {
+        "name": "tablet",
+        "value": "860px",
+        "purpose": "Sidebar becomes a top bar; two-column layouts stack."
+      },
+      {
+        "name": "phone",
+        "value": "560px",
+        "purpose": "Stage stepper shows bars only plus the current stage."
+      }
     ]
   },
   "components": [
@@ -114,11 +238,31 @@
       "Status as soft pills (tinted wash, no border) and small square grade chips; never as loud banners."
     ],
     "rules": [
-      { "name": "The One Teal Rule", "body": "Teal is the only accent and it marks action or progress: one primary button per panel, links, the active nav item, focus. It is never used as decoration, background fill or heading color.", "section": "colors" },
-      { "name": "The Wash-Not-Border Rule", "body": "Semantic states are shown as colored text on the matching pale wash with no border (pills, notices, score badges). Hairline borders are reserved for neutral structure.", "section": "colors" },
-      { "name": "The Mono Figures Rule", "body": "Any value a rep compares or copies (money, percentages, counts, dates in tables, emails, file sizes) is set in JetBrains Mono with tabular numerals. Prose never is.", "section": "typography" },
-      { "name": "The Weight-Not-Size Rule", "body": "Hierarchy inside a panel comes from weight (650/600/500/400) and the uppercase label, not from larger type. Only the page headline exceeds 17px.", "section": "typography" },
-      { "name": "The Hairline-First Rule", "body": "If a border can carry the structure, no shadow is added. Shadows never signal importance.", "section": "elevation" }
+      {
+        "name": "The One Teal Rule",
+        "body": "Teal is the only accent and it marks action or progress: one primary button per panel, links, the active nav item, focus. It is never used as decoration, background fill or heading color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Wash-Not-Border Rule",
+        "body": "Semantic states are shown as colored text on the matching pale wash with no border (pills, notices, score badges). Hairline borders are reserved for neutral structure.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Figures Rule",
+        "body": "Any value a rep compares or copies (money, percentages, counts, dates in tables, emails, file sizes) is set in JetBrains Mono with tabular numerals. Prose never is.",
+        "section": "typography"
+      },
+      {
+        "name": "The Weight-Not-Size Rule",
+        "body": "Hierarchy inside a panel comes from weight (650/600/500/400) and the uppercase label, not from larger type. Only the page headline exceeds 17px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline-First Rule",
+        "body": "If a border can carry the structure, no shadow is added. Shadows never signal importance.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do keep one teal primary button per panel and make every other control a default or link button.",

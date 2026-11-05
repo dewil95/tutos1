@@ -137,6 +137,7 @@ Numbers are the content. Money, balances, scores, dates, emails and file sizes a
 The same system runs in light and dark mode through one set of tokens. Dark mode is a tonal recolor of the same design: slightly brighter teal, no shadows, the same hairline structure.
 
 **Key Characteristics:**
+
 - One accent (teal), used sparingly: primary buttons, links, active navigation, focus rings, "sent / in review" states.
 - Structure by hairline borders on white panels; shadows are a whisper in light mode and absent in dark mode.
 - Figures in mono with tabular numerals; prose in Instrument Sans; uppercase 11px tracked labels for sections and table headers.
@@ -148,10 +149,12 @@ The same system runs in light and dark mode through one set of tokens. Dark mode
 A grey-green neutral family with one teal accent and three semantic hues, each paired with a pale wash for backgrounds.
 
 ### Primary
+
 - **Ascend Teal** (#0f6e66): the only accent. Primary buttons, links, active nav highlight (as a 16% wash on the sidebar), focus rings, the brand mark, "sent / in review" pills and done steps in the stage stepper. In dark mode it brightens to #3fb3a6 with near-black text (#06201c) on it.
 - **Teal Wash** (#e3f1ef): background of in-progress pills, outgoing chat bubbles, and the 3px focus halo on inputs. Dark mode: #15302c.
 
 ### Neutral
+
 - **Ink** (#15201d): all primary text. Dark mode: #e4ece9.
 - **Muted Ink** (#5d6b67): secondary text, labels, table headers, breadcrumbs, dt keys. Dark mode: #9db0aa.
 - **Faint Ink** (#8a9692): tertiary text, empty states, timestamps, placeholder-level emphasis. Dark mode: #6f8580.
@@ -162,11 +165,13 @@ A grey-green neutral family with one teal accent and three semantic hues, each p
 - **Pine** (#10211e) with **Pine Ink** (#d6e3df) and **Pine Muted** (#8aa29b): the sidebar and its text. Dark mode sidebar: #0a1210.
 
 ### Semantic
+
 - **Good** (#1d7a46) on **Good Wash** (#e2f3e8): approvals, fit scores, "live sending", success notices. Dark: #5cc98c / #15301f.
 - **Warn** (#9a5c00) on **Warn Wash** (#fbf0dc): stips requested, outside-appetite scores, conflicts, test mode. Dark: #e6a94a / #33270f.
 - **Bad** (#b3261e) on **Bad Wash** (#fbe5e3): declines, errors, closed-lost stage, failed messages. Dark: #f07f76 / #3a1a17.
 
 ### Named Rules
+
 **The One Teal Rule.** Teal is the only accent and it marks action or progress: one primary button per panel, links, the active nav item, focus. It is never used as decoration, background fill or heading color.
 
 **The Wash-Not-Border Rule.** Semantic states are shown as colored text on the matching pale wash with no border (pills, notices, score badges). Hairline borders are reserved for neutral structure.
@@ -179,6 +184,7 @@ A grey-green neutral family with one teal accent and three semantic hues, each p
 **Character:** A plain, slightly narrow humanist sans for reading, paired with a crisp mono for anything you compare or copy. The pairing reads as a well-kept ledger: quiet text, exact figures.
 
 ### Hierarchy
+
 - **Headline** (650, 24px, 1.2, -0.015em): the page title (merchant name on a deal, "Settings"). Balanced wrapping. One per page.
 - **Title** (650, 15px): panel headings ("Ascend application", "Ship the file"); flex row so a tag can sit beside it.
 - **Body** (400, 14px, 1.5): everything else; form controls at 13px.
@@ -187,6 +193,7 @@ A grey-green neutral family with one teal accent and three semantic hues, each p
 - **Figure** (JetBrains Mono, 500–600, tabular-nums): money and amounts (13px on cards, 17px in stat tiles, 24px in the risk score), email addresses (11.5px), counts, scores (11px pills), API secrets.
 
 ### Named Rules
+
 **The Mono Figures Rule.** Any value a rep compares or copies (money, percentages, counts, dates in tables, emails, file sizes) is set in JetBrains Mono with tabular numerals. Prose never is.
 
 **The Weight-Not-Size Rule.** Hierarchy inside a panel comes from weight (650/600/500/400) and the uppercase label, not from larger type. Only the page headline exceeds 17px.
@@ -204,9 +211,11 @@ Below 860px the sidebar becomes a top bar (icons only, brand without tagline, na
 Flat by default. Structure is drawn with 1px hairlines; a panel's shadow is a whisper (`0 1px 2px rgba(16,33,30,.06), 0 1px 1px rgba(16,33,30,.04)`) that only separates white from the near-white page. Dark mode removes shadows entirely and relies on the three surface tones (paper → surface → surface 2) and hairlines. The sticky sub-navigation floats on an 88% page-color blur rather than a shadow. Focus is a 2px teal outline (offset 2px) on anything focusable and a 3px teal-wash halo plus teal border on inputs.
 
 ### Shadow Vocabulary
+
 - **Panel whisper** (`box-shadow: 0 1px 2px rgba(16,33,30,0.06), 0 1px 1px rgba(16,33,30,0.04)`): panels, cards, the deal header, login and merchant cards. Light mode only.
 
 ### Named Rules
+
 **The Hairline-First Rule.** If a border can carry the structure, no shadow is added. Shadows never signal importance.
 
 ## Shapes
@@ -216,6 +225,7 @@ Soft rectangles with small radii, scaled to the element: 4px focus outlines, 6px
 ## Components
 
 ### Buttons
+
 - **Shape:** gently rounded (7px), 13px text, 7px 11px padding, inline-flex with 6px icon gap.
 - **Default:** white surface, strong-hairline border, 500 weight; hover darkens the border to faint ink.
 - **Primary:** teal fill, white text, 600 weight; hover brightens 6%. One per panel, for the action that advances the deal ("Send to selected lenders", "Upload, read and sign").
@@ -224,6 +234,7 @@ Soft rectangles with small radii, scaled to the element: 4px focus outlines, 6px
 - **Focus:** 2px teal outline with 2px offset.
 
 ### Pills and chips
+
 - **Status pill:** 11.5px 600 text, 2px 9px padding, fully rounded. Neutral = surface-2 with hairline; sent/in review = teal on teal wash; approved = good on good wash; declined = bad on bad wash; stips = warn on warn wash. No border on semantic variants.
 - **Tag:** 11px 500, 1px 8px, hairline border; `.on` turns the border and text good.
 - **Score badge:** mono 11px pill; fit = good on good wash, outside appetite = warn on warn wash.
@@ -231,6 +242,7 @@ Soft rectangles with small radii, scaled to the element: 4px focus outlines, 6px
 - **Count:** mono 11px pill on surface with hairline (board column totals).
 
 ### Cards / Containers
+
 - **Panel:** surface, hairline, 10px radius, panel whisper, 18px 20px padding, 14px vertical margin.
 - **Deal card (board):** surface, hairline, 8px radius, 10px 12px padding, 4px grid gap; name 600, amount in mono 13px, meta row 12px; hover turns the border teal.
 - **Stat tile:** surface-2, hairline, 8px radius, 10px 12px; uppercase 11px key over a mono 17px 600 value.
@@ -238,28 +250,34 @@ Soft rectangles with small radii, scaled to the element: 4px focus outlines, 6px
 - **Flag:** surface-2 row with a 3px left bar (bad/warn/strong hairline) and an 80px uppercase severity column.
 
 ### Inputs / Fields
+
 - **Style:** surface, strong-hairline border, 7px radius, 13px text, 7px 11px padding.
 - **Focus:** teal border plus a 3px teal-wash halo, no outline.
 - **Field label:** 12px 500 muted text above the control, 5px gap, 10px below the field.
 - **Checkbox:** 15px, teal accent-color. **File input:** 5px padding. **Fieldset:** hairline, 8px radius.
 
 ### Navigation
+
 - **Sidebar:** pine background, 20px 14px padding, 24px gaps; brand row (28px teal mark with a 700 "A", name 650 with an 11px muted tagline), nav list, footer with the mode pill (dot: amber test / green live), user name and sign-out link in 12px muted.
 - **Nav item:** 8px 10px, 7px radius, pine-ink 500 text with a 16px line icon at 75% opacity; hover = 6% white; active = 16% teal wash with white text and a full-opacity icon.
 - **Sub-navigation (deal page):** sticky row of 6px 10px links, muted 500 text, hover turns surface/ink; sits on a blurred page-color bar.
 
 ### Stage stepper (signature component)
+
 Six equal columns, each a 3px top bar with an 11px uppercase label beneath. Done and current steps turn the bar teal (current also colors the label); a closed-lost deal turns the current step red. On phones only the bars remain, plus the current step's name.
 
 ### Timeline
+
 Hairline-separated rows with a 9px dot in the left gutter: strong hairline for outgoing or system events, teal for inbound lender email.
 
 ### Tables
+
 `table.grid`: 13px, 10px cell padding, hairline row rules, uppercase 11px muted headers over a strong hairline. `table.num` adds mono 12.5px tabular cells with no wrapping.
 
 ## Do's and Don'ts
 
 ### Do:
+
 - **Do** keep one teal primary button per panel and make every other control a default or link button.
 - **Do** set every comparable figure (money, counts, dates in tables, emails) in JetBrains Mono with tabular numerals.
 - **Do** carry hierarchy with weight (650/600/500) and 11px uppercase tracked labels; keep body at 14px and controls at 13px.
@@ -269,6 +287,7 @@ Hairline-separated rows with a 9px dot in the left gutter: strong hairline for o
 - **Do** keep the sidebar pine and the page near-white; the content column stays at or under 1240px.
 
 ### Don't:
+
 - **Don't** add gradients, colored panel backgrounds, large radii (over 14px) or drop shadows to signal importance.
 - **Don't** use teal for headings, backgrounds or decoration, or add a second accent.
 - **Don't** nest boxes inside boxes; rows are separated by hairlines, not cards within panels.
