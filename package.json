@@ -17,7 +17,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yml,yaml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yml,yaml,css}\"",
     "db:schema-sql": "pnpm --silent --filter @mca/db schema:sql",
-    "db:migrate": "pnpm --filter @mca/db migrate"
+    "db:migrate": "pnpm --filter @mca/db migrate",
+    "db:sync-lenders": "pnpm --filter @mca/db sync-lenders"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

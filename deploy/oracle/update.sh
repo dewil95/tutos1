@@ -37,6 +37,8 @@ fi
 
 echo "== Database"
 as_app env DATABASE_PATH="$DATABASE_PATH" pnpm db:migrate
+# Lender addresses and appetite come from docs/funder-appetite-matrix.csv: apply any change.
+as_app env DATABASE_PATH="$DATABASE_PATH" pnpm db:sync-lenders
 
 echo "== Restart"
 systemctl restart ascend-crm
