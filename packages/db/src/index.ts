@@ -42,3 +42,4 @@ export function getPrisma(): PrismaClient {
   return client;
 }
 export * from "./seed";
+export { syncAllTenantLenders } from "./syncLenders";

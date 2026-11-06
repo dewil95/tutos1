@@ -10,6 +10,7 @@ import {
   merchantIdsByName,
   purgeTenant,
   seedTenant,
+  syncAllTenantLenders,
   type PrismaClient,
 } from "./index";
 import { migrationFiles, splitSql, useTestDatabase } from "./testing";
@@ -153,6 +154,27 @@ describe("seed", () => {
     const mazal = lenders.find((l) => l.name === "Mazal Funders")!;
     expect(asList(mazal.submissionCc)).toEqual(["iso@mazalfunders.com", "nate@mazalfunders.com"]);
     await purgeTenant(prisma, first.tenant.id);
+  }, 60_000);
+});
+
+describe("lender sync on deploy", () => {
+  it("puts every tenant's lender addresses back in line with the roster", async () => {
+    const prisma = getPrisma();
+    const slug = `sync-${Date.now()}`;
+    const { tenant } = await seedTenant(prisma, { slug });
+    const hardRock = await prisma.funder.findUniqueOrThrow({
+      where: { tenantId_name: { tenantId: tenant.id, name: "Hard Rock Financial" } },
+    });
+    await prisma.funder.update({
+      where: { id: hardRock.id },
+      data: { submissionTo: "subs@hardrockfg.com", submissionCc: ["joseph@hardrockfg.com"] },
+    });
+    const results = await syncAllTenantLenders(prisma);
+    expect(results.find((r) => r.tenant === slug)).toMatchObject({ added: 0 });
+    const after = await prisma.funder.findUniqueOrThrow({ where: { id: hardRock.id } });
+    expect(after.submissionTo).toBe("subs@limestoneadvance.com");
+    expect(asList(after.submissionCc)).toEqual(["joseph@limestoneadvance.com"]);
+    await purgeTenant(prisma, tenant.id);
   }, 60_000);
 });
 

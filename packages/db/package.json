@@ -20,7 +20,8 @@
     "build": "echo 'db: nothing to build'",
     "test": "vitest run",
     "schema:sql": "node scripts/schema-sql.mjs",
-    "migrate": "tsx src/migrate.ts"
+    "migrate": "tsx src/migrate.ts",
+    "sync-lenders": "tsx src/syncLenders.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.10.0",
