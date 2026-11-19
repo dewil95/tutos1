@@ -4,7 +4,11 @@ import { getPrisma } from "@mca/db";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { applicationUploadToPdf } from "@/server/ascendApplication";
+import {
+  applicationUploadToPdf,
+  statementUploadsToPdfs,
+  UploadShapeError,
+} from "@/server/ascendApplication";
 import { fileAscendApplication } from "@/server/applicationFile";
 import { InputError, writeApplicationForm } from "@/server/applicationForm";
 import { inlineBudgetMs } from "@/server/env";
@@ -68,7 +72,7 @@ export async function startApplication(form: FormData) {
     const started = await startPublicApplication(prisma, {
       tenantId: tid,
       application,
-      statements: statements.filter((f) => f.type === "application/pdf"),
+      statements: await statementUploadsToPdfs(statements),
       lang,
       ip,
     });
@@ -77,6 +81,7 @@ export async function startApplication(form: FormData) {
     if (jobId) after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }));
   } catch (err) {
     if (err instanceof WatermarkedFileError) return fail("watermark");
+    if (err instanceof UploadShapeError) return fail(err.code === "apptype" ? "files" : err.code);
     console.error("[application] start failed", err);
     return fail("failed");
   }
@@ -126,10 +131,14 @@ export async function addStatements(token: string, form: FormData) {
   const row = await findWebApplication(prisma, token);
   if (!row) redirect(page(token));
   const files = await Promise.all(form.getAll("statements").filter(isFile).map(read));
-  if (files.some((f) => f.type !== "application/pdf")) redirect(page(token, { error: "files" }));
+  if (files.some((f) => !FILE_TYPES.test(f.type))) redirect(page(token, { error: "files" }));
   let n = 0;
   try {
-    n = await storeStatements(prisma, { tenantId: row.tenantId, dealId: row.dealId }, files);
+    n = await storeStatements(
+      prisma,
+      { tenantId: row.tenantId, dealId: row.dealId },
+      await statementUploadsToPdfs(files),
+    );
   } catch (err) {
     if (err instanceof WatermarkedFileError) redirect(page(token, { error: "watermark" }));
     console.error(`[application ${row.dealId}] statements failed`, err);
