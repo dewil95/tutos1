@@ -12,6 +12,7 @@ import { z } from "zod";
 import {
   AiOutputError,
   AiRefusalError,
+  AiQuotaError,
   AiUnavailableError,
   ZERO_USAGE,
   hashInput,
@@ -76,7 +77,31 @@ export function geminiResponseSchema(schema: z.ZodType): unknown {
   return stripSchemaKeys(z.toJSONSchema(schema, { target: "draft-2020-12" }), GEMINI_DROP_KEYS);
 }
 
+/** A 429 for a quota that lasts (per minute or per day): seconds of retrying cannot fix it. */
+export function isGeminiQuotaError(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    err.status === 429 &&
+    /quota|RESOURCE_EXHAUSTED|per (day|minute)/i.test(err.message)
+  );
+}
+
+/** How long Google asks us to wait: "retryDelay":"63245s" or "Please retry in 17h34m5.9s". */
+export function geminiRetryAfterMs(err: unknown): number {
+  const msg = err instanceof Error ? err.message : String(err);
+  const delay = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(msg);
+  if (delay) return Math.ceil(Number(delay[1]) * 1000);
+  const human = /retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?/i.exec(msg);
+  if (human && (human[1] || human[2] || human[3])) {
+    return Math.ceil(
+      (Number(human[1] ?? 0) * 3600 + Number(human[2] ?? 0) * 60 + Number(human[3] ?? 0)) * 1000,
+    );
+  }
+  return /per day/i.test(msg) ? 60 * 60_000 : 5 * 60_000;
+}
+
 export function isRetryableGeminiError(err: unknown): boolean {
+  if (isGeminiQuotaError(err)) return false;
   if (err instanceof ApiError) return err.status === 429 || err.status >= 500;
   // undici surfaces dropped connections as TypeError("fetch failed")
   return err instanceof TypeError && /fetch failed|network|socket/i.test(err.message);
@@ -185,6 +210,8 @@ export class GeminiClient implements LlmClient {
         error: describeGeminiError(err),
       });
       if (isGeminiKeyError(err)) throw new AiUnavailableError(describeGeminiError(err));
+      if (isGeminiQuotaError(err))
+        throw new AiQuotaError(describeGeminiError(err), geminiRetryAfterMs(err));
       throw err;
     }
 

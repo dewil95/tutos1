@@ -103,6 +103,20 @@ export class AiOutputError extends Error {
   }
 }
 
+/**
+ * The provider's quota is used up (a 429 that no quick retry fixes, e.g. a per-day limit).
+ * The job should wait `retryAfterMs` and try again without spending an attempt.
+ */
+export class AiQuotaError extends Error {
+  constructor(
+    message: string,
+    public readonly retryAfterMs: number,
+  ) {
+    super(message);
+    this.name = "AiQuotaError";
+  }
+}
+
 /** The AI is not usable (key missing or rejected); retrying will not help until it is fixed. */
 export class AiUnavailableError extends Error {
   constructor(message: string) {

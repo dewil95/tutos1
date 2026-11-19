@@ -1,13 +1,14 @@
 import {
   claimJobs,
   completeJob,
+  deferJob,
   failJob,
   type ClaimedJob,
   type JobType,
   type PrismaClient,
 } from "@mca/db";
-import { AiUnavailableError } from "@mca/ai";
-import { PermanentJobError } from "./errors";
+import { AiQuotaError, AiUnavailableError } from "@mca/ai";
+import { humanizeJobError, PermanentJobError, quotaRetryAt } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
 import { handleHistoryImport } from "./historyImport";
 import { handleInboxSync } from "./inboxSync";
@@ -100,7 +101,17 @@ async function runOne(prisma: PrismaClient, job: ClaimedJob, result: RunResult):
     await completeJob(prisma, job.id);
     result.done.push(job.id);
   } catch (err) {
-    const error = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    // A used-up AI quota is waited out (hours, not minutes) without spending an attempt, and
+    // without the other jobs of the batch hammering the same quota next tick.
+    if (err instanceof AiQuotaError) {
+      const until = quotaRetryAt(err);
+      const error = humanizeJobError(err, until);
+      await deferJob(prisma, job, error, until);
+      result.retried.push({ id: job.id, error });
+      console.warn(`[job ${job.type} ${job.id}] deferred to ${until.toISOString()}: ${error}`);
+      return;
+    }
+    const error = humanizeJobError(err);
     // A missing or rejected AI key fails at once: retrying for minutes cannot fix it.
     const permanent = err instanceof PermanentJobError || err instanceof AiUnavailableError;
     const outcome = await failJob(

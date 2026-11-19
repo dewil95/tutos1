@@ -133,6 +133,28 @@ export async function completeJob(prisma: PrismaClient, id: string): Promise<voi
   });
 }
 
+/**
+ * Puts a claimed job back in the queue for `until` without spending an attempt: for an outside
+ * condition (an AI quota used up) that time, not retrying, fixes.
+ */
+export async function deferJob(
+  prisma: PrismaClient,
+  job: Pick<ClaimedJob, "id">,
+  error: string,
+  until: Date,
+): Promise<void> {
+  await prisma.job.update({
+    where: { id: job.id },
+    data: {
+      status: "QUEUED",
+      lockedAt: null,
+      runAt: until,
+      attempts: { decrement: 1 },
+      lastError: error.slice(0, 2000),
+    },
+  });
+}
+
 /** Exponential backoff: 1, 2, 4, 8 … minutes; FAILED after maxAttempts. */
 export function retryDelayMs(attempts: number): number {
   return Math.min(60, 2 ** Math.max(0, attempts - 1)) * 60_000;
