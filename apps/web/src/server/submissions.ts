@@ -95,13 +95,22 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
 
   const docs = await prisma.document.findMany({
     where: { id: { in: req.documentIds }, dealId: deal.id },
-    select: { id: true, internalOnly: true },
+    select: { id: true, internalOnly: true, type: true, uploadedVia: true },
   });
   // The Risk Report and other team-only files can never go to a lender.
   if (docs.some((d) => d.internalOnly))
     throw new Error("Internal files cannot be sent to lenders.");
   if (docs.length !== new Set(req.documentIds).size)
     throw new Error("Some files are not on this deal.");
+  // The Ascend application the CRM files after the reading is unsigned until a signature is
+  // recorded on the deal: it must not reach a lender in that state.
+  if (
+    docs.some((d) => d.type === "APPLICATION" && d.uploadedVia === "generated") &&
+    !(await prisma.applicationSignature.findFirst({ where: { dealId: deal.id } }))
+  )
+    throw new Error(
+      "The Ascend application is not signed yet. Have the merchant sign it, or upload the signed copy, before sending.",
+    );
 
   const funders = await prisma.funder.findMany({
     where: { id: { in: req.funderIds }, tenantId: req.tenantId, isActive: true },
@@ -141,6 +150,8 @@ export async function queueSubmissions(prisma: PrismaClient, req: SendRequest): 
 
   const submissionIds: string[] = [];
   const jobIds: string[] = [];
+  // Nothing to send (every lender already had this merchant): the deal stays where it is.
+  if (plans.length === 0) return { submissionIds, jobIds, skipped };
   await prisma.deal.update({
     where: { id: deal.id },
     data: {

@@ -50,7 +50,18 @@ const STAGE_ORDER: DealStage[] = [
   "FUNDED",
 ];
 
-/** Moves the deal forward only (a late "file received" never pulls a funded deal back). */
+/**
+ * The stage to set when something wants `target`, or null when the deal is already there or
+ * further along (a late "file received" never pulls a funded deal back). Declined, dead and
+ * renewal-eligible deals stay as a human set them.
+ */
+export function forwardStage(current: DealStage, target: DealStage): DealStage | null {
+  const ci = STAGE_ORDER.indexOf(current);
+  if (ci === -1) return null;
+  return STAGE_ORDER.indexOf(target) > ci ? target : null;
+}
+
+/** Moves the deal forward only, from what a lender's reply says. */
 export function advanceStage(current: DealStage, intent: FunderReply["intent"]): DealStage | null {
   const target: Partial<Record<FunderReply["intent"], DealStage>> = {
     APPROVED: "OFFERS_RECEIVED",
@@ -61,10 +72,7 @@ export function advanceStage(current: DealStage, intent: FunderReply["intent"]):
     FUNDED: "FUNDED",
   };
   const t = target[intent];
-  if (!t) return null;
-  const ci = STAGE_ORDER.indexOf(current);
-  if (ci === -1) return null; // DECLINED / DEAD / RENEWAL_ELIGIBLE stay as set by a human
-  return STAGE_ORDER.indexOf(t) > ci ? t : null;
+  return t ? forwardStage(current, t) : null;
 }
 
 /**

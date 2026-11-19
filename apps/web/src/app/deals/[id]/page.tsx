@@ -173,7 +173,10 @@ export default async function DealPage({
       }
     : null;
   const signedAtUpload = signedCopy ? null : await pendingUploadSignature(prisma, id);
-  const preselected = new Set(defaultPackage(documents));
+  // The unsigned "generated" application is never pre-ticked for lenders.
+  const preselected = new Set(
+    defaultPackage(signedCopy ? documents : documents.filter((d) => d.uploadedVia !== "generated")),
+  );
   const submittedFunderIds = new Set(
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
   );
@@ -281,9 +284,9 @@ export default async function DealPage({
           . Ask the merchant for the original PDF from their bank.
         </p>
       ) : null}
-      {signedApp && thisDealSubs.length === 0 ? (
+      {signedCopy && thisDealSubs.length === 0 ? (
         <p className="notice ok">
-          Ascend application ready ({signedApp.fileName}).{" "}
+          Ascend application ready ({signedCopy.fileName}).{" "}
           <a href="#ship">
             <strong>Choose the lenders and send →</strong>
           </a>{" "}
@@ -465,7 +468,7 @@ export default async function DealPage({
 
       <form action={sendToLenders.bind(null, id)} className="panel" id="ship">
         <h2>Ship the file</h2>
-        {!signedApp ? (
+        {!signedCopy ? (
           <p className="notice warn">
             Ascend application not signed yet. Download it in{" "}
             <a href="#ascend-application">Ascend application</a>, have the merchant sign it, then
