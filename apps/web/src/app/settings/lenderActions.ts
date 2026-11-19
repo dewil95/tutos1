@@ -7,7 +7,7 @@ import { requireUser } from "@/server/auth";
 /**
  * Brings the lender directory up to date with the roster bundled in the app
  * (docs/funder-appetite-matrix.csv): addresses, minimums, states, positions, industries.
- * Adds lenders that are new on the roster; never deletes one.
+ * Adds lenders that are new on the roster and retires those taken off it; never deletes one.
  */
 export async function updateLendersFromRoster() {
   const user = await requireUser();
@@ -15,7 +15,7 @@ export async function updateLendersFromRoster() {
   const r = await syncFunders(getPrisma(), user.tenantId);
   redirect(
     `/settings?${new URLSearchParams({
-      lenders: `Lenders updated from the roster: ${r.added} added, ${r.updated} updated.`,
+      lenders: `Lenders updated from the roster: ${r.added} added, ${r.updated} updated, ${r.retired} retired.`,
     })}`,
   );
 }

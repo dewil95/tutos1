@@ -11,8 +11,10 @@ import {
   purgeTenant,
   seedTenant,
   syncAllTenantLenders,
+  syncFunders,
   type PrismaClient,
 } from "./index";
+import { FUNDER_ROSTER_CSV } from "./funderRoster";
 import { migrationFiles, splitSql, useTestDatabase } from "./testing";
 import { claimJobs, completeJob, enqueueJob, failJob, retryDelayMs } from "./jobs";
 
@@ -57,9 +59,14 @@ describe("funder CSV", () => {
     expect(mazal.program.preferredPositions).toEqual(["1st"]);
     for (const s of seeds.filter((x) => x.isActive)) expect(s.submissionTo).toMatch(/@/);
     // A lender on a free mailbox is matched by its exact address, never by gmail.com.
-    expect(seeds.find((s) => s.name === "Fund Me Fast")!.emailDomains).toEqual([
-      "fundmefastllc@gmail.com",
-    ]);
+    const header = readFileSync(
+      join(here, "../../../docs/funder-appetite-matrix.csv"),
+      "utf8",
+    ).split("\n")[0]!;
+    const gmailOnly = funderSeedsFromCsv(
+      `${header}\nFree Mail Lender,Core,email,freemaillender@gmail.com,,,,,,,,,,,,,,ALL,,,,,,,,,,,,\n`,
+    );
+    expect(gmailOnly[0]!.emailDomains).toEqual(["freemaillender@gmail.com"]);
     // Addresses a lender only replies from (portals) are recognised too.
     expect(seeds.find((s) => s.name.startsWith("Lendini"))!.emailDomains).toContain(
       "fundingmetrics.com",
@@ -174,6 +181,27 @@ describe("lender sync on deploy", () => {
     const after = await prisma.funder.findUniqueOrThrow({ where: { id: hardRock.id } });
     expect(after.submissionTo).toBe("subs@limestoneadvance.com");
     expect(asList(after.submissionCc)).toEqual(["joseph@limestoneadvance.com"]);
+    await purgeTenant(prisma, tenant.id);
+  }, 60_000);
+
+  it("retires a lender taken off the roster and brings it back when it returns", async () => {
+    const prisma = getPrisma();
+    const slug = `retire-${Date.now()}`;
+    const { tenant } = await seedTenant(prisma, { slug });
+    const withoutZlur = FUNDER_ROSTER_CSV.split("\n")
+      .filter((l) => !l.startsWith("Zlur,"))
+      .join("\n");
+    expect(await syncFunders(prisma, tenant.id, withoutZlur)).toMatchObject({
+      added: 0,
+      retired: 1,
+    });
+    const zlur = () =>
+      prisma.funder.findUniqueOrThrow({
+        where: { tenantId_name: { tenantId: tenant.id, name: "Zlur" } },
+      });
+    expect((await zlur()).isActive).toBe(false);
+    expect(await syncFunders(prisma, tenant.id)).toMatchObject({ added: 0, retired: 0 });
+    expect((await zlur()).isActive).toBe(true);
     await purgeTenant(prisma, tenant.id);
   }, 60_000);
 });
