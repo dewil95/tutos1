@@ -263,7 +263,7 @@ export default async function SettingsPage({
       <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
 
       <section className="panel">
-        <h2>Lenders ({funders.filter((f) => f.isActive).length} active)</h2>
+        <h2>Lenders ({funders.filter((f) => f.isActive).length})</h2>
         <div className="tablewrap">
           <table className="grid">
             <thead>
@@ -276,21 +276,29 @@ export default async function SettingsPage({
               </tr>
             </thead>
             <tbody>
-              {funders.map((f) => (
-                <tr key={f.id} className={f.isActive ? "" : "muted"}>
-                  <td>
-                    {f.name}
-                    {f.isActive ? "" : " (inactive)"}
-                  </td>
-                  <td className="small">{f.submissionTo ?? "—"}</td>
-                  <td className="small">{asList(f.submissionCc).join(", ") || "—"}</td>
-                  <td className="small">{appetiteSummary(f) || "—"}</td>
-                  <td className="small">{asList(f.emailDomains).join(", ")}</td>
-                </tr>
-              ))}
+              {funders
+                .filter((f) => f.isActive)
+                .map((f) => (
+                  <tr key={f.id}>
+                    <td>{f.name}</td>
+                    <td className="small">{f.submissionTo ?? "—"}</td>
+                    <td className="small">{asList(f.submissionCc).join(", ") || "—"}</td>
+                    <td className="small">{appetiteSummary(f) || "—"}</td>
+                    <td className="small">{asList(f.emailDomains).join(", ")}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
+        {funders.some((f) => !f.isActive) ? (
+          <p className="small muted">
+            Retired (off the roster, history kept):{" "}
+            {funders
+              .filter((f) => !f.isActive)
+              .map((f) => f.name)
+              .join(", ")}
+          </p>
+        ) : null}
         <p className="small muted">
           Lender addresses and appetite come from the roster in the app
           (docs/funder-appetite-matrix.csv). Changed the roster? Update the list here.
