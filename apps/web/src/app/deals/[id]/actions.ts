@@ -1,6 +1,6 @@
 "use server";
 
-import { asList, enqueueJob, getPrisma, type DocumentType } from "@mca/db";
+import { asList, enqueueJob, getPrisma, type DealStage, type DocumentType } from "@mca/db";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -324,6 +324,74 @@ export async function requestContracts(dealId: string, form: FormData) {
 }
 
 /** One-click reply confirming the lender's clawback policy (required before commission is paid). */
+const CLOSE_REASONS: Record<string, string> = {
+  duplicate: "Duplicate of another deal",
+  quiet: "Merchant went quiet",
+  declined: "Declined by every lender",
+  test: "Test or not a real deal",
+  other: "Other",
+};
+
+/** Takes a deal off the board (Dead) with a reason; the history stays and it can be reopened. */
+export async function closeDeal(dealId: string, form: FormData) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, tenantId: user.tenantId } });
+  if (!deal) redirect("/");
+  if (deal.stage === "DEAD" || deal.stage === "DECLINED") redirect(back(dealId, {}));
+  const code = String(form.get("reason") ?? "other");
+  const note = String(form.get("note") ?? "").trim();
+  const reason = [CLOSE_REASONS[code] ?? CLOSE_REASONS.other, note].filter(Boolean).join(": ");
+  await prisma.$transaction([
+    prisma.deal.update({
+      where: { id: dealId },
+      data: { stage: "DEAD", stageChangedAt: new Date(), lostReason: reason.slice(0, 300) },
+    }),
+    prisma.dealEvent.create({
+      data: {
+        dealId,
+        type: "deal_closed",
+        actorType: "user",
+        actorId: user.id,
+        payload: { fromStage: deal.stage, reason },
+      },
+    }),
+  ]);
+  revalidatePath("/");
+  redirect("/?show=closed");
+}
+
+/** Puts a closed deal back where it was. */
+export async function reopenDeal(dealId: string) {
+  const user = await requireUser();
+  const prisma = getPrisma();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, tenantId: user.tenantId } });
+  if (!deal) redirect("/");
+  const closed = await prisma.dealEvent.findFirst({
+    where: { dealId, type: "deal_closed" },
+    orderBy: { createdAt: "desc" },
+  });
+  const fromStage = (closed?.payload as { fromStage?: string } | null)?.fromStage;
+  const stage = (fromStage && fromStage !== "DEAD" ? fromStage : "DOCS_RECEIVED") as DealStage;
+  await prisma.$transaction([
+    prisma.deal.update({
+      where: { id: dealId },
+      data: { stage, stageChangedAt: new Date(), lostReason: null },
+    }),
+    prisma.dealEvent.create({
+      data: {
+        dealId,
+        type: "deal_reopened",
+        actorType: "user",
+        actorId: user.id,
+        payload: { stage },
+      },
+    }),
+  ]);
+  revalidatePath("/");
+  redirect(back(dealId, {}));
+}
+
 export async function confirmClawback(dealId: string, form: FormData) {
   const user = await requireUser();
   let target: string;

@@ -1,4 +1,5 @@
 import { AiQuotaError, AiUnavailableError } from "@mca/ai";
+import { GoogleApiError } from "@mca/connectors";
 
 /** Thrown for errors a retry cannot fix (bad data, missing config); the job fails at once. */
 export class PermanentJobError extends Error {
@@ -28,7 +29,17 @@ function providerMessage(message: string): string {
  * What the team sees on the deal page and in Settings when a job fails: plain words first,
  * the provider's own message after, never a wall of JSON.
  */
+/** Google refused the mailbox's refresh token: only reconnecting in Settings fixes it. */
+export function isGoogleAccessRevoked(err: unknown): boolean {
+  return (
+    err instanceof GoogleApiError &&
+    (err.status === 401 || /invalid_grant|invalid_token|unauthorized_client/i.test(err.message))
+  );
+}
+
 export function humanizeJobError(err: unknown, retryAt?: Date): string {
+  if (isGoogleAccessRevoked(err))
+    return `Google access for the team mailbox expired or was revoked: Settings → Reconnect the team mailbox. Google: ${(err as Error).message.slice(0, 160)}`;
   if (err instanceof AiQuotaError) {
     const when = retryAt
       ? ` It tries again by itself at ${retryAt.toLocaleTimeString("en-US", { timeZone: NY, hour: "numeric", minute: "2-digit" })} (New York).`

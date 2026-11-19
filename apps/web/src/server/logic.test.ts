@@ -8,6 +8,7 @@ import {
   subjectMentions,
 } from "./inbox/route";
 import { advanceStage, forwardStage, statusForIntent } from "./jobs/parseReply";
+import { dealProfile } from "./lenders";
 import { parsePositions, positionsToText } from "./submissions";
 
 const funders = [
@@ -94,6 +95,21 @@ describe("inbox routing", () => {
       true,
     );
     expect(subjectMentions("Decline: Acme", ["Ac", null])).toBe(false);
+  });
+});
+
+describe("deal profile for the lender ranking", () => {
+  it('treats a misread "$1" request as unknown instead of ruling lenders out', () => {
+    const base = {
+      paperGrade: "B",
+      avgMonthlyTrueRevenue: 40_000,
+      startDate: null,
+      existingPositions: 0,
+      state: "NJ",
+      naics: null,
+    };
+    expect(dealProfile({ ...base, requestedAmount: 1 }).requestedAmount).toBeNull();
+    expect(dealProfile({ ...base, requestedAmount: 25_000 }).requestedAmount).toBe(25_000);
   });
 });
 
