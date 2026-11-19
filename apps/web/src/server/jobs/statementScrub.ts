@@ -102,10 +102,8 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
     };
   });
 
-  // D1 has no multi-statement transactions: these writes run in order; each is idempotent
-  // enough that a retry after a crash in between ends in the same state.
-  {
-    const tx = prisma;
+  // One transaction: the analysis, the positions, the grade and the event land together.
+  await prisma.$transaction(async (tx) => {
     const analysis = await tx.bankAnalysis.create({
       data: {
         dealId,
@@ -165,7 +163,7 @@ export async function handleStatementScrub(prisma: PrismaClient, job: ClaimedJob
         },
       },
     });
-  }
+  });
   // Next: the internal Risk Report built on this scrub.
   await enqueueJob(prisma, {
     tenantId: deal.tenantId,

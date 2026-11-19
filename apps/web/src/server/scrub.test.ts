@@ -1,6 +1,6 @@
 import { enqueueJob, getPrisma, purgeTenant, type PrismaClient } from "@mca/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { queueScrubWhenReady } from "./jobs/statementExtract";
+import { classifyExtraction, queueScrubWhenReady } from "./jobs/statementExtract";
 import { collectRows } from "./jobs/statementScrub";
 import { typesThatFit } from "./jobs/runner";
 import { databaseReady } from "./testDb";
@@ -51,6 +51,33 @@ describe("collectRows", () => {
     ]);
     expect(rows[0]!.totalDeposits).toBe(45_000);
     expect(sourceByMonth["2026-08|1234"]).toBe("new");
+  });
+});
+
+describe("statement verdict", () => {
+  const d = (type: string) => ({ type, pages: [1], label: type }) as never;
+  it("keeps a statement with monthly figures", () => {
+    expect(
+      classifyExtraction({ months: [month("2026-09") as never], documents: [d("BANK_STATEMENT")] }),
+    ).toEqual({
+      kind: "statement",
+    });
+  });
+  it("reports a statement the model could not read instead of filing it as other", () => {
+    expect(classifyExtraction({ months: [], documents: [d("BANK_STATEMENT")] })).toEqual({
+      kind: "unreadable",
+    });
+    expect(classifyExtraction({ months: [], documents: [] })).toEqual({ kind: "unreadable" });
+  });
+  it("files a file that is really an application or something else under that type", () => {
+    expect(classifyExtraction({ months: [], documents: [d("APPLICATION")] })).toEqual({
+      kind: "reclassified",
+      type: "APPLICATION",
+    });
+    expect(classifyExtraction({ months: [], documents: [d("VOIDED_CHECK")] })).toEqual({
+      kind: "reclassified",
+      type: "OTHER",
+    });
   });
 });
 
