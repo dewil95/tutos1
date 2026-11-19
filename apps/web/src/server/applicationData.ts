@@ -2,6 +2,9 @@ import type { ApplicationReading } from "@mca/ai";
 import { encryptSecret, type EntityType, type PrismaClient } from "@mca/db";
 import { requireEnv } from "./env";
 
+/** A requested amount below this is a misread, not a request. */
+export const MIN_REQUESTED_AMOUNT = 1000;
+
 export interface FieldConflict {
   field: string;
   current: string;
@@ -142,7 +145,12 @@ export async function applyApplication(
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: target.dealId } });
   const dealData: Record<string, unknown> = {};
   const r = a.request;
-  if (r.requestedAmount && (deal.requestedAmount === null || mode === "overwrite")) {
+  // Under $1,000 the model misread a box ("$1"): better unknown than wrong on the board.
+  if (
+    r.requestedAmount &&
+    r.requestedAmount >= MIN_REQUESTED_AMOUNT &&
+    (deal.requestedAmount === null || mode === "overwrite")
+  ) {
     dealData.requestedAmount = r.requestedAmount;
   }
   if (r.useOfFunds && (!deal.useOfFunds || mode === "overwrite"))

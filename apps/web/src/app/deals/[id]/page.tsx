@@ -20,8 +20,10 @@ import { WhatsAppPanel } from "./WhatsAppPanel";
 import { AscendApplicationPanel } from "./AscendApplicationPanel";
 import {
   analyseDealStatements,
+  closeDeal,
   confirmClawback,
   relabelDocument,
+  reopenDeal,
   retrySubmission,
   sendToLenders,
   uploadFiles,
@@ -238,6 +240,9 @@ export default async function DealPage({
         ownerName={deal.owner?.name ?? null}
         source={deal.source}
         driveFolderId={deal.driveFolderId}
+        lostReason={deal.lostReason}
+        close={closeDeal.bind(null, id)}
+        reopen={reopenDeal.bind(null, id)}
       />
 
       {flash.error ? <p className="notice error">{flash.error}</p> : null}

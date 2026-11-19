@@ -30,6 +30,10 @@ export interface DealHeaderProps {
   ownerName: string | null;
   source: string;
   driveFolderId: string | null;
+  lostReason: string | null;
+  /** Server actions bound to this deal. */
+  close: (form: FormData) => Promise<void>;
+  reopen: () => Promise<void>;
 }
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -81,6 +85,31 @@ export function DealHeader(p: DealHeaderProps) {
             </a>
           ) : null}
         </div>
+        {closed ? (
+          <form action={p.reopen} className="notice warn row">
+            <span>
+              This deal is closed ({p.stage.toLowerCase()}
+              {p.lostReason ? `: ${p.lostReason}` : ""}). It is off the board.
+            </span>
+            <button type="submit">Reopen</button>
+          </form>
+        ) : (
+          <details className="close-deal">
+            <summary className="small muted">Close this deal…</summary>
+            <form action={p.close} className="row">
+              <select name="reason" defaultValue="duplicate" aria-label="Reason">
+                <option value="duplicate">Duplicate of another deal</option>
+                <option value="quiet">Merchant went quiet</option>
+                <option value="declined">Declined by every lender</option>
+                <option value="test">Test or not a real deal</option>
+                <option value="other">Other</option>
+              </select>
+              <input name="note" placeholder="Note (optional)" />
+              <button type="submit">Close deal</button>
+              <span className="small muted">Takes it off the board; history is kept.</span>
+            </form>
+          </details>
+        )}
         <ol className={`stepper ${closed ? "closed" : ""}`} aria-label="Deal stage">
           {STEPS.map((s, i) => (
             <li
