@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
 import { storeDealFile } from "@/server/documents";
 import { tenantMailbox } from "@/server/google";
+import { forwardStage } from "@/server/jobs/parseReply";
 import { runDueJobs } from "@/server/jobs/runner";
 import { ensureRules, renderTemplate } from "@/server/email/rules";
 import { sendTracked } from "@/server/email/send";
@@ -297,14 +298,15 @@ export async function requestContracts(dealId: string, form: FormData) {
       replyToGmailId: sub.gmailMessageId,
       userId: user.id,
     });
+    // Contracts for a second lender, or a resend, never pull a deal in stips/contract/funded back.
+    const stage = forwardStage(sub.deal.stage, "OFFER_ACCEPTED");
     await prisma.deal.update({
       where: { id: dealId },
       data: {
         soldAmount: amount,
         soldFactor: factor,
         soldTermDays: termDays,
-        stage: "OFFER_ACCEPTED",
-        stageChangedAt: new Date(),
+        ...(stage ? { stage, stageChangedAt: new Date() } : {}),
       },
     });
     if (merchantEmail && !sub.deal.merchant.email) {

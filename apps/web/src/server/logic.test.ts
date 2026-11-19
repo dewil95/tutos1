@@ -7,7 +7,7 @@ import {
   routeMessage,
   subjectMentions,
 } from "./inbox/route";
-import { advanceStage, statusForIntent } from "./jobs/parseReply";
+import { advanceStage, forwardStage, statusForIntent } from "./jobs/parseReply";
 import { parsePositions, positionsToText } from "./submissions";
 
 const funders = [
@@ -116,6 +116,15 @@ describe("reply → status", () => {
     expect(statusForIntent("DECLINED", "IN_REVIEW")).toBe("DECLINED");
     expect(statusForIntent("STIP_REQUEST", "APPROVED")).toBeNull();
     expect(statusForIntent("MARKETING", "SENT")).toBeNull();
+  });
+
+  it("a contract request never pulls a deal back from stips, contract out or funded", () => {
+    expect(forwardStage("OFFERS_RECEIVED", "OFFER_ACCEPTED")).toBe("OFFER_ACCEPTED");
+    expect(forwardStage("OFFER_ACCEPTED", "OFFER_ACCEPTED")).toBeNull();
+    expect(forwardStage("STIPS", "OFFER_ACCEPTED")).toBeNull();
+    expect(forwardStage("CONTRACT_OUT", "OFFER_ACCEPTED")).toBeNull();
+    expect(forwardStage("FUNDED", "OFFER_ACCEPTED")).toBeNull();
+    expect(forwardStage("DEAD", "OFFER_ACCEPTED")).toBeNull();
   });
 
   it("advances the deal stage forward only", () => {

@@ -134,6 +134,65 @@ describe.runIf(reachable)("send to lenders (dry run)", () => {
     expect(plan.skipped[0]?.reason).toMatch(/already submitted/);
   });
 
+  it("leaves the stage alone when every lender was skipped", async () => {
+    // A second deal for the same merchant: the lender already has the merchant.
+    const merchantId = (await prisma.deal.findUniqueOrThrow({ where: { id: dealId } })).merchantId;
+    const again = await prisma.deal.create({ data: { tenantId, merchantId } });
+    const signed = await prisma.document.create({
+      data: {
+        tenantId,
+        dealId: again.id,
+        type: "APPLICATION",
+        driveFileId: `drive-again-${Date.now()}`,
+        fileName: "Ascend-Fund-Application-Acme-signed.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1000,
+        sha256: "z",
+      },
+    });
+    const plan = await queueSubmissions(prisma, {
+      tenantId,
+      userId,
+      dealId: again.id,
+      funderIds: [funderIds[0]!],
+      documentIds: [signed.id],
+      positions: [],
+      note: null,
+    });
+    expect(plan.submissionIds).toEqual([]);
+    expect((await prisma.deal.findUniqueOrThrow({ where: { id: again.id } })).stage).toBe("INTAKE");
+  });
+
+  it("refuses to send the unsigned Ascend application the CRM generated", async () => {
+    const merchant = await prisma.merchant.create({ data: { tenantId, legalName: "Beta Tacos" } });
+    const deal = await prisma.deal.create({ data: { tenantId, merchantId: merchant.id } });
+    const generated = await prisma.document.create({
+      data: {
+        tenantId,
+        dealId: deal.id,
+        type: "APPLICATION",
+        uploadedVia: "generated",
+        driveFileId: `drive-gen-${Date.now()}`,
+        fileName: "Ascend-Fund-Application-Beta-Tacos.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1000,
+        sha256: "y",
+      },
+    });
+    await expect(
+      queueSubmissions(prisma, {
+        tenantId,
+        userId,
+        dealId: deal.id,
+        funderIds: [funderIds[1]!],
+        documentIds: [generated.id],
+        positions: [],
+        note: null,
+      }),
+    ).rejects.toThrow(/not signed yet/);
+    expect(await prisma.submission.count({ where: { dealId: deal.id } })).toBe(0);
+  });
+
   it("rejects a send when any selected lender has no address, before queueing anything", async () => {
     const bad = await prisma.funder.create({
       data: { tenantId, name: "No Email Lender", submissionCc: [] },
