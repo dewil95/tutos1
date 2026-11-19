@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
-import { tickBudgetMs } from "@/server/env";
+import { appUrl, tickBudgetMs } from "@/server/env";
 import { enqueueJob, getPrisma } from "@mca/db";
+import { alertJobFailures } from "@/server/jobs/alerts";
 import { runDueJobs } from "@/server/jobs/runner";
 import { whatsappConfigured } from "@/server/whatsapp/config";
 
@@ -60,7 +61,15 @@ async function tick(req: Request) {
     }
   }
   const result = await runDueJobs(prisma, { budgetMs: tickBudgetMs() });
+  // Jobs that gave up are emailed to the admins (at most once an hour); never fails the tick.
+  const alert = await alertJobFailures(prisma, result.failed, `${appUrl(req)}/settings`).catch(
+    (err: unknown) => {
+      console.error(`[alert] ${err instanceof Error ? err.message : String(err)}`);
+      return { emailed: [] as string[] };
+    },
+  );
   return Response.json({
+    alerted: alert.emailed,
     mailboxes: mailboxes.length,
     done: result.done.length,
     retried: result.retried,

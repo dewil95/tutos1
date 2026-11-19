@@ -29,6 +29,8 @@ model Tenant {
   fromAddress        String?
   /// Team members copied on every lender submission (after the lender's own CC addresses)
   teamCc             Json     @default("[]")
+  /** When admins were last emailed about failed jobs (at most once an hour). */
+  lastFailureAlertAt DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

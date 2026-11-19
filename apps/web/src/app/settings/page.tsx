@@ -58,10 +58,27 @@ async function retryFailedJobs() {
   if (user.role !== "ADMIN" && user.role !== "MANAGER") redirect("/settings");
   const prisma = getPrisma();
   const types: JobType[] = ["PARSE_REPLY", "STATEMENT_EXTRACT", "APPLICATION_READ"];
-  const { count } = await prisma.job.updateMany({
+  const failed = await prisma.job.findMany({
     where: { tenantId: user.tenantId, status: "FAILED", type: { in: types } },
-    data: { status: "QUEUED", attempts: 0, runAt: new Date(), lockedAt: null, lastError: null },
+    select: { id: true },
+    orderBy: { updatedAt: "asc" },
   });
+  // Spread out (one every 20 s) so a quota that is still short is not hit by all of them at
+  // once; the first few run right away.
+  const now = Date.now();
+  for (const [i, j] of failed.entries()) {
+    await prisma.job.update({
+      where: { id: j.id },
+      data: {
+        status: "QUEUED",
+        attempts: 0,
+        runAt: new Date(now + i * 20_000),
+        lockedAt: null,
+        lastError: null,
+      },
+    });
+  }
+  const count = failed.length;
   after(() => runDueJobs(prisma, { budgetMs: inlineBudgetMs(), types }).then(() => undefined));
   redirect(`/settings?${new URLSearchParams({ retried: String(count) })}`);
 }
