@@ -2,6 +2,7 @@ import { runDocumentQa, runStatementExtraction, type StatementExtraction } from 
 import { inspectPdf } from "@mca/connectors";
 import { enqueueJob, type ClaimedJob, type Prisma, type PrismaClient } from "@mca/db";
 import { llmClient } from "../ai";
+import { queueDocumentWork } from "../documents";
 import { tenantMailbox } from "../google";
 import { PermanentJobError } from "./errors";
 
@@ -44,30 +45,67 @@ export async function handleStatementExtract(prisma: PrismaClient, job: ClaimedJ
     ),
   ]);
 
+  const verdict = classifyExtraction(a1.data);
+  if (verdict.kind === "unreadable") {
+    // Fails at once (no retry: the file is what it is). The deal page lists it as unreadable
+    // and "Re-run bank scrub" tries again after the file is fixed; the scrub goes on without it.
+    await queueScrubWhenReady(prisma, doc.tenantId, doc.dealId, doc.id);
+    throw new PermanentJobError(`The AI found no monthly figures in ${doc.fileName}`);
+  }
+
   const months = a1.data.months;
   const sorted = [...months].sort((a, b) => a.month.localeCompare(b.month));
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
-  const isStatement =
-    a1.data.documents.some((d) => d.type === "BANK_STATEMENT") && months.length > 0;
 
-  await prisma.document.update({
+  const updated = await prisma.document.update({
     where: { id: doc.id },
     data: {
       extraction: a1.data as unknown as Prisma.InputJsonObject,
       fraudFlags: { metadata, qa: qa?.data ?? null } as unknown as Prisma.InputJsonObject,
       extractedAt: new Date(),
-      ...(isStatement
+      ...(verdict.kind === "statement"
         ? {
             periodStart: first ? new Date(`${first.month}-01T00:00:00Z`) : null,
             periodEnd: last ? endOfMonth(last.month) : null,
             bankName: first?.bankName ?? null,
             accountLast4: first?.accountLast4 ?? null,
           }
-        : { type: a1.data.documents[0]?.type === "APPLICATION" ? "APPLICATION" : "OTHER" }),
+        : { type: verdict.type }),
     },
   });
+  if (verdict.kind === "reclassified") {
+    // Filed under what it really is, on the record; an application goes on to be read.
+    await prisma.dealEvent.create({
+      data: {
+        dealId: doc.dealId,
+        type: "document_reclassified",
+        actorType: "ai",
+        payload: { documentId: doc.id, fileName: doc.fileName, from: doc.type, to: verdict.type },
+      },
+    });
+    if (verdict.type === "APPLICATION") await queueDocumentWork(prisma, updated);
+  }
   await queueScrubWhenReady(prisma, doc.tenantId, doc.dealId, doc.id);
+}
+
+/**
+ * What A1 made of a file sent as a bank statement: a statement with monthly figures; a file
+ * that is really something else (filed as that); or a statement the model could not read
+ * (no monthly figures, or nothing recognised), which must be reported, never silently dropped.
+ */
+export function classifyExtraction(
+  data: Pick<StatementExtraction, "months" | "documents">,
+):
+  | { kind: "statement" }
+  | { kind: "reclassified"; type: "APPLICATION" | "OTHER" }
+  | { kind: "unreadable" } {
+  const found = data.documents[0]?.type;
+  const saysStatement = data.documents.some((d) => d.type === "BANK_STATEMENT");
+  if (saysStatement && data.months.length > 0) return { kind: "statement" };
+  if (!saysStatement && found)
+    return { kind: "reclassified", type: found === "APPLICATION" ? "APPLICATION" : "OTHER" };
+  return { kind: "unreadable" };
 }
 
 function endOfMonth(month: string): Date {
