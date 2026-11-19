@@ -84,7 +84,7 @@ export async function handleInboxSync(prisma: PrismaClient, job: ClaimedJob): Pr
   for (const m of messages) await ingest(ctx, m);
   await prisma.mailboxConnection.update({
     where: { id: connection.id },
-    data: { historyId: nextCursor, lastSyncedAt: new Date() },
+    data: { historyId: nextCursor, lastSyncedAt: new Date(), lastError: null },
   });
 }
 
@@ -143,6 +143,7 @@ async function saveAttachments(
   const ids: string[] = [];
   for (const a of m.attachments) {
     if (a.sizeBytes > 25 * 1024 * 1024) continue;
+    if (via === "funder_email" && isDecorativeImage(a)) continue;
     const data = await ctx.mailbox.gmail.getAttachment(m.messageId, a.attachmentId);
     const doc = await storeDealFile(ctx.prisma, ctx.mailbox, {
       tenantId: ctx.tenantId,
@@ -155,6 +156,14 @@ async function saveAttachments(
     ids.push(doc.id);
   }
   return ids;
+}
+
+/** Logos and signature pictures in lender mail; an offer sent as a picture is kept. */
+export function isDecorativeImage(a: { fileName: string; mimeType: string; sizeBytes: number }) {
+  if (!/^image\//i.test(a.mimeType)) return false;
+  if (/logo|signature|banner|icon|badge|^image\d{3}\.|^outlook-|^~wrd/i.test(a.fileName))
+    return true;
+  return a.sizeBytes < 40 * 1024;
 }
 
 /** A deal the team emailed to lenders straight from Gmail: create it so it is tracked here too. */

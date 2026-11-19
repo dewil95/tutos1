@@ -50,7 +50,11 @@ export async function handleHistoryImport(
   const save = (s: HistoryImportState) =>
     prisma.mailboxConnection.update({
       where: { id: connection.id },
-      data: { importState: s as unknown as Prisma.InputJsonObject, lastSyncedAt: new Date() },
+      data: {
+        importState: s as unknown as Prisma.InputJsonObject,
+        lastSyncedAt: new Date(),
+        lastError: null,
+      },
     });
 
   if (!state.ids) {

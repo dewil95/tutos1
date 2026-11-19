@@ -121,44 +121,64 @@ export async function createDealFromApplication(form: FormData) {
     });
     // Before the reading is queued: a reading that finishes fast still finds the signature.
     await keepSignature(deal.id);
-    const doc = await storeDealFile(prisma, mailbox, {
-      tenantId: user.tenantId,
-      dealId: deal.id,
-      merchantId: merchant.id,
-      file: { fileName: app.fileName, mimeType: "application/pdf", data: app.data },
-      type: "APPLICATION",
-      uploadedVia: "staff",
-      uploadedById: user.id,
-      autoProcess: false,
-    });
-    // Another company's form: kept for the team, never packaged for a lender.
-    await prisma.document.update({ where: { id: doc.id }, data: { internalOnly: true } });
-    const jobId = await enqueueJob(prisma, {
-      tenantId: user.tenantId,
-      type: "APPLICATION_READ",
-      payload: { documentId: doc.id, newDeal: true },
-      dedupeKey: `appread:${doc.id}`,
-    });
-    for (const s of statements) {
-      await storeDealFile(prisma, mailbox, {
+    let jobId: string;
+    try {
+      const doc = await storeDealFile(prisma, mailbox, {
         tenantId: user.tenantId,
         dealId: deal.id,
         merchantId: merchant.id,
-        file: { fileName: s.name, mimeType: s.type || "application/pdf", data: s.data },
-        type: "BANK_STATEMENT",
+        file: { fileName: app.fileName, mimeType: "application/pdf", data: app.data },
+        type: "APPLICATION",
         uploadedVia: "staff",
         uploadedById: user.id,
+        autoProcess: false,
       });
+      // Another company's form: kept for the team, never packaged for a lender.
+      await prisma.document.update({ where: { id: doc.id }, data: { internalOnly: true } });
+      jobId = await enqueueJob(prisma, {
+        tenantId: user.tenantId,
+        type: "APPLICATION_READ",
+        payload: { documentId: doc.id, newDeal: true },
+        dedupeKey: `appread:${doc.id}`,
+      });
+      for (const s of statements) {
+        await storeDealFile(prisma, mailbox, {
+          tenantId: user.tenantId,
+          dealId: deal.id,
+          merchantId: merchant.id,
+          file: { fileName: s.name, mimeType: s.type || "application/pdf", data: s.data },
+          type: "BANK_STATEMENT",
+          uploadedVia: "staff",
+          uploadedById: user.id,
+        });
+      }
+      await prisma.dealEvent.create({
+        data: {
+          dealId: deal.id,
+          type: "application_uploaded",
+          actorType: "user",
+          actorId: user.id,
+          payload: { documentId: doc.id, statements: statements.length },
+        },
+      });
+    } catch (err) {
+      // Drive or the queue failed after the deal was created: close it with the reason so the
+      // board does not show a nameless "reading…" card forever.
+      await prisma.deal
+        .update({
+          where: { id: deal.id },
+          data: {
+            stage: "DEAD",
+            stageChangedAt: new Date(),
+            lostReason: `Upload failed: ${err instanceof Error ? err.message : String(err)}`.slice(
+              0,
+              300,
+            ),
+          },
+        })
+        .catch(() => undefined);
+      throw err;
     }
-    await prisma.dealEvent.create({
-      data: {
-        dealId: deal.id,
-        type: "application_uploaded",
-        actorType: "user",
-        actorId: user.id,
-        payload: { documentId: doc.id, statements: statements.length },
-      },
-    });
     after(() =>
       runDueJobs(prisma, { budgetMs: inlineBudgetMs(), ids: [jobId] }).then(() => undefined),
     );

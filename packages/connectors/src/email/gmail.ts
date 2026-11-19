@@ -85,7 +85,9 @@ export function parseGmailMessage(m: GmailMessage): InboundEmail {
   const attachments: InboundAttachmentRef[] = [];
   const walk = (p: GmailPart | undefined) => {
     if (!p) return;
-    if (p.filename && p.body?.attachmentId) {
+    const inline =
+      /^inline\b/i.test(header(p, "Content-Disposition") ?? "") || !!header(p, "Content-ID");
+    if (p.filename && p.body?.attachmentId && !inline) {
       attachments.push({
         fileName: p.filename,
         mimeType: p.mimeType ?? "application/octet-stream",

@@ -182,6 +182,12 @@ export default async function SettingsPage({
             <li key={m.id}>
               {m.email} — last inbox check{" "}
               {m.lastSyncedAt ? m.lastSyncedAt.toLocaleString("en-US") : "never"}
+              {m.lastError ? (
+                <p className="notice error">
+                  Inbox checks stopped: {m.lastError}. Press &quot;Reconnect the team mailbox&quot;
+                  below and pick {m.email} again.
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>

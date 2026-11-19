@@ -972,6 +972,8 @@ model MailboxConnection {
   scopes                Json      @default("[]")
   historyId             String?
   lastSyncedAt          DateTime?
+  /// Why the last inbox check failed for good (Google access revoked); cleared on success.
+  lastError             String?
   driveRootFolderId     String?
   /// "send": the funding mailbox (inbox check, sending, Drive). "history": a team member's
   /// mailbox read once, read-only, to learn past deals, lender answers and positions.

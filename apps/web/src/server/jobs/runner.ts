@@ -8,7 +8,7 @@ import {
   type PrismaClient,
 } from "@mca/db";
 import { AiQuotaError, AiUnavailableError } from "@mca/ai";
-import { humanizeJobError, PermanentJobError, quotaRetryAt } from "./errors";
+import { humanizeJobError, isGoogleAccessRevoked, PermanentJobError, quotaRetryAt } from "./errors";
 import { handleApplicationRead } from "./applicationRead";
 import { handleHistoryImport } from "./historyImport";
 import { handleInboxSync } from "./inboxSync";
@@ -112,8 +112,18 @@ async function runOne(prisma: PrismaClient, job: ClaimedJob, result: RunResult):
       return;
     }
     const error = humanizeJobError(err);
+    // Google refused the mailbox: the mailbox carries the message (Settings shows it) and the
+    // job stops; the tick keeps re-queueing it, so the first sync after reconnecting succeeds.
+    const revoked = isGoogleAccessRevoked(err);
+    const mailboxId = (job.payload as { mailboxId?: string } | null)?.mailboxId;
+    if (revoked && mailboxId) {
+      await prisma.mailboxConnection
+        .updateMany({ where: { id: mailboxId }, data: { lastError: error } })
+        .catch((e: unknown) => console.error(`[job ${job.id}] marking mailbox: ${String(e)}`));
+    }
     // A missing or rejected AI key fails at once: retrying for minutes cannot fix it.
-    const permanent = err instanceof PermanentJobError || err instanceof AiUnavailableError;
+    const permanent =
+      err instanceof PermanentJobError || err instanceof AiUnavailableError || revoked;
     const outcome = await failJob(
       prisma,
       permanent ? { ...job, attempts: job.maxAttempts } : job,

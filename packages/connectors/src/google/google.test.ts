@@ -181,6 +181,33 @@ describe("GmailProvider", () => {
     expect(parseAddressList(null)).toEqual([]);
   });
 
+  it("keeps real attachments and drops inline signature images", () => {
+    const part = (filename: string, headers: { name: string; value: string }[]) => ({
+      mimeType: "image/jpeg",
+      filename,
+      headers,
+      body: { size: 100, attachmentId: `a-${filename}` },
+    });
+    const m = parseGmailMessage({
+      id: "x",
+      threadId: "t",
+      payload: {
+        mimeType: "multipart/mixed",
+        parts: [
+          { mimeType: "text/plain", body: { data: Buffer.from("Approved").toString("base64url") } },
+          part("offer.pdf", [
+            { name: "Content-Disposition", value: 'attachment; filename="offer.pdf"' },
+          ]),
+          part("mazal-logo.jpg", [{ name: "Content-ID", value: "<logo@mazal>" }]),
+          part("image001.png", [
+            { name: "Content-Disposition", value: "inline; filename=image001.png" },
+          ]),
+        ],
+      },
+    });
+    expect(m.attachments.map((a) => a.fileName)).toEqual(["offer.pdf"]);
+  });
+
   it("reads the HTML when the plain text only points to it (portal offers)", () => {
     const html =
       "<h2>PreApproved Offers</h2><p>Maximum advance $75,000</p><p>Buy rate 1.380</p><p>Daily $792.86</p>";

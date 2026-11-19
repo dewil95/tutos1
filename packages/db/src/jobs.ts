@@ -48,7 +48,6 @@ export async function enqueueJob(prisma: PrismaClient, input: EnqueueInput): Pro
           payload: input.payload,
           runAt: input.runAt ?? new Date(),
           attempts: 0,
-          lastError: null,
           lockedAt: null,
         },
       });
