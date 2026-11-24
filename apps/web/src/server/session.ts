@@ -9,7 +9,9 @@ import { createRemoteJWKSet, jwtVerify, SignJWT, type JWTVerifyGetKey } from "jo
 export const SESSION_COOKIE = "crm_session";
 /** Holds the state and nonce of a sign-in in progress, only for /api/auth. */
 export const LOGIN_COOKIE = "crm_login";
-export const SESSION_HOURS = 12;
+/** A rep signs in once a month, not every morning; the team list is still checked on every request. */
+export const SESSION_DAYS = 30;
+export const SESSION_HOURS = SESSION_DAYS * 24;
 
 const ISSUER = "ascend-crm";
 const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
