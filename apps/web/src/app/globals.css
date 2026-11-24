@@ -975,6 +975,44 @@ table.offers td {
 .grade.D {
   color: var(--bad);
 }
+/* The one line at the top of a deal: what is going on, and the single thing to do about it. */
+.next-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 14px;
+}
+.next-step p {
+  margin: 0;
+}
+.next-step strong {
+  font-weight: 600;
+}
+.next-step.ok {
+  background: var(--good-soft);
+}
+.next-step.warn {
+  background: var(--warn-soft);
+}
+.next-step.bad {
+  background: var(--bad-soft);
+}
+.next-step .button {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .next-step {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .notice {
   max-width: 72ch;
   padding: 10px 14px;

@@ -9,6 +9,7 @@ import {
 } from "./inbox/route";
 import { advanceStage, forwardStage, statusForIntent } from "./jobs/parseReply";
 import { dealProfile } from "./lenders";
+import { nextStep, type NextStepInput } from "./nextStep";
 import { parsePositions, positionsToText } from "./submissions";
 
 const funders = [
@@ -110,6 +111,73 @@ describe("deal profile for the lender ranking", () => {
     };
     expect(dealProfile({ ...base, requestedAmount: 1 }).requestedAmount).toBeNull();
     expect(dealProfile({ ...base, requestedAmount: 25_000 }).requestedAmount).toBe(25_000);
+  });
+});
+
+describe("next step on the deal page", () => {
+  const base: NextStepInput = {
+    stage: "DOCS_RECEIVED",
+    reading: "done",
+    missing: [],
+    signed: true,
+    signatureFromUploadPending: false,
+    statements: 3,
+    pendingStatements: 0,
+    scrubbed: true,
+    contractsRequested: false,
+    submissions: [],
+  };
+  const sub = (
+    funder: string,
+    status: NextStepInput["submissions"][number]["status"],
+    extra = {},
+  ) => ({
+    funder,
+    status,
+    latest: null,
+    offer: null,
+    ...extra,
+  });
+
+  it("walks the file from reading to shopping", () => {
+    expect(nextStep({ ...base, reading: "reading" })?.title).toMatch(/Reading/);
+    expect(nextStep({ ...base, missing: ["EIN", "Owner SSN"] })).toMatchObject({
+      tone: "warn",
+      title: "2 details missing before the merchant can sign:",
+      detail: "EIN, Owner SSN.",
+    });
+    expect(nextStep({ ...base, signed: false, signatureFromUploadPending: true })?.action).toEqual({
+      label: "Apply the signature",
+      href: "#ascend-application",
+    });
+    expect(nextStep({ ...base, signed: false })?.title).toBe("Not signed yet.");
+    expect(nextStep({ ...base, statements: 0 })?.title).toBe("No bank statements yet.");
+    expect(nextStep(base)).toMatchObject({ tone: "ok", action: { href: "#ship" } });
+  });
+
+  it("follows the lenders' answers", () => {
+    const sent = [sub("Mazal Funders", "SENT"), sub("Zlur", "ACKNOWLEDGED")];
+    expect(nextStep({ ...base, submissions: sent })?.title).toBe(
+      "Sent to 2 lenders · 1 replied · waiting on 1.",
+    );
+    expect(
+      nextStep({
+        ...base,
+        submissions: [sub("Mazal Funders", "APPROVED", { offer: { amount: 15000, factor: 1.45 } })],
+      }),
+    ).toMatchObject({ tone: "ok", title: "Offer from Mazal Funders.", detail: /\$15,000 at 1.45/ });
+    expect(
+      nextStep({
+        ...base,
+        contractsRequested: true,
+        submissions: [sub("Mazal Funders", "APPROVED")],
+      })?.title,
+    ).toBe("Contracts requested.");
+    expect(
+      nextStep({ ...base, submissions: [sub("Zlur", "DECLINED"), sub("TMR Now", "DECLINED")] }),
+    ).toMatchObject({ tone: "bad", title: "All 2 lenders declined." });
+    expect(nextStep({ ...base, stage: "DEAD" })).toBeNull();
+    expect(nextStep({ ...base, stage: "FUNDED" })?.title).toBe("Funded.");
   });
 });
 
