@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth";
 import { emailDryRun, inlineBudgetMs, merchantEmailsOff } from "@/server/env";
 import { runDueJobs } from "@/server/jobs/runner";
+import { whatsappConfigured } from "@/server/whatsapp/config";
 import { ApiKeyCreator } from "./ApiKeyCreator";
 import { EmailRulesSection } from "./EmailRulesSection";
 import { WhatsAppSection } from "./WhatsAppSection";
@@ -226,64 +227,7 @@ export default async function SettingsPage({
         ) : null}
       </section>
 
-      <section className="panel">
-        <h2>Website API</h2>
-        <p className="small muted">
-          Your website sends each completed application to <code>POST /api/v1/applications</code>{" "}
-          with an API key (see docs/API.md). The deal, merchant, owners and files appear here
-          automatically.
-        </p>
-        {apiKeys.length ? (
-          <table className="grid">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Key</th>
-                <th>Last used</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {apiKeys.map((k) => (
-                <tr key={k.id} className={k.revokedAt ? "muted" : ""}>
-                  <td>{k.name}</td>
-                  <td className="small">
-                    <code>{k.prefix}…</code>
-                  </td>
-                  <td className="small">
-                    {k.revokedAt
-                      ? `revoked ${k.revokedAt.toLocaleDateString("en-US")}`
-                      : k.lastUsedAt
-                        ? k.lastUsedAt.toLocaleString("en-US")
-                        : "never"}
-                  </td>
-                  <td>
-                    {!k.revokedAt && isAdmin ? (
-                      <form action={revokeApiKey}>
-                        <input type="hidden" name="id" value={k.id} />
-                        <button type="submit">Revoke</button>
-                      </form>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-        {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
-      </section>
-
-      <HistorySection mailboxes={historyMailboxes} canEdit={isAdmin} />
-
       <ApplicationSection tenantId={user.tenantId} canEdit={isAdmin} />
-
-      <WhatsAppSection
-        tenantId={user.tenantId}
-        canEdit={isAdmin}
-        flash={{ ok: flash.wa, error: flash.waError }}
-      />
-
-      <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
 
       <section className="panel">
         <h2>Lenders ({funders.filter((f) => f.isActive).length})</h2>
@@ -354,6 +298,84 @@ export default async function SettingsPage({
           ) : null}
         </section>
       ) : null}
+
+      <details
+        className="panel more-settings"
+        open={historyMailboxes.length > 0 || whatsappConfigured()}
+      >
+        <summary>
+          <h2>More settings</h2>
+          <span className="small muted">
+            Website API, learning from past email, WhatsApp, lender email templates
+          </span>
+        </summary>
+        <section className="panel">
+          <h2>Website API</h2>
+          <p className="small muted">
+            Your website sends each completed application to <code>POST /api/v1/applications</code>{" "}
+            with an API key (see docs/API.md). The deal, merchant, owners and files appear here
+            automatically.
+          </p>
+          {apiKeys.length ? (
+            <table className="grid">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key</th>
+                  <th>Last used</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {apiKeys.map((k) => (
+                  <tr key={k.id} className={k.revokedAt ? "muted" : ""}>
+                    <td>{k.name}</td>
+                    <td className="small">
+                      <code>{k.prefix}…</code>
+                    </td>
+                    <td className="small">
+                      {k.revokedAt
+                        ? `revoked ${k.revokedAt.toLocaleDateString("en-US")}`
+                        : k.lastUsedAt
+                          ? k.lastUsedAt.toLocaleString("en-US")
+                          : "never"}
+                    </td>
+                    <td>
+                      {!k.revokedAt && isAdmin ? (
+                        <form action={revokeApiKey}>
+                          <input type="hidden" name="id" value={k.id} />
+                          <button type="submit">Revoke</button>
+                        </form>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+          {isAdmin ? <ApiKeyCreator /> : <p className="small muted">An admin creates API keys.</p>}
+        </section>
+
+        <HistorySection mailboxes={historyMailboxes} canEdit={isAdmin} />
+
+        {whatsappConfigured() ? (
+          <WhatsAppSection
+            tenantId={user.tenantId}
+            canEdit={isAdmin}
+            flash={{ ok: flash.wa, error: flash.waError }}
+          />
+        ) : (
+          <section className="panel">
+            <h2>WhatsApp applications</h2>
+            <p className="small muted">
+              Built and switched off. To turn it on, set the WhatsApp variables on the server
+              (README → WhatsApp); the setup steps appear here once they are set.
+            </p>
+          </section>
+        )}
+
+        <EmailRulesSection tenantId={user.tenantId} canEdit={isAdmin} />
+      </details>
     </>
   );
 }
