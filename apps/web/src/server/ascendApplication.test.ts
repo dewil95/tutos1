@@ -3,8 +3,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { databaseReady } from "./testDb";
 import type { OwnerPii } from "./ascendApplication";
 import type { Draft } from "./whatsapp/questions";
-import type { OwnerPii } from "./ascendApplication";
-import type { Draft } from "./whatsapp/questions";
 
 // Synthetic merchant only: "another company's" application as a mocked A5 reading.
 const READING = {
