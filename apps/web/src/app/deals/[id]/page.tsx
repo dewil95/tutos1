@@ -579,8 +579,8 @@ export default async function DealPage({
           <div>
             <h3>3. Lenders — one separate email each</h3>
             <p className="small muted">
-              The top 5 recommended are ticked; untick or add as you like. One separate email
-              each: To = the lender&apos;s first address · CC = its other addresses + team (
+              The top 5 recommended are ticked; untick or add as you like. One separate email each:
+              To = the lender&apos;s first address · CC = its other addresses + team (
               {asList(tenant.teamCc).join(", ") || "none"}) · never BCC
             </p>
             <SelectTopLenders />
@@ -605,7 +605,6 @@ export default async function DealPage({
                 </ul>
               </details>
             ) : null}
-            </ul>
           </div>
         </div>
         <div className="ship-actions">
