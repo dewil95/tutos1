@@ -1473,3 +1473,14 @@ ul.habits {
 .sigpad.warn {
   border-color: var(--bad);
 }
+
+/* Ascend application: the ways to sign when the merchant is not at the desk, behind a fold. */
+.other-ways {
+  margin-top: 10px;
+}
+.other-ways > summary {
+  cursor: pointer;
+}
+.other-ways ol.steps {
+  margin-top: 10px;
+}

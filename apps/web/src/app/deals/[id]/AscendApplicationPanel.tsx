@@ -347,9 +347,24 @@ export function AscendApplicationPanel({
         </li>
 
         <li>
-          <strong>Sign right here</strong>{" "}
+          <strong>Signature</strong>{" "}
           {signed ? (
-            <span className="small ok">Signed.</span>
+            <>
+              <span className="small ok">✓ Signed: {open(signed)} (ticked for lenders below).</span>
+              <details className="small">
+                <summary className="muted">Replace the signed copy</summary>
+                <form action={uploadSignedApplication.bind(null, dealId)} className="row">
+                  <input
+                    type="file"
+                    name="signed"
+                    accept="application/pdf,image/jpeg,image/png"
+                    multiple
+                    required
+                  />
+                  <button type="submit">Replace signed copy</button>
+                </form>
+              </details>
+            </>
           ) : signedAtUpload ? (
             <div className="small">
               <span className="ok">
@@ -402,64 +417,64 @@ export function AscendApplicationPanel({
               </p>
             </form>
           )}
-        </li>
-
-        <li>
-          <strong>Or send the merchant a link to sign online</strong>{" "}
-          <span className="small muted">
-            They check the details, add what&apos;s missing (SSN, date of birth, statements) and
-            sign by typing their name. The signed PDF lands here by itself.
-          </span>
-          {signLink ? (
-            <div className="notice ok">
-              {signLinkEmailed?.startsWith("dry-run:")
-                ? `Emails to merchants are off: the email to ${signLinkEmailed.slice(8)} was written to the timeline, not sent. Send the link yourself:`
-                : signLinkEmailed
-                  ? `Emailed to ${signLinkEmailed}. The link (works 14 days, shown only now):`
-                  : "Send this link to the merchant (works 14 days, shown only now):"}
-              <input readOnly value={signLink} className="mono" />
-            </div>
-          ) : null}
-          <form action={createSigningLink.bind(null, dealId)} className="row">
-            <label className="check small">
-              <input type="checkbox" name="email" value="yes" defaultChecked />
-              Email it to the owner (only if merchant emails are on)
-            </label>
-            <button type="submit">Create signing link</button>
-          </form>
-        </li>
-
-        <li>
-          <strong>Or download Ascend&apos;s application</strong>{" "}
-          <a className="button" href={`/deals/${dealId}/ascend-application.pdf`}>
-            Download PDF
-          </a>
-          <div className="small muted">
-            Filled from the details above, with an empty signature line for the merchant. It shows
-            the full SSN and date of birth: send it to the merchant through DocuSign or another
-            secure channel, not plain email.
-          </div>
-        </li>
-
-        <li>
-          <strong>Upload the signed application</strong>{" "}
-          {signed ? (
-            <span className="small ok">
-              Ready to ship: {open(signed)} (ticked for lenders below)
-            </span>
-          ) : (
-            <span className="small warn">Not signed yet</span>
+          {signed ? null : (
+            /* The merchant is not here: a link to sign online, or a PDF for DocuSign / paper. */
+            <details className="other-ways" open={!!signLink}>
+              <summary className="small muted">
+                Merchant not here? Other ways to sign (link, DocuSign, paper)
+              </summary>
+              <ol className="steps">
+                <li>
+                  <strong>Send a link to sign online</strong>{" "}
+                  <span className="small muted">
+                    They check the details, add what&apos;s missing (SSN, date of birth, statements)
+                    and sign. The signed PDF lands here by itself.
+                  </span>
+                  {signLink ? (
+                    <div className="notice ok">
+                      {signLinkEmailed?.startsWith("dry-run:")
+                        ? `Emails to merchants are off: the email to ${signLinkEmailed.slice(8)} was written to the timeline, not sent. Send the link yourself:`
+                        : signLinkEmailed
+                          ? `Emailed to ${signLinkEmailed}. The link (works 14 days, shown only now):`
+                          : "Send this link to the merchant (works 14 days, shown only now):"}
+                      <input readOnly value={signLink} className="mono" />
+                    </div>
+                  ) : null}
+                  <form action={createSigningLink.bind(null, dealId)} className="row">
+                    <label className="check small">
+                      <input type="checkbox" name="email" value="yes" defaultChecked />
+                      Email it to the owner (only if merchant emails are on)
+                    </label>
+                    <button type="submit">Create signing link</button>
+                  </form>
+                </li>
+                <li>
+                  <strong>Download Ascend&apos;s application</strong>{" "}
+                  <a className="button" href={`/deals/${dealId}/ascend-application.pdf`}>
+                    Download PDF
+                  </a>
+                  <div className="small muted">
+                    Filled from the details above, with an empty signature line. It shows the full
+                    SSN and date of birth: send it through DocuSign or another secure channel, not
+                    plain email.
+                  </div>
+                </li>
+                <li>
+                  <strong>Upload the signed copy</strong>{" "}
+                  <form action={uploadSignedApplication.bind(null, dealId)} className="row">
+                    <input
+                      type="file"
+                      name="signed"
+                      accept="application/pdf,image/jpeg,image/png"
+                      multiple
+                      required
+                    />
+                    <button type="submit">Upload signed copy</button>
+                  </form>
+                </li>
+              </ol>
+            </details>
           )}
-          <form action={uploadSignedApplication.bind(null, dealId)} className="row">
-            <input
-              type="file"
-              name="signed"
-              accept="application/pdf,image/jpeg,image/png"
-              multiple
-              required
-            />
-            <button type="submit">{signed ? "Replace signed copy" : "Upload signed copy"}</button>
-          </form>
         </li>
       </ol>
     </section>
