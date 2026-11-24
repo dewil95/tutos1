@@ -72,7 +72,7 @@ export async function createWebApplication(
   input: {
     tenantId: string;
     dealId: string;
-    origin: "public" | "team";
+    origin: "public" | "team" | "internal";
     lang?: Lang;
     email?: string | null;
     phone?: string | null;
@@ -585,7 +585,7 @@ export async function applyUploadSignature(
   const snap = await reviewSnapshot(prisma, { tenantId, dealId, lang: "en" });
   if (!snap) return { ok: false, error: "expired" };
   const at = new Date(pending.at);
-  const token = await createWebApplication(prisma, { tenantId, dealId, origin: "team" });
+  const token = await createWebApplication(prisma, { tenantId, dealId, origin: "internal" });
   return signWebApplication(
     prisma,
     token,
