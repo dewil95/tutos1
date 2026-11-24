@@ -1,4 +1,4 @@
-import type { OwnerPii } from "@/server/ascendApplication";
+import type { MissingField, OwnerPii } from "@/server/ascendApplication";
 import type { Draft } from "@/server/whatsapp/questions";
 import { SignaturePad } from "@/app/application/[token]/SignaturePad";
 import {
@@ -49,7 +49,7 @@ export function AscendApplicationPanel({
   draft: Draft;
   pii: OwnerPii[];
   ownerIds: string[];
-  missing: string[];
+  missing: MissingField[];
   source: FileRef | null;
   signed: FileRef | null;
   reading: { state: "reading" | "failed" | "done" | "not_application"; error?: string } | null;
@@ -129,12 +129,57 @@ export function AscendApplicationPanel({
           {reading?.state === "reading" ? (
             <span className="small muted">Filled in as soon as the reading is done.</span>
           ) : missing.length ? (
-            <span className="small warn">Missing: {missing.join(", ")}</span>
+            <span className="small warn">Missing: {missing.map((m) => m.label).join(", ")}</span>
           ) : (
             <span className="small ok">All required fields are filled.</span>
           )}
-          <details open={missing.length > 0}>
-            <summary className="small">Edit application details</summary>
+          {missing.length && reading?.state !== "reading" ? (
+            /* Only what is missing, nothing else to scroll past; the same action saves it. */
+            <form action={saveApplicationDetails.bind(null, dealId)} className="stack missing-form">
+              {b.legalName && !missing.some((m) => m.inputs.some((i) => i.name === "legalName")) ? (
+                <input type="hidden" name="legalName" value={b.legalName} />
+              ) : null}
+              {missing.some((m) => m.inputs.some((i) => i.name.endsWith("-0"))) ? (
+                <>
+                  <input type="hidden" name="ownerId-0" value={ownerIds[0] ?? ""} />
+                  {owners[0]?.firstName &&
+                  !missing.some((m) => m.inputs.some((i) => i.name === "firstName-0")) ? (
+                    <>
+                      <input type="hidden" name="firstName-0" value={owners[0].firstName} />
+                      <input type="hidden" name="lastName-0" value={owners[0].lastName ?? ""} />
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              {missing.map((m) => (
+                <div className="row" key={m.label}>
+                  {m.inputs.map((i) => (
+                    <label className="field" key={i.name}>
+                      {m.inputs.length > 1 ? `${m.label}: ${i.label}` : m.label}
+                      <input
+                        name={i.name}
+                        type={i.type === "date" ? "date" : "text"}
+                        inputMode={i.type === "numeric" ? "numeric" : undefined}
+                        size={i.size}
+                        autoComplete="off"
+                        required
+                      />
+                    </label>
+                  ))}
+                </div>
+              ))}
+              <p>
+                <button type="submit" className="primary">
+                  Save what&apos;s missing
+                </button>{" "}
+                <span className="small muted">
+                  Everything else stays as it is. SSN, DOB and EIN are stored encrypted.
+                </span>
+              </p>
+            </form>
+          ) : null}
+          <details>
+            <summary className="small">Edit everything</summary>
             <form action={saveApplicationDetails.bind(null, dealId)} className="stack appform">
               <fieldset>
                 <legend>Business</legend>
