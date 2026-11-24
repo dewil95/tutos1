@@ -7,6 +7,7 @@ import { dealApplication, missingFields } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
+import { nextStep } from "@/server/nextStep";
 import { positionsToText } from "@/server/submissions";
 import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
 import { appetiteSummary, dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
@@ -216,6 +217,7 @@ export default async function DealPage({
     }),
   });
 
+  const missing = missingFields(application.draft, application.pii);
   const replyFor = (submissionId: string) =>
     activities
       .filter((a) => a.aiSummary)
@@ -227,6 +229,29 @@ export default async function DealPage({
           }[]
         ).some((e) => e.activityId === a.id),
       );
+
+  // The one line at the top: what is going on and the single thing to do about it.
+  const next = nextStep({
+    stage: deal.stage,
+    reading: reading?.state ?? null,
+    missing,
+    signed: !!signedCopy,
+    signatureFromUploadPending: !!signedAtUpload,
+    statements: documents.filter((d) => d.type === "BANK_STATEMENT").length,
+    pendingStatements,
+    scrubbed: !!analysis,
+    contractsRequested: deal.soldAmount !== null,
+    submissions: thisDealSubs.map((s) => {
+      const reply = replyFor(s.id);
+      const offer = reply?.r.offers[0];
+      return {
+        funder: s.funder.name,
+        status: s.status,
+        latest: reply?.r.summary ?? null,
+        offer: offer ? { amount: offer.advanceAmount, factor: offer.factorRate } : null,
+      };
+    }),
+  });
 
   return (
     <>
@@ -245,6 +270,19 @@ export default async function DealPage({
         reopen={reopenDeal.bind(null, id)}
       />
 
+      {next ? (
+        <section className={`next-step ${next.tone}`} aria-label="Next step">
+          <p>
+            <strong>{next.title}</strong>
+            {next.detail ? <> {next.detail}</> : null}
+          </p>
+          {next.action ? (
+            <a className="button primary" href={next.action.href}>
+              {next.action.label}
+            </a>
+          ) : null}
+        </section>
+      ) : null}
       {flash.error ? <p className="notice error">{flash.error}</p> : null}
       {flash.queued ? (
         <p className="notice ok">
@@ -289,16 +327,6 @@ export default async function DealPage({
           . Ask the merchant for the original PDF from their bank.
         </p>
       ) : null}
-      {signedCopy && thisDealSubs.length === 0 ? (
-        <p className="notice ok">
-          Ascend application ready ({signedCopy.fileName}).{" "}
-          <a href="#ship">
-            <strong>Choose the lenders and send →</strong>
-          </a>{" "}
-          The application and the newest bank statements are attached.
-          {emailDryRun() ? " Test mode: emails are written to the timeline, not sent." : ""}
-        </p>
-      ) : null}
       {!mailbox ? (
         <p className="notice warn">
           Gmail/Drive not connected yet — an admin can connect the team mailbox in{" "}
@@ -313,7 +341,7 @@ export default async function DealPage({
         draft={application.draft}
         pii={application.pii}
         ownerIds={application.owners.map((o) => o.id)}
-        missing={missingFields(application.draft, application.pii)}
+        missing={missing}
         source={sourceApp}
         signed={signedCopy}
         reading={reading}
