@@ -4,19 +4,32 @@ import { READING_PLACEHOLDER } from "@/server/ascendApplication";
 
 export const dynamic = "force-dynamic";
 
-const STAGES: DealStage[] = [
-  "INTAKE",
-  "DOCS_REQUESTED",
-  "DOCS_RECEIVED",
-  "PRE_UNDERWRITING",
-  "READY_TO_SUBMIT",
-  "SUBMITTED",
-  "OFFERS_RECEIVED",
-  "OFFER_ACCEPTED",
-  "STIPS",
-  "CONTRACT_OUT",
-  "FUNDED",
+/**
+ * The board shows six columns that match how a file moves, not the eleven stages the database
+ * keeps (five of them were always empty). Stage names in the database do not change.
+ */
+const COLUMNS: { key: string; label: string; stages: DealStage[]; hint?: string }[] = [
+  {
+    key: "preparing",
+    label: "Preparing",
+    stages: ["INTAKE", "DOCS_REQUESTED", "DOCS_RECEIVED", "PRE_UNDERWRITING", "READY_TO_SUBMIT"],
+    hint: "Reading, docs, signature",
+  },
+  {
+    key: "ready",
+    label: "Ready to shop",
+    stages: ["INTAKE", "DOCS_REQUESTED", "DOCS_RECEIVED", "PRE_UNDERWRITING", "READY_TO_SUBMIT"],
+    hint: "Signed, not sent yet",
+  },
+  { key: "submitted", label: "Submitted", stages: ["SUBMITTED"] },
+  { key: "offers", label: "Offers", stages: ["OFFERS_RECEIVED", "OFFER_ACCEPTED"] },
+  { key: "contract", label: "Contract", stages: ["STIPS", "CONTRACT_OUT"] },
+  { key: "funded", label: "Funded", stages: ["FUNDED", "RENEWAL_ELIGIBLE"] },
 ];
+const OPEN_STAGES = [...new Set(COLUMNS.flatMap((c) => c.stages))];
+const CLOSED: DealStage[] = ["DEAD", "DECLINED"];
+/** A nameless "reading…" deal older than this did not get read: say so on the card. */
+const READING_STALE_MS = 15 * 60_000;
 
 interface BoardDeal {
   id: string;
@@ -29,13 +42,15 @@ interface BoardDeal {
   stageChangedAt: Date;
   createdAt: Date;
   lostReason: string | null;
+  /** A really signed Ascend application is on the deal. */
+  signed: boolean;
+  /** Something was sent to a lender. */
+  sent: boolean;
+  /** A signing link was created for the merchant. */
+  linkSent: boolean;
   /** WhatsApp application chat state, if the deal came in on WhatsApp. */
   whatsapp: string | null;
 }
-
-const CLOSED: DealStage[] = ["DEAD", "DECLINED"];
-/** A nameless "reading…" deal older than this did not get read: say so on the card. */
-const READING_STALE_MS = 15 * 60_000;
 
 /** Board badge for WhatsApp deals: what the chat is waiting on. */
 const WA_LABEL: Record<string, string> = {
@@ -62,9 +77,24 @@ async function loadDeals(
         merchant: { select: { legalName: true, dba: true } },
         owner: { select: { name: true } },
         whatsapp: { select: { status: true } },
+        signatures: { select: { id: true }, take: 1 },
+        webApplications: {
+          select: { id: true },
+          where: { origin: { in: ["public", "team"] } },
+          take: 1,
+        },
+        documents: {
+          where: { type: "APPLICATION", internalOnly: false },
+          select: { uploadedVia: true },
+        },
+        submissions: {
+          where: { status: { notIn: ["DRAFT", "WITHDRAWN"] } },
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: { updatedAt: "desc" },
-      take: 200,
+      take: 300,
     });
     return {
       deals: rows.map((d) => ({
@@ -78,6 +108,10 @@ async function loadDeals(
         stageChangedAt: d.stageChangedAt,
         createdAt: d.createdAt,
         lostReason: d.lostReason,
+        signed:
+          d.signatures.length > 0 || d.documents.some((doc) => doc.uploadedVia !== "generated"),
+        sent: d.submissions.length > 0,
+        linkSent: d.webApplications.length > 0,
         whatsapp: d.whatsapp?.status ?? null,
       })),
       error: null,
@@ -87,21 +121,114 @@ async function loadDeals(
   }
 }
 
-const STAGE_LABEL: Partial<Record<DealStage, string>> = {
-  INTAKE: "Intake",
-  DOCS_REQUESTED: "Docs requested",
-  DOCS_RECEIVED: "Docs received",
-  PRE_UNDERWRITING: "Scrubbed",
-  READY_TO_SUBMIT: "Ready to submit",
-  SUBMITTED: "Submitted",
-  OFFERS_RECEIVED: "Offers",
-  OFFER_ACCEPTED: "Offer accepted",
-  STIPS: "Stips",
-  CONTRACT_OUT: "Contract out",
-  FUNDED: "Funded",
-};
+/** Which column a deal sits in: the preparing stages split by whether it is signed and unsent. */
+function columnOf(d: BoardDeal): string {
+  const col = COLUMNS.find((c) => c.stages.includes(d.stage));
+  if (!col) return "preparing";
+  if (col.key === "preparing" || col.key === "ready")
+    return d.signed && !d.sent ? "ready" : "preparing";
+  return col.key;
+}
 
-const money = (n: number) => `${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+function daysIn(d: Date): string {
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  return days <= 0 ? "today" : `${days}d`;
+}
+
+export default async function DealBoardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
+  const user = await requireUser();
+  const { show } = await searchParams;
+  if (show === "closed") return <ClosedDeals tenantId={user.tenantId} />;
+  const { deals, error } = await loadDeals(user.tenantId, OPEN_STAGES);
+  const open = deals.filter((d) => d.stage !== "FUNDED" && d.stage !== "RENEWAL_ELIGIBLE");
+  const pipeline = open.reduce((a, d) => a + (d.requestedAmount ?? 0), 0);
+  return (
+    <>
+      <header className="page-head">
+        <div>
+          <h1>Deals</h1>
+          <p>
+            {open.length} open · {money(pipeline)} requested in the pipeline
+          </p>
+        </div>
+        <span className="row">
+          <a className="small muted" href="/?show=closed">
+            Closed deals
+          </a>
+          <a className="button primary" href="/deals/new">
+            New deal
+          </a>
+        </span>
+      </header>
+      {error ? (
+        <p className="notice error">
+          Database not reachable ({error}). On the server, run{" "}
+          <code>sudo bash /opt/ascend-crm/deploy/oracle/update.sh</code> (see README).
+        </p>
+      ) : null}
+      <div className="board">
+        {COLUMNS.map((col) => {
+          const inColumn = deals.filter((d) => columnOf(d) === col.key);
+          return (
+            <section className="column" key={col.key}>
+              <h3 title={col.hint}>
+                {col.label}
+                <span className="count">{inColumn.length}</span>
+              </h3>
+              {inColumn.length === 0 ? <p className="empty">No deals</p> : null}
+              {inColumn.map((d) => (
+                <a className="card" key={d.id} href={`/deals/${d.id}`}>
+                  <span className="name">{d.merchantName}</span>
+                  {d.merchantName === READING_PLACEHOLDER &&
+                  Date.now() - d.createdAt.getTime() > READING_STALE_MS ? (
+                    <span className="tag attention">Application not read · open to retry</span>
+                  ) : null}
+                  {col.key === "preparing" && !d.signed && d.linkSent ? (
+                    <span className="tag">Waiting for the merchant to sign</span>
+                  ) : null}
+                  {col.key === "ready" && d.stage === "PRE_UNDERWRITING" ? (
+                    <span className="tag">Scrubbed</span>
+                  ) : null}
+                  {d.whatsapp ? (
+                    <span
+                      className={`tag wa ${["HANDOFF", "ABANDONED"].includes(d.whatsapp) ? "attention" : ""}`}
+                    >
+                      {WA_LABEL[d.whatsapp] ?? "WhatsApp"}
+                    </span>
+                  ) : null}
+                  <span className="amount">
+                    {d.requestedAmount ? (
+                      money(d.requestedAmount)
+                    ) : (
+                      <span className="faint">amount tbd</span>
+                    )}
+                  </span>
+                  <span className="meta">
+                    <span>
+                      {d.paperGrade ? (
+                        <span className={`grade ${d.paperGrade}`}>{d.paperGrade}</span>
+                      ) : null}{" "}
+                      {d.ownerName ?? ""}
+                    </span>
+                    <span className="faint" title="Time in this stage">
+                      {daysIn(d.stageChangedAt)}
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </>
+  );
+}
 
 /** Deals taken off the board (dead or declined), newest first, each one a click away. */
 async function ClosedDeals({ tenantId }: { tenantId: string }) {
@@ -149,98 +276,6 @@ async function ClosedDeals({ tenantId }: { tenantId: string }) {
           </table>
         </div>
       ) : null}
-    </>
-  );
-}
-
-function daysIn(d: Date): string {
-  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  return days <= 0 ? "today" : `${days}d`;
-}
-
-export default async function DealBoardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ show?: string }>;
-}) {
-  const user = await requireUser();
-  const { show } = await searchParams;
-  if (show === "closed") return <ClosedDeals tenantId={user.tenantId} />;
-  const { deals, error } = await loadDeals(user.tenantId, STAGES);
-  const open = deals.filter((d) => d.stage !== "FUNDED");
-  const pipeline = open.reduce((a, d) => a + (d.requestedAmount ?? 0), 0);
-  return (
-    <>
-      <header className="page-head">
-        <div>
-          <h1>Deals</h1>
-          <p>
-            {open.length} open · {money(pipeline)} requested in the pipeline
-          </p>
-        </div>
-        <span className="row">
-          <a className="small muted" href="/?show=closed">
-            Closed deals
-          </a>
-          <a className="button primary" href="/deals/new">
-            New deal
-          </a>
-        </span>
-      </header>
-      {error ? (
-        <p className="notice error">
-          Database not reachable ({error}). On the server, run{" "}
-          <code>sudo bash /opt/ascend-crm/deploy/oracle/update.sh</code> (see README).
-        </p>
-      ) : null}
-      <div className="board">
-        {STAGES.map((stage) => {
-          const inStage = deals.filter((d) => d.stage === stage);
-          return (
-            <section className="column" key={stage}>
-              <h3>
-                {STAGE_LABEL[stage] ?? stage}
-                <span className="count">{inStage.length}</span>
-              </h3>
-              {inStage.length === 0 ? <p className="empty">No deals</p> : null}
-              {inStage.map((d) => (
-                <a className="card" key={d.id} href={`/deals/${d.id}`}>
-                  <span className="name">{d.merchantName}</span>
-                  {d.merchantName === READING_PLACEHOLDER &&
-                  Date.now() - d.createdAt.getTime() > READING_STALE_MS ? (
-                    <span className="tag attention">Application not read · open to retry</span>
-                  ) : null}
-                  {d.whatsapp ? (
-                    <span
-                      className={`tag wa ${["HANDOFF", "ABANDONED"].includes(d.whatsapp) ? "attention" : ""}`}
-                    >
-                      {WA_LABEL[d.whatsapp] ?? "WhatsApp"}
-                    </span>
-                  ) : null}
-                  <span className="amount">
-                    {d.requestedAmount ? (
-                      money(d.requestedAmount)
-                    ) : (
-                      <span className="faint">amount tbd</span>
-                    )}
-                  </span>
-                  <span className="meta">
-                    <span>
-                      {d.paperGrade ? (
-                        <span className={`grade ${d.paperGrade}`}>{d.paperGrade}</span>
-                      ) : null}{" "}
-                      {d.ownerName ?? ""}
-                    </span>
-                    <span className="faint" title="Time in this stage">
-                      {daysIn(d.stageChangedAt)}
-                    </span>
-                  </span>
-                </a>
-              ))}
-            </section>
-          );
-        })}
-      </div>
     </>
   );
 }

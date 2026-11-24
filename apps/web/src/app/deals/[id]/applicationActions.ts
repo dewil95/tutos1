@@ -220,7 +220,7 @@ export async function signHereNow(dealId: string, form: FormData) {
     const token = await createWebApplication(prisma, {
       tenantId: user.tenantId,
       dealId,
-      origin: "team",
+      origin: "internal",
     });
     const result = await signWebApplication(prisma, token, {
       name: "",
