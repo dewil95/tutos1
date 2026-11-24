@@ -1,4 +1,5 @@
 import { buildRecipients } from "@mca/connectors";
+import { MIN_REQUESTED_AMOUNT } from "./applicationData";
 import { asList, type Funder, type FunderProgram, type PrismaClient, type Tenant } from "@mca/db";
 import {
   rankFunders,
@@ -170,7 +171,11 @@ export function dealProfile(input: {
       : null,
     ficoEstimate: null,
     existingPositions: input.existingPositions,
-    requestedAmount: input.requestedAmount,
+    // A misread "$1" must not rule every lender out for "requested below min advance".
+    requestedAmount:
+      input.requestedAmount && input.requestedAmount >= MIN_REQUESTED_AMOUNT
+        ? input.requestedAmount
+        : null,
     state: input.state,
     naics: input.naics,
     industry: input.industry ?? null,
