@@ -1495,3 +1495,44 @@ ul.habits {
 .lenders-rest ul.lenders {
   margin-top: 8px;
 }
+
+/* A panel that folds (Timeline, More settings): the heading is the summary. */
+details.panel > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  list-style: none;
+}
+details.panel > summary::-webkit-details-marker {
+  display: none;
+}
+details.panel > summary h2 {
+  margin: 0;
+}
+details.panel > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 12px;
+}
+details.panel[open] > summary::before {
+  content: "▾";
+}
+details.panel[open] > summary {
+  margin-bottom: 12px;
+}
+details.more-settings > .panel {
+  box-shadow: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+details.thread {
+  margin-top: 6px;
+}
+details.thread ul.timeline {
+  margin-top: 6px;
+}

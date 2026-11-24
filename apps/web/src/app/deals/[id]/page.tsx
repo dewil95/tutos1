@@ -8,7 +8,7 @@ import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { nextStep } from "@/server/nextStep";
-import { latestOffer, latestReply, loggedActivityIds } from "@/server/replies";
+import { latestOffer, latestReply, loggedActivityIds, repliesFor } from "@/server/replies";
 import { positionsToText } from "@/server/submissions";
 import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
@@ -494,6 +494,27 @@ export default async function DealPage({
                         ) : (
                           "—"
                         )}
+                        {(() => {
+                          const thread = repliesFor(s.rawStatusLog, replies);
+                          return thread.length > 1 ? (
+                            <details className="thread">
+                              <summary className="small muted">
+                                Thread ({thread.length} replies)
+                              </summary>
+                              <ul className="timeline small">
+                                {thread.map(({ a, r }) => (
+                                  <li key={a.id} className="inbound">
+                                    <span className="muted">
+                                      {a.occurredAt.toLocaleString("en-US")} ·{" "}
+                                      {r.intent.replace(/_/g, " ").toLowerCase()}
+                                    </span>
+                                    <div>{r.summary}</div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ) : null;
+                        })()}
                         {s.status === "APPROVED" && s.gmailThreadId ? (
                           <ContractRequestForm
                             dealId={id}
@@ -698,9 +719,15 @@ export default async function DealPage({
         error={riskError}
       />
 
-      <section className="panel" id="timeline">
-        <h2>Timeline</h2>
-        {activities.length === 0 ? <p className="empty">No emails yet.</p> : null}
+      <details className="panel" id="timeline">
+        <summary>
+          <h2>Timeline</h2>
+          <span className="small muted">
+            {activities.length === 0
+              ? "No emails yet."
+              : `${activities.length} email${activities.length === 1 ? "" : "s"} on this deal, newest first.`}
+          </span>
+        </summary>
         <ul className="timeline">
           {activities.map((a) => (
             <li key={a.id} className={a.direction === "INBOUND" ? "inbound" : ""}>
@@ -715,7 +742,7 @@ export default async function DealPage({
             </li>
           ))}
         </ul>
-      </section>
+      </details>
     </>
   );
 }
