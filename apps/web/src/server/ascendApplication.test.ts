@@ -1,6 +1,10 @@
 import { decryptSecret, getPrisma, purgeTenant, type PrismaClient } from "@mca/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { databaseReady } from "./testDb";
+import type { OwnerPii } from "./ascendApplication";
+import type { Draft } from "./whatsapp/questions";
+import type { OwnerPii } from "./ascendApplication";
+import type { Draft } from "./whatsapp/questions";
 
 // Synthetic merchant only: "another company's" application as a mocked A5 reading.
 const READING = {
@@ -66,6 +70,7 @@ const {
   applicationUploadToPdf,
   dealApplication,
   missingFields,
+  missingInputs,
   renderDealApplication,
 } = await import("./ascendApplication");
 const { handleApplicationRead } = await import("./jobs/applicationRead");
@@ -101,6 +106,42 @@ describe("Ascend application helpers", () => {
     await expect(
       applicationUploadToPdf([{ name: "a.docx", type: "application/msword", data: png }]),
     ).rejects.toThrow(/PDF, or JPG\/PNG/);
+  });
+
+  it("turns what is missing into the inputs that fill it, named like the full form", () => {
+    const draft = {
+      business: { legalName: "Sample Tacos LLC", address: {} },
+      request: {},
+      owners: [{ firstName: "Ana", lastName: "Diaz", address: {} }],
+    } as unknown as Draft;
+    const missing = missingInputs(draft, [{ ssn: null, dob: null } as unknown as OwnerPii]);
+    expect(missing.map((m) => m.label)).toEqual([
+      "EIN (tax ID)",
+      "Business start date",
+      "Business address",
+      "Amount requested",
+      "Ownership %",
+      "Owner's home address",
+      "Owner SSN",
+      "Owner date of birth",
+    ]);
+    expect(missing.flatMap((m) => m.inputs.map((i) => i.name))).toEqual([
+      "ein",
+      "startDate",
+      "line1",
+      "city",
+      "state",
+      "postalCode",
+      "amount",
+      "pct-0",
+      "line1-0",
+      "city-0",
+      "state-0",
+      "postalCode-0",
+      "ssn-0",
+      "dob-0",
+    ]);
+    expect(missingFields(draft, [])).toHaveLength(8);
   });
 
   it("lists what the application still needs", () => {

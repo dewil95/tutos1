@@ -204,15 +204,66 @@ const REQUIRED = [
   "owners.0.address",
 ];
 
+/** One input of the application form (same names as the full form, so one action saves both). */
+export interface MissingInput {
+  name: string;
+  label: string;
+  type?: "date" | "numeric";
+  size?: number;
+}
+/** A required detail still missing, with the inputs that fill it. */
+export interface MissingField {
+  label: string;
+  inputs: MissingInput[];
+}
+
+const INPUTS: Record<string, MissingInput[]> = {
+  "business.legalName": [{ name: "legalName", label: "Legal name" }],
+  "business.ein": [{ name: "ein", label: "EIN", type: "numeric", size: 12 }],
+  "business.startDate": [{ name: "startDate", label: "Start date", type: "date" }],
+  "business.address": [
+    { name: "line1", label: "Address" },
+    { name: "city", label: "City" },
+    { name: "state", label: "State", size: 3 },
+    { name: "postalCode", label: "ZIP", size: 6 },
+  ],
+  "request.amount": [{ name: "amount", label: "Amount requested", type: "numeric", size: 10 }],
+  "owners.0.name": [
+    { name: "firstName-0", label: "First name" },
+    { name: "lastName-0", label: "Last name" },
+  ],
+  "owners.0.ownershipPct": [{ name: "pct-0", label: "Ownership %", type: "numeric", size: 4 }],
+  "owners.0.address": [
+    { name: "line1-0", label: "Home address" },
+    { name: "city-0", label: "City" },
+    { name: "state-0", label: "State", size: 3 },
+    { name: "postalCode-0", label: "ZIP", size: 6 },
+  ],
+};
+
+/** Required application details the deal is still missing, each with the inputs to fill it. */
+export function missingInputs(draft: Draft, pii: OwnerPii[]): MissingField[] {
+  const empty = (v: unknown) => v === undefined || v === null || v === "";
+  const out = FIELDS.filter((f) => REQUIRED.includes(f.key) && empty(f.get(draft))).map((f) => ({
+    label: f.label.en,
+    inputs: INPUTS[f.key] ?? [],
+  }));
+  if (!pii[0]?.ssn)
+    out.push({
+      label: "Owner SSN",
+      inputs: [{ name: "ssn-0", label: "SSN", type: "numeric", size: 12 }],
+    });
+  if (!pii[0]?.dob)
+    out.push({
+      label: "Owner date of birth",
+      inputs: [{ name: "dob-0", label: "Date of birth", type: "date" }],
+    });
+  return out;
+}
+
 /** Required application fields the deal is still missing (labels for the deal page). */
 export function missingFields(draft: Draft, pii: OwnerPii[]): string[] {
-  const empty = (v: unknown) => v === undefined || v === null || v === "";
-  const out = FIELDS.filter((f) => REQUIRED.includes(f.key) && empty(f.get(draft))).map(
-    (f) => f.label.en,
-  );
-  if (!pii[0]?.ssn) out.push("Owner SSN");
-  if (!pii[0]?.dob) out.push("Owner date of birth");
-  return out;
+  return missingInputs(draft, pii).map((m) => m.label);
 }
 
 /** The unsigned Ascend application for a deal, with an empty signature line. */

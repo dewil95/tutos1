@@ -3,7 +3,7 @@ import type { PositionLine } from "@mca/connectors";
 import { asList, getPrisma, type DocumentType } from "@mca/db";
 import type { BankMetrics } from "@mca/domain";
 import { notFound } from "next/navigation";
-import { dealApplication, missingFields } from "@/server/ascendApplication";
+import { dealApplication, missingInputs } from "@/server/ascendApplication";
 import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
@@ -218,7 +218,7 @@ export default async function DealPage({
     }),
   });
 
-  const missing = missingFields(application.draft, application.pii);
+  const missing = missingInputs(application.draft, application.pii);
   // Sending is one click: the top 5 recommended lenders come ticked; lenders outside appetite
   // or already sent sit under a fold instead of pushing the Send button off the screen.
   const shown = rows.filter((r) => !r.already && !r.problem && r.eligible);
@@ -241,7 +241,7 @@ export default async function DealPage({
   const next = nextStep({
     stage: deal.stage,
     reading: reading?.state ?? null,
-    missing,
+    missing: missing.map((m) => m.label),
     signed: !!signedCopy,
     signatureFromUploadPending: !!signedAtUpload,
     statements: documents.filter((d) => d.type === "BANK_STATEMENT").length,
