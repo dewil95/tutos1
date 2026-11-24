@@ -238,23 +238,62 @@ export async function renderDealApplication(
 
 const PHOTO = /^image\/(jpe?g|png)$/;
 
+/** The files uploaded do not make one document; `code` picks the message in the merchant's language. */
+export class UploadShapeError extends Error {
+  constructor(
+    public readonly code: "onepdf" | "mixed" | "apptype",
+    message: string,
+  ) {
+    super(message);
+    this.name = "UploadShapeError";
+  }
+}
+
 /** The application as one PDF: the PDF itself, or the page photos joined in order. */
 export async function applicationUploadToPdf(
   files: { name: string; type: string; data: Buffer }[],
 ): Promise<{ fileName: string; data: Buffer }> {
   const pdfs = files.filter((f) => f.type === "application/pdf");
-  if (pdfs.length > 1) throw new Error("Upload one application PDF (or photos of its pages).");
+  if (pdfs.length > 1)
+    throw new UploadShapeError("onepdf", "Upload one application PDF (or photos of its pages).");
   if (pdfs.length === 1) {
     if (files.length > 1)
-      throw new Error("Upload either the PDF or photos of the pages, not both.");
+      throw new UploadShapeError(
+        "mixed",
+        "Upload either the PDF or photos of the pages, not both.",
+      );
     return { fileName: pdfs[0]!.name, data: pdfs[0]!.data };
   }
   if (!files.every((f) => PHOTO.test(f.type))) {
-    throw new Error("The application must be a PDF, or JPG/PNG photos of its pages.");
+    throw new UploadShapeError(
+      "apptype",
+      "The application must be a PDF, or JPG/PNG photos of its pages.",
+    );
   }
   const n = files.length;
   return {
     fileName: `Application photos (${n} page${n === 1 ? "" : "s"}).pdf`,
     data: await imagesToPdf(files.map((f) => ({ mimeType: f.type, data: f.data }))),
   };
+}
+
+/**
+ * Bank statements as PDFs: the PDFs as they are, and any photos (phones ignore the file picker's
+ * PDF filter) joined into one PDF so they are scrubbed instead of silently dropped.
+ */
+export async function statementUploadsToPdfs(
+  files: { name: string; type: string; data: Buffer }[],
+): Promise<{ name: string; type: string; data: Buffer }[]> {
+  const pdfs = files.filter((f) => f.type === "application/pdf");
+  const photos = files.filter((f) => PHOTO.test(f.type));
+  if (photos.length === 0) return pdfs;
+  const n = photos.length;
+  return [
+    ...pdfs,
+    {
+      name: `Bank statement photos (${n} page${n === 1 ? "" : "s"}).pdf`,
+      type: "application/pdf",
+      data: await imagesToPdf(photos.map((f) => ({ mimeType: f.type, data: f.data }))),
+    },
+  ];
 }
