@@ -8,6 +8,7 @@ import { requireUser } from "@/server/auth";
 import { defaultPackage } from "@/server/documents";
 import { emailDryRun } from "@/server/env";
 import { nextStep } from "@/server/nextStep";
+import { latestOffer, latestReply, loggedActivityIds } from "@/server/replies";
 import { positionsToText } from "@/server/submissions";
 import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
 import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
@@ -185,6 +186,16 @@ export default async function DealPage({
     submissions.filter((s) => s.status !== "WITHDRAWN").map((s) => s.funderId),
   );
   const thisDealSubs = submissions.filter((s) => s.dealId === id);
+  // A busy deal has more than 60 activities: the replies the status log points at are loaded
+  // by id, so an approval from three weeks ago still shows its terms.
+  const loggedIds = thisDealSubs.flatMap((s) => loggedActivityIds(s.rawStatusLog));
+  const missingReplies = loggedIds.filter((aid) => !activities.some((a) => a.id === aid));
+  const replies = missingReplies.length
+    ? [
+        ...activities,
+        ...(await prisma.activity.findMany({ where: { id: { in: missingReplies } } })),
+      ]
+    : activities;
   const positions = (deal.submissionPositions ?? []) as unknown as PositionLine[];
 
   const metrics = analysis?.metrics as unknown as BankMetrics | undefined;
@@ -225,17 +236,12 @@ export default async function DealPage({
   const rest = rows.filter((r) => !shown.includes(r));
   const recommended = new Set(shown.slice(0, 5).map((r) => r.funder.id));
 
-  const replyFor = (submissionId: string) =>
-    activities
-      .filter((a) => a.aiSummary)
-      .map((a) => ({ a, r: a.aiSummary as unknown as FunderReply }))
-      .find(({ a }) =>
-        (
-          (thisDealSubs.find((s) => s.id === submissionId)?.rawStatusLog ?? []) as {
-            activityId?: string;
-          }[]
-        ).some((e) => e.activityId === a.id),
-      );
+  const logOf = (submissionId: string) =>
+    thisDealSubs.find((s) => s.id === submissionId)?.rawStatusLog ?? [];
+  /** What the lender said last. */
+  const replyFor = (submissionId: string) => latestReply(logOf(submissionId), replies);
+  /** The reply that carries the terms, even when a later email was only an acknowledgement. */
+  const offerFor = (submissionId: string) => latestOffer(logOf(submissionId), replies);
 
   // The one line at the top: what is going on and the single thing to do about it.
   const next = nextStep({
@@ -250,7 +256,7 @@ export default async function DealPage({
     contractsRequested: deal.soldAmount !== null,
     submissions: thisDealSubs.map((s) => {
       const reply = replyFor(s.id);
-      const offer = reply?.r.offers[0];
+      const offer = offerFor(s.id)?.r.offers[0];
       return {
         funder: s.funder.name,
         status: s.status,
@@ -395,6 +401,7 @@ export default async function DealPage({
                 {thisDealSubs.map((s) => {
                   const job = jobs.find((j) => j.dedupeKey === `send:${s.id}`);
                   const reply = replyFor(s.id);
+                  const offer = offerFor(s.id);
                   return (
                     <tr key={s.id}>
                       <td>{s.funder.name}</td>
@@ -437,10 +444,10 @@ export default async function DealPage({
                                 Forwarded to {reply.r.forwardedToAlternateFunder} for pricing.
                               </div>
                             ) : null}
-                            {reply.r.offers.length ? (
+                            {offer?.r.offers.length ? (
                               <table className="offers">
                                 <tbody>
-                                  {reply.r.offers.map((o, i) => (
+                                  {offer.r.offers.map((o, i) => (
                                     <tr key={i}>
                                       <td>{money(o.advanceAmount)}</td>
                                       <td>{o.factorRate}</td>
@@ -466,9 +473,13 @@ export default async function DealPage({
                                 </tbody>
                               </table>
                             ) : null}
-                            {reply.r.offers.length ? (
+                            {offer?.r.offers.length ? (
                               <div className="muted">
-                                AI-read offer — check against the email before quoting.
+                                AI-read offer
+                                {offer.a.id !== reply.a.id
+                                  ? ` from ${offer.a.occurredAt.toLocaleDateString("en-US")}`
+                                  : ""}{" "}
+                                — check against the email before quoting.
                               </div>
                             ) : null}
                             {reply.r.intent === "FUNDED" &&
@@ -487,8 +498,10 @@ export default async function DealPage({
                           <ContractRequestForm
                             dealId={id}
                             submissionId={s.id}
-                            merchantEmail={deal.merchant.email}
-                            offer={reply?.r.offers[0] ?? null}
+                            merchantEmail={
+                              deal.merchant.email ?? deal.merchant.owners[0]?.email ?? null
+                            }
+                            offer={offer?.r.offers[0] ?? null}
                             stipFiles={allDocuments
                               .filter(
                                 (d) => d.type === "VOIDED_CHECK" || d.type === "DRIVERS_LICENSE",

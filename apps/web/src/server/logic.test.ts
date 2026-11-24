@@ -10,6 +10,7 @@ import {
 import { advanceStage, forwardStage, statusForIntent } from "./jobs/parseReply";
 import { dealProfile } from "./lenders";
 import { nextStep, type NextStepInput } from "./nextStep";
+import { latestOffer, latestReply, repliesFor } from "./replies";
 import { parsePositions, positionsToText } from "./submissions";
 
 const funders = [
@@ -178,6 +179,29 @@ describe("next step on the deal page", () => {
     ).toMatchObject({ tone: "bad", title: "All 2 lenders declined." });
     expect(nextStep({ ...base, stage: "DEAD" })).toBeNull();
     expect(nextStep({ ...base, stage: "FUNDED" })?.title).toBe("Funded.");
+  });
+});
+
+describe("which reply speaks for a submission", () => {
+  const act = (id: string, day: number, intent: string, offers: unknown[] = []) => ({
+    id,
+    occurredAt: new Date(2026, 10, day),
+    aiSummary: { intent, summary: `${intent} (${id})`, offers },
+  });
+  const log = [{ activityId: "a1" }, { activityId: "a2" }, { activityId: "a3" }];
+  const activities = [
+    act("a1", 1, "ACKNOWLEDGED"),
+    act("a2", 3, "APPROVED", [{ advanceAmount: 15000, factorRate: 1.45 }]),
+    act("a3", 5, "STIP_REQUEST"),
+    act("other", 6, "APPROVED", [{ advanceAmount: 1 }]), // another submission's reply
+  ];
+
+  it("keeps the offer visible after a later acknowledgement or stip request", () => {
+    expect(repliesFor(log, activities).map((x) => x.a.id)).toEqual(["a3", "a2", "a1"]);
+    expect(latestReply(log, activities)?.a.id).toBe("a3");
+    expect(latestOffer(log, activities)?.a.id).toBe("a2");
+    expect(latestOffer([{ activityId: "a1" }], activities)).toBeUndefined();
+    expect(latestReply(null, activities)).toBeUndefined();
   });
 });
 
