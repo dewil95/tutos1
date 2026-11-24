@@ -1,11 +1,19 @@
 import { ApiError, FileState, ThinkingLevel, type GenerateContentResponse } from "@google/genai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiOutputError, AiRefusalError, AiUnavailableError, type AiRunRecord } from "../llm";
+import {
+  AiOutputError,
+  AiQuotaError,
+  AiRefusalError,
+  AiUnavailableError,
+  type AiRunRecord,
+} from "../llm";
 import { estimateCostUsd } from "../models";
 import { FunderReplySchema } from "../schemas/funderReply";
 import {
   GeminiClient,
+  geminiRetryAfterMs,
+  isRetryableGeminiError,
   geminiResponseSchema,
   geminiThinkingConfig,
   geminiUsage,
@@ -206,13 +214,28 @@ describe("GeminiClient.structured", () => {
   it("retries 429 and 5xx, then succeeds", async () => {
     const generate = vi
       .fn()
-      .mockRejectedValueOnce(new ApiError({ message: "quota", status: 429 }))
+      .mockRejectedValueOnce(new ApiError({ message: "slow down", status: 429 }))
       .mockRejectedValueOnce(new ApiError({ message: "unavailable", status: 503 }))
       .mockResolvedValue(response());
     const client = new GeminiClient({ ai: sdkWith(generate), sleep: async () => undefined });
     const res = await client.structured(call);
     expect(res.data.answer).toBe(42);
     expect(generate).toHaveBeenCalledTimes(3);
+  });
+
+  it("a used-up quota is not retried: it surfaces as AiQuotaError with Google's wait", async () => {
+    const message =
+      '{"error":{"code":429,"message":"You exceeded your current quota. Quota exceeded for metric: generate_content_free_tier_requests, limit: 20, model: gemini-3-flash, description: Generate content requests per day limit exceeded on Free Tier. Please retry in 17h34m5.918s.","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"63245s"}]}}';
+    const generate = vi.fn().mockRejectedValue(new ApiError({ message, status: 429 }));
+    const client = new GeminiClient({ ai: sdkWith(generate), sleep: async () => undefined });
+    const err = await client.structured(call).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AiQuotaError);
+    expect((err as AiQuotaError).retryAfterMs).toBe(63_245_000);
+    expect(generate).toHaveBeenCalledTimes(1);
+    // A plain burst 429 (no quota wording) is still retried.
+    expect(isRetryableGeminiError(new ApiError({ message: "slow down", status: 429 }))).toBe(true);
+    expect(geminiRetryAfterMs(new Error("Please retry in 2m30s"))).toBe(150_000);
+    expect(geminiRetryAfterMs(new Error("requests per day limit exceeded"))).toBe(3_600_000);
   });
 
   it("does not retry a 400 and records the error", async () => {

@@ -16,7 +16,7 @@ import {
 } from "./index";
 import { FUNDER_ROSTER_CSV } from "./funderRoster";
 import { migrationFiles, splitSql, useTestDatabase } from "./testing";
-import { claimJobs, completeJob, enqueueJob, failJob, retryDelayMs } from "./jobs";
+import { claimJobs, completeJob, deferJob, enqueueJob, failJob, retryDelayMs } from "./jobs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -284,6 +284,18 @@ describe("job queue (SQLite)", () => {
     expect(j2!.attempts).toBe(2);
     expect(await failJob(prisma, j2!, "boom again")).toBe("failed");
     expect((await prisma.job.findUniqueOrThrow({ where: { id } })).status).toBe("FAILED");
+  });
+
+  it("defers a job to a later time without spending an attempt", async () => {
+    const id = await enqueueJob(prisma, { tenantId, type: "PARSE_REPLY", payload: {} });
+    const [j] = await claimJobs(prisma, { limit: 1, ids: [id] });
+    expect(j!.attempts).toBe(1);
+    const until = new Date(Date.now() + 3_600_000);
+    await deferJob(prisma, j!, "AI quota used up", until);
+    const row = await prisma.job.findUniqueOrThrow({ where: { id } });
+    expect(row).toMatchObject({ status: "QUEUED", attempts: 0, lastError: "AI quota used up" });
+    expect(row.runAt.getTime()).toBe(until.getTime());
+    expect(await claimJobs(prisma, { limit: 1, ids: [id] })).toEqual([]); // not due yet
   });
 
   it("reclaims jobs stuck in RUNNING after the stale timeout", async () => {
