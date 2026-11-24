@@ -1483,4 +1483,13 @@ ul.habits {
 }
 .other-ways ol.steps {
   margin-top: 10px;
+/* Ship the file: lenders outside appetite or already sent, under a fold below the list. */
+.lenders-rest {
+  margin-top: 12px;
+}
+.lenders-rest > summary {
+  cursor: pointer;
+}
+.lenders-rest ul.lenders {
+  margin-top: 8px;
 }

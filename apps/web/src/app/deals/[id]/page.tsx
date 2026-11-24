@@ -10,7 +10,8 @@ import { emailDryRun } from "@/server/env";
 import { nextStep } from "@/server/nextStep";
 import { positionsToText } from "@/server/submissions";
 import { pendingUploadSignature, reviewSnapshot } from "@/server/webApplication";
-import { appetiteSummary, dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
+import { dealProfile, lenderHistory, lenderRows } from "@/server/lenders";
+import { LenderItem } from "./LenderItem";
 import { SelectTopLenders } from "./SelectTopLenders";
 import { MerchantPanel } from "./MerchantPanel";
 import { DealHeader } from "./DealHeader";
@@ -218,6 +219,12 @@ export default async function DealPage({
   });
 
   const missing = missingFields(application.draft, application.pii);
+  // Sending is one click: the top 5 recommended lenders come ticked; lenders outside appetite
+  // or already sent sit under a fold instead of pushing the Send button off the screen.
+  const shown = rows.filter((r) => !r.already && !r.problem && r.eligible);
+  const rest = rows.filter((r) => !shown.includes(r));
+  const recommended = new Set(shown.slice(0, 5).map((r) => r.funder.id));
+
   const replyFor = (submissionId: string) =>
     activities
       .filter((a) => a.aiSummary)
@@ -572,69 +579,32 @@ export default async function DealPage({
           <div>
             <h3>3. Lenders — one separate email each</h3>
             <p className="small muted">
+              The top 5 recommended are ticked; untick or add as you like. One separate email each:
               To = the lender&apos;s first address · CC = its other addresses + team (
               {asList(tenant.teamCc).join(", ") || "none"}) · never BCC
             </p>
             <SelectTopLenders />
             <ul className="lenders">
-              {rows.map(
-                ({ funder: f, to, cc, problem, already, eligible, score, reasons: all }) => {
-                  const appetite = appetiteSummary(f);
-                  const reasons = all.filter((r) => !appetite.includes(r));
-                  return (
-                    <li
-                      key={f.id}
-                      className={already || problem ? "disabled" : eligible ? "" : "outside"}
-                    >
-                      <div className="lender-head">
-                        <label>
-                          <input
-                            type="checkbox"
-                            name="funderIds"
-                            value={f.id}
-                            disabled={already || !!problem}
-                            data-recommended={!already && !problem && eligible ? "1" : undefined}
-                          />{" "}
-                          <strong>{f.name}</strong>
-                        </label>{" "}
-                        {!already && !problem ? (
-                          <span
-                            className={`score ${eligible ? "fit" : "nofit"}`}
-                            title="Fit score 0-100"
-                          >
-                            {eligible ? `fit ${score}` : "outside appetite"}
-                          </span>
-                        ) : null}
-                        {already ? (
-                          <span className="small muted"> already submitted for this merchant</span>
-                        ) : null}
-                        {problem ? <span className="small error"> {problem}</span> : null}
-                      </div>
-                      {appetite || (reasons.length && !already) ? (
-                        <div className="lender-meta small">
-                          {appetite ? <span className="appetite">{appetite}</span> : null}
-                          {appetite && reasons.length && !already ? " · " : ""}
-                          {reasons.length && !already ? (
-                            <span className={eligible ? "muted" : "warn"}>
-                              {reasons.join(" · ")}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {!problem ? (
-                        <div
-                          className="addr"
-                          title={`To: ${to.join(", ")}${cc.length ? ` · CC: ${cc.join(", ")}` : ""}`}
-                        >
-                          To: {to.join(", ")}
-                          {cc.length ? ` · CC: ${cc.join(", ")}` : ""}
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                },
-              )}
+              {shown.map((row) => (
+                <LenderItem
+                  key={row.funder.id}
+                  row={row}
+                  checked={recommended.has(row.funder.id)}
+                />
+              ))}
             </ul>
+            {rest.length ? (
+              <details className="lenders-rest">
+                <summary className="small muted">
+                  Outside appetite or already sent ({rest.length})
+                </summary>
+                <ul className="lenders">
+                  {rest.map((row) => (
+                    <LenderItem key={row.funder.id} row={row} checked={false} />
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </div>
         </div>
         <div className="ship-actions">
